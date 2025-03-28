@@ -43,10 +43,10 @@ public class AuthController {
 
     @PostMapping("/signin/serviceman")
     public ResponseEntity<?> authenticateServiceman(@Valid @RequestBody LoginDto loginDto) {
-        return authenticate(loginDto, User.UserRole.SERVICEMAN);
+        return authenticate(loginDto);
     }
 
-    private ResponseEntity<?> authenticate(LoginDto loginDto, User.UserRole expectedRole) {
+    private ResponseEntity<?> authenticate(LoginDto loginDto) {
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(loginDto.email(), loginDto.password()));
 

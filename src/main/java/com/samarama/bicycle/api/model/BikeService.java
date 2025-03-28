@@ -8,6 +8,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Column;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -44,6 +45,10 @@ public class BikeService {
     private String openingHours;  // JSON string representation of opening hours
 
     private String description;
+
+    @NotBlank
+    @Size(max = 120)
+    private String password;
 
     private LocalDateTime createdAt = LocalDateTime.now();
 }

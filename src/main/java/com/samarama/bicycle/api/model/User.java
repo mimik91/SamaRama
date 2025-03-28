@@ -6,8 +6,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Column;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.EnumType;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.FetchType;
@@ -26,7 +24,7 @@ import java.util.Set;
 @NoArgsConstructor
 @AllArgsConstructor
 @Entity
-@Table(name = "users")
+@Table(name = "user")
 public class User {
 
     @Id
@@ -54,9 +52,6 @@ public class User {
     @Size(max = 120)
     private String password;
 
-    @Enumerated(EnumType.STRING)
-    private UserRole role;
-
     private boolean verified = false;
 
     private LocalDateTime createdAt = LocalDateTime.now();
@@ -64,7 +59,4 @@ public class User {
     @OneToMany(mappedBy = "owner", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private Set<Bicycle> bicycles = new HashSet<>();
 
-    public enum UserRole {
-        CLIENT, SERVICEMAN
-    }
 }
