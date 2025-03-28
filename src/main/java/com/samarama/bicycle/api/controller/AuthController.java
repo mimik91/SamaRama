@@ -11,9 +11,12 @@ import com.samarama.bicycle.api.repository.UserRepository;
 import com.samarama.bicycle.api.security.JwtUtils;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.AuthenticationProvider;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
@@ -45,46 +48,59 @@ public class AuthController {
 
     @PostMapping("/signin/client")
     public ResponseEntity<?> authenticateClient(@Valid @RequestBody LoginDto loginDto) {
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(loginDto.email(), loginDto.password()));
+        try {
+            Authentication authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(loginDto.email(), loginDto.password()));
 
-        SecurityContextHolder.getContext().setAuthentication(authentication);
-        String jwt = jwtUtils.generateJwtToken(authentication);
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+            String jwt = jwtUtils.generateJwtToken(authentication);
 
-        User user = userRepository.findByEmail(loginDto.email())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+            User user = userRepository.findByEmail(loginDto.email())
+                    .orElseThrow(() -> new UsernameNotFoundException("User not found"));
 
-        Map<String, Object> response = new HashMap<>();
-        response.put("token", jwt);
-        response.put("id", user.getId());
-        response.put("email", user.getEmail());
-        response.put("firstName", user.getFirstName());
-        response.put("lastName", user.getLastName());
+            Map<String, Object> response = new HashMap<>();
+            response.put("token", jwt);
+            response.put("id", user.getId());
+            response.put("email", user.getEmail());
+            response.put("firstName", user.getFirstName());
+            response.put("lastName", user.getLastName());
+            response.put("role", "CLIENT");
 
-        return ResponseEntity.ok(response);
+            return ResponseEntity.ok(response);
+        } catch (BadCredentialsException e) {
+            return ResponseEntity.status(401).body(Map.of("message", "Invalid credentials"));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("message", "Authentication error: " + e.getMessage()));
+        }
     }
 
     @PostMapping("/signin/service")
     public ResponseEntity<?> authenticateService(@Valid @RequestBody LoginDto loginDto) {
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(loginDto.email(), loginDto.password()));
+        try {
+            Authentication authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(loginDto.email(), loginDto.password()));
 
-        SecurityContextHolder.getContext().setAuthentication(authentication);
-        String jwt = jwtUtils.generateJwtToken(authentication);
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+            String jwt = jwtUtils.generateJwtToken(authentication);
 
-        BikeService service = bikeServiceRepository.findByEmail(loginDto.email());
-        if(service == null){
-            throw new BikeServiceNotFoundException(loginDto.email());
+            BikeService service = bikeServiceRepository.findByEmail(loginDto.email()).orElseThrow(new BikeServiceNotFoundException(loginDto.email()));
+
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("token", jwt);
+            response.put("id", service.getId());
+            response.put("email", service.getEmail());
+            response.put("name", service.getName());
+            response.put("role", "SERVICE");
+
+            return ResponseEntity.ok(response);
+        } catch (BadCredentialsException e) {
+            return ResponseEntity.status(401).body(Map.of("message", "Invalid credentials"));
+        } catch (BikeServiceNotFoundException e) {
+            return ResponseEntity.status(404).body(Map.of("message", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("message", "Authentication error: " + e.getMessage()));
         }
-
-        Map<String, Object> response = new HashMap<>();
-        response.put("token", jwt);
-        response.put("id", service.getId());
-        response.put("email", service.getEmail());
-        response.put("name", service.getName());
-        response.put("role", "SERVICE");
-
-        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/signup/client")
@@ -100,7 +116,6 @@ public class AuthController {
         user.setLastName(registrationDto.lastName());
         user.setPhoneNumber(registrationDto.phoneNumber());
         user.setPassword(encoder.encode(registrationDto.password()));
-        // Role CLIENT jest już domyślne w klasie User
 
         userRepository.save(user);
 
@@ -123,8 +138,6 @@ public class AuthController {
         bikeService.setEmail(bikeServiceDto.email());
         bikeService.setDescription(bikeServiceDto.description());
         bikeService.setPassword(encoder.encode(bikeServiceDto.password()));
-
-        // Konwersja openingHours do JSON zostanie obsłużona w kontrolerze BikeServiceController
 
         bikeServiceRepository.save(bikeService);
 

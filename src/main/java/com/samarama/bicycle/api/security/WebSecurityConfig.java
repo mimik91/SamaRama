@@ -4,7 +4,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.PropertySource;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -22,10 +21,14 @@ public class WebSecurityConfig {
 
     private final JwtAuthEntryPoint unauthorizedHandler;
     private final JwtTokenFilter jwtTokenFilter;
+    private final AuthenticationManager authenticationManager;
 
-    public WebSecurityConfig(JwtAuthEntryPoint unauthorizedHandler, JwtTokenFilter jwtTokenFilter) {
+    public WebSecurityConfig(JwtAuthEntryPoint unauthorizedHandler,
+                             JwtTokenFilter jwtTokenFilter,
+                             AuthenticationManager authenticationManager) {
         this.unauthorizedHandler = unauthorizedHandler;
         this.jwtTokenFilter = jwtTokenFilter;
+        this.authenticationManager = authenticationManager;
     }
 
     @Bean
@@ -35,6 +38,8 @@ public class WebSecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth ->
                         auth.requestMatchers("/api/auth/**").permitAll()
+                                .requestMatchers("/api/bike-services").permitAll() // Publiczny dostęp do listy serwisów
+                                .requestMatchers("/api/bike-services/{id}").permitAll() // Publiczny dostęp do pojedynczego serwisu
                                 .requestMatchers("/api/test/**").permitAll()
                                 .requestMatchers("/test").permitAll()
                                 .anyRequest().authenticated()
@@ -47,10 +52,5 @@ public class WebSecurityConfig {
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
-    }
-
-    @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration authConfig) throws Exception {
-        return authConfig.getAuthenticationManager();
     }
 }
