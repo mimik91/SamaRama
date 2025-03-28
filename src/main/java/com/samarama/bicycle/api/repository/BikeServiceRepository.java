@@ -6,4 +6,7 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface BikeServiceRepository extends JpaRepository<BikeService, Long> {
+
+    BikeService findByEmail(String email);
+    Boolean existsByEmail(String email);
 }

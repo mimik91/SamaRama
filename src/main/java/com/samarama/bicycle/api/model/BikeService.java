@@ -1,19 +1,15 @@
 package com.samarama.bicycle.api.model;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.Table;
-import jakarta.persistence.Id;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Column;
+import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Set;
 
 @Data
 @NoArgsConstructor
@@ -39,16 +35,21 @@ public class BikeService {
     private String phoneNumber;
 
     @Email
+    @Column(unique = true)
     private String email;
 
+    @NotBlank
+    private String password;
+
     @Column(columnDefinition = "jsonb")
-    private String openingHours;  // JSON string representation of opening hours
+    private String openingHours;
 
     private String description;
 
-    @NotBlank
-    @Size(max = 120)
-    private String password;
+    private boolean verified = false;
 
     private LocalDateTime createdAt = LocalDateTime.now();
+
+    @OneToMany(mappedBy = "service", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private Set<ServiceRecord> serviceRecords = new HashSet<>();
 }
