@@ -9,6 +9,7 @@ import com.samarama.bicycle.api.repository.UserRepository;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
@@ -41,7 +42,7 @@ public class BicycleController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('CLIENT', 'SERVICEMAN')")
+    @PreAuthorize("hasAnyRole('CLIENT', 'SERVICE')")
     public ResponseEntity<?> addBicycle(@Valid @RequestBody BicycleDto bicycleDto) {
         if (bicycleRepository.existsByFrameNumber(bicycleDto.frameNumber())) {
             return ResponseEntity.badRequest().body(Map.of("message", "Bicycle with this frame number already exists"));
@@ -52,13 +53,18 @@ public class BicycleController {
         bicycle.setBrand(bicycleDto.brand());
         bicycle.setModel(bicycleDto.model());
         bicycle.setType(bicycleDto.type());
+        bicycle.setProductionDate(bicycleDto.productionDate());
 
-        String email = getCurrentUserEmail();
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+        // Sprawdź czy zalogowany użytkownik ma rolę CLIENT
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        boolean isClient = authentication.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .anyMatch(authority -> authority.equals("ROLE_CLIENT"));
 
-        // Only set owner if the user is a client
-        if (user.getRole() == User.UserRole.CLIENT) {
+        if (isClient) {
+            String email = getCurrentUserEmail();
+            User user = userRepository.findByEmail(email)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
             bicycle.setOwner(user);
         }
 
@@ -67,7 +73,7 @@ public class BicycleController {
     }
 
     @GetMapping("/search")
-    @PreAuthorize("hasRole('SERVICEMAN')")
+    @PreAuthorize("hasRole('SERVICE')")
     public ResponseEntity<?> searchBicycleByFrameNumber(@RequestParam String frameNumber) {
         Optional<Bicycle> bicycle = bicycleRepository.findByFrameNumber(frameNumber);
         return bicycle.map(ResponseEntity::ok)

@@ -22,10 +22,8 @@ public class BikeServiceDetailsServiceImpl implements UserDetailsService {
     @Override
     @Transactional
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
-        BikeService service = bikeServiceRepository.findByEmail(email);
-        if(service == null){
-            throw new com.samarama.bicycle.api.exceptions.BikeServiceNotFoundException(email);
-        }
+        BikeService service = bikeServiceRepository.findByEmail(email)
+                .orElseThrow(() -> new com.samarama.bicycle.api.exceptions.BikeServiceNotFoundException(email));
 
         return new org.springframework.security.core.userdetails.User(
                 service.getEmail(),

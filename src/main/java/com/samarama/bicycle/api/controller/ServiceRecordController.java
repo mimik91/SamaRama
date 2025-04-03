@@ -12,6 +12,7 @@ import com.samarama.bicycle.api.repository.UserRepository;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
@@ -32,7 +33,8 @@ public class ServiceRecordController {
 
     public ServiceRecordController(ServiceRecordRepository serviceRecordRepository,
                                    BicycleRepository bicycleRepository,
-                                   UserRepository userRepository, BikeServiceRepository bikeServiceRepository) {
+                                   UserRepository userRepository,
+                                   BikeServiceRepository bikeServiceRepository) {
         this.serviceRecordRepository = serviceRecordRepository;
         this.bicycleRepository = bicycleRepository;
         this.userRepository = userRepository;
@@ -44,14 +46,21 @@ public class ServiceRecordController {
         Bicycle bicycle = bicycleRepository.findById(bicycleId)
                 .orElseThrow(() -> new RuntimeException("Bicycle not found"));
 
-        // Check if user is owner or a serviceman
+        // Sprawdź czy zalogowany użytkownik ma odpowiednie uprawnienia
         String email = getCurrentUserEmail();
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        boolean isService = authentication.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .anyMatch(authority -> authority.equals("ROLE_SERVICE"));
 
-        if (user.getRole() != User.UserRole.SERVICEMAN &&
-                (bicycle.getOwner() == null || !bicycle.getOwner().getId().equals(user.getId()))) {
-            return ResponseEntity.status(403).build();
+        // Jeśli to nie serwis, sprawdź czy to właściciel roweru
+        if (!isService) {
+            User user = userRepository.findByEmail(email)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            if (bicycle.getOwner() == null || !bicycle.getOwner().getId().equals(user.getId())) {
+                return ResponseEntity.status(403).build();
+            }
         }
 
         List<ServiceRecord> records = serviceRecordRepository.findByBicycle(bicycle);
@@ -59,7 +68,7 @@ public class ServiceRecordController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('SERVICEMAN')")
+    @PreAuthorize("hasRole('SERVICE')")
     public ResponseEntity<?> addServiceRecord(@Valid @RequestBody ServiceRecordDto serviceRecordDto) {
         // Validate service date is not more than a month in the past
         LocalDate oneMonthAgo = LocalDate.now().minusMonths(1);

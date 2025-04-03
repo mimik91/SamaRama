@@ -9,9 +9,9 @@ import com.samarama.bicycle.api.model.User;
 import com.samarama.bicycle.api.repository.BikeServiceRepository;
 import com.samarama.bicycle.api.repository.UserRepository;
 import com.samarama.bicycle.api.security.JwtUtils;
+import com.samarama.bicycle.api.utils.SecurityConstants;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -83,8 +83,8 @@ public class AuthController {
             SecurityContextHolder.getContext().setAuthentication(authentication);
             String jwt = jwtUtils.generateJwtToken(authentication);
 
-            BikeService service = bikeServiceRepository.findByEmail(loginDto.email()).orElseThrow(new BikeServiceNotFoundException(loginDto.email()));
-
+            BikeService service = bikeServiceRepository.findByEmail(loginDto.email())
+                    .orElseThrow(() -> BikeServiceNotFoundException.withEmail(loginDto.email()));
 
             Map<String, Object> response = new HashMap<>();
             response.put("token", jwt);
@@ -116,6 +116,7 @@ public class AuthController {
         user.setLastName(registrationDto.lastName());
         user.setPhoneNumber(registrationDto.phoneNumber());
         user.setPassword(encoder.encode(registrationDto.password()));
+        user.addRole(SecurityConstants.ROLE_CLIENT);
 
         userRepository.save(user);
 
