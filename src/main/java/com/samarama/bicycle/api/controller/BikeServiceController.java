@@ -4,12 +4,15 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.samarama.bicycle.api.dto.BikeServiceDto;
 import com.samarama.bicycle.api.model.BikeService;
+import com.samarama.bicycle.api.model.Coordinate;
 import com.samarama.bicycle.api.repository.BikeServiceRepository;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
+
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -37,6 +40,15 @@ public class BikeServiceController {
         Optional<BikeService> service = bikeServiceRepository.findById(id);
         return service.map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/pins")
+    public List<Coordinate> getPins(){
+        List<Coordinate> coordinates = new ArrayList<>();
+        coordinates.add(new Coordinate(50.123531527613174, 19.994590889250954));
+        coordinates.add(new Coordinate(50.04518594733987, 19.969305017836163));
+        coordinates.add(new Coordinate(50.06107845338891, 19.937200299871716));
+        return coordinates;
     }
 
     @PostMapping

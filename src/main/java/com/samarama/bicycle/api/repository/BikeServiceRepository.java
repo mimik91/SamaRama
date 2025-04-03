@@ -8,7 +8,6 @@ import java.util.Optional;
 
 @Repository
 public interface BikeServiceRepository extends JpaRepository<BikeService, Long> {
-
     Optional<BikeService> findByEmail(String email);
     Boolean existsByEmail(String email);
 }
