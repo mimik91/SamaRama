@@ -26,13 +26,21 @@ public class BikeService {
     private String name;
 
     @NotBlank
-    private String address;
+    private String street;
+
+    @NotBlank
+    private String building;
+
+    private String flat;
 
     private String postalCode;
 
+    @NotBlank
     private String city;
 
     private String phoneNumber;
+
+    private String businessPhone;
 
     @Email
     @Column(unique = true)
@@ -44,6 +52,10 @@ public class BikeService {
     @Column(columnDefinition = "jsonb")
     private String openingHours;
 
+    private Double latitude;
+
+    private Double longitude;
+
     private String description;
 
     private boolean verified = false;
@@ -52,4 +64,13 @@ public class BikeService {
 
     @OneToMany(mappedBy = "service", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private Set<ServiceRecord> serviceRecords = new HashSet<>();
+
+    public void setOpeningHours(String openingHours) {
+        // If null or empty, set to empty JSON object
+        if (openingHours == null || openingHours.isBlank()) {
+            this.openingHours = "{}";
+        } else {
+            this.openingHours = openingHours;
+        }
+    }
 }

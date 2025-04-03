@@ -1,5 +1,7 @@
 package com.samarama.bicycle.api.controller;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.samarama.bicycle.api.dto.BikeServiceDto;
 import com.samarama.bicycle.api.dto.LoginDto;
 import com.samarama.bicycle.api.dto.UserRegistrationDto;
@@ -9,7 +11,6 @@ import com.samarama.bicycle.api.model.User;
 import com.samarama.bicycle.api.repository.BikeServiceRepository;
 import com.samarama.bicycle.api.repository.UserRepository;
 import com.samarama.bicycle.api.security.JwtUtils;
-import com.samarama.bicycle.api.utils.SecurityConstants;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -64,7 +65,7 @@ public class AuthController {
             response.put("email", user.getEmail());
             response.put("firstName", user.getFirstName());
             response.put("lastName", user.getLastName());
-            response.put("role", user.getRoles().contains(SecurityConstants.ROLE_CLIENT) ? "CLIENT" : "OTHER_ROLE");
+            response.put("role", "CLIENT");
 
             return ResponseEntity.ok(response);
         } catch (BadCredentialsException e) {
@@ -83,8 +84,7 @@ public class AuthController {
             SecurityContextHolder.getContext().setAuthentication(authentication);
             String jwt = jwtUtils.generateJwtToken(authentication);
 
-            BikeService service = bikeServiceRepository.findByEmail(loginDto.email())
-                    .orElseThrow(() -> BikeServiceNotFoundException.withEmail(loginDto.email()));
+            BikeService service = bikeServiceRepository.findByEmail(loginDto.email()).orElseThrow(() -> new BikeServiceNotFoundException(loginDto.email()));
 
             Map<String, Object> response = new HashMap<>();
             response.put("token", jwt);
@@ -116,7 +116,6 @@ public class AuthController {
         user.setLastName(registrationDto.lastName());
         user.setPhoneNumber(registrationDto.phoneNumber());
         user.setPassword(encoder.encode(registrationDto.password()));
-        user.addRole(SecurityConstants.ROLE_CLIENT);
 
         userRepository.save(user);
 
@@ -130,18 +129,38 @@ public class AuthController {
             return ResponseEntity.badRequest().body(Map.of("message", "Email is already in use!"));
         }
 
-        BikeService bikeService = new BikeService();
-        bikeService.setName(bikeServiceDto.name());
-        bikeService.setAddress(bikeServiceDto.address());
-        bikeService.setPostalCode(bikeServiceDto.postalCode());
-        bikeService.setCity(bikeServiceDto.city());
-        bikeService.setPhoneNumber(bikeServiceDto.phoneNumber());
-        bikeService.setEmail(bikeServiceDto.email());
-        bikeService.setDescription(bikeServiceDto.description());
-        bikeService.setPassword(encoder.encode(bikeServiceDto.password()));
+        try {
+            BikeService bikeService = new BikeService();
+            bikeService.setName(bikeServiceDto.name());
+            bikeService.setStreet(bikeServiceDto.street());
+            bikeService.setBuilding(bikeServiceDto.building());
+            bikeService.setFlat(bikeServiceDto.flat());
+            bikeService.setPostalCode(bikeServiceDto.postalCode());
+            bikeService.setCity(bikeServiceDto.city());
+            bikeService.setPhoneNumber(bikeServiceDto.phoneNumber());
+            bikeService.setBusinessPhone(bikeServiceDto.businessPhone());
+            bikeService.setEmail(bikeServiceDto.email());
+            bikeService.setDescription(bikeServiceDto.description());
+            bikeService.setLatitude(bikeServiceDto.latitude());
+            bikeService.setLongitude(bikeServiceDto.longitude());
+            bikeService.setPassword(encoder.encode(bikeServiceDto.password()));
 
-        bikeServiceRepository.save(bikeService);
+            // Fix for the openingHours JSONB field
+            ObjectMapper objectMapper = new ObjectMapper();
+            String openingHoursJson;
+            if (bikeServiceDto.openingHours() == null || bikeServiceDto.openingHours().isEmpty()) {
+                openingHoursJson = "{}";  // Default empty JSON object
+            } else {
+                openingHoursJson = objectMapper.writeValueAsString(bikeServiceDto.openingHours());
+            }
+            bikeService.setOpeningHours(openingHoursJson);
 
-        return ResponseEntity.ok(Map.of("message", "Bike service registered successfully!"));
+            bikeServiceRepository.save(bikeService);
+            return ResponseEntity.ok(Map.of("message", "Bike service registered successfully!"));
+        } catch (JsonProcessingException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Error processing opening hours data"));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("message", "Registration error: " + e.getMessage()));
+        }
     }
 }

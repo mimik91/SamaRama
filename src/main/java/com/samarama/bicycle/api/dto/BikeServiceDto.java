@@ -8,13 +8,18 @@ import java.util.Map;
 
 public record BikeServiceDto(
         @NotBlank String name,
-        @NotBlank String address,
+        @NotBlank String street,
+        @NotBlank String building,
+        String flat,
         String postalCode,
         String city,
         String phoneNumber,
+        String businessPhone,
         @Email String email,
         Map<String, String>openingHours,
         String description,
+        Double latitude,
+        Double longitude,
         @NotBlank @Size(min = 6) String password
 ) {
 }

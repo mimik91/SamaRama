@@ -4,7 +4,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.samarama.bicycle.api.dto.BikeServiceDto;
 import com.samarama.bicycle.api.model.BikeService;
-import com.samarama.bicycle.api.model.Coordinate;
 import com.samarama.bicycle.api.repository.BikeServiceRepository;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -12,10 +11,10 @@ import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @CrossOrigin(origins = "*", maxAge = 3600)
 @RestController
@@ -43,12 +42,16 @@ public class BikeServiceController {
     }
 
     @GetMapping("/pins")
-    public List<Coordinate> getPins(){
-        List<Coordinate> coordinates = new ArrayList<>();
-        coordinates.add(new Coordinate(50.123531527613174, 19.994590889250954));
-        coordinates.add(new Coordinate(50.04518594733987, 19.969305017836163));
-        coordinates.add(new Coordinate(50.06107845338891, 19.937200299871716));
-        return coordinates;
+    public ResponseEntity<List<com.samarama.bicycle.api.model.Coordinate>> getPins() {
+        // First check if there are services with coordinates in the database
+        List<BikeService> services = bikeServiceRepository.findAll();
+
+        List<com.samarama.bicycle.api.model.Coordinate> coordinates = services.stream()
+                .filter(service -> service.getLatitude() != null && service.getLongitude() != null)
+                .map(service -> new com.samarama.bicycle.api.model.Coordinate(service.getId(), service.getLatitude(), service.getLongitude()))
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(coordinates);
     }
 
     @PostMapping
@@ -57,12 +60,18 @@ public class BikeServiceController {
         try {
             BikeService bikeService = new BikeService();
             bikeService.setName(bikeServiceDto.name());
-            bikeService.setAddress(bikeServiceDto.address());
+            bikeService.setStreet(bikeServiceDto.street());
+            bikeService.setBuilding(bikeServiceDto.building());
+            bikeService.setFlat(bikeServiceDto.flat());
             bikeService.setPostalCode(bikeServiceDto.postalCode());
             bikeService.setCity(bikeServiceDto.city());
             bikeService.setPhoneNumber(bikeServiceDto.phoneNumber());
             bikeService.setEmail(bikeServiceDto.email());
             bikeService.setDescription(bikeServiceDto.description());
+
+            // Set coordinates if provided
+            bikeService.setLatitude(bikeServiceDto.latitude());
+            bikeService.setLongitude(bikeServiceDto.longitude());
 
             // Convert opening hours map to JSON string
             String openingHoursJson = objectMapper.writeValueAsString(bikeServiceDto.openingHours());
@@ -74,6 +83,7 @@ public class BikeServiceController {
             return ResponseEntity.badRequest().body(Map.of("message", "Invalid opening hours format"));
         }
     }
+
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('SERVICEMAN')")
     public ResponseEntity updateBikeService(@PathVariable Long id, @Valid @RequestBody BikeServiceDto bikeServiceDto) {
@@ -86,12 +96,18 @@ public class BikeServiceController {
         try {
             BikeService bikeService = existingService.get();
             bikeService.setName(bikeServiceDto.name());
-            bikeService.setAddress(bikeServiceDto.address());
+            bikeService.setStreet(bikeServiceDto.street());
+            bikeService.setBuilding(bikeServiceDto.building());
+            bikeService.setFlat(bikeService.getFlat());
             bikeService.setPostalCode(bikeServiceDto.postalCode());
             bikeService.setCity(bikeServiceDto.city());
             bikeService.setPhoneNumber(bikeServiceDto.phoneNumber());
             bikeService.setEmail(bikeServiceDto.email());
             bikeService.setDescription(bikeServiceDto.description());
+
+            // Update coordinates if provided
+            bikeService.setLatitude(bikeServiceDto.latitude());
+            bikeService.setLongitude(bikeServiceDto.longitude());
 
             // Convert opening hours map to JSON string
             String openingHoursJson = objectMapper.writeValueAsString(bikeServiceDto.openingHours());
