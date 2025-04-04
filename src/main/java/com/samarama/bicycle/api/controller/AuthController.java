@@ -129,38 +129,26 @@ public class AuthController {
             return ResponseEntity.badRequest().body(Map.of("message", "Email is already in use!"));
         }
 
-        try {
-            BikeService bikeService = new BikeService();
-            bikeService.setName(bikeServiceDto.name());
-            bikeService.setStreet(bikeServiceDto.street());
-            bikeService.setBuilding(bikeServiceDto.building());
-            bikeService.setFlat(bikeServiceDto.flat());
-            bikeService.setPostalCode(bikeServiceDto.postalCode());
-            bikeService.setCity(bikeServiceDto.city());
-            bikeService.setPhoneNumber(bikeServiceDto.phoneNumber());
-            bikeService.setBusinessPhone(bikeServiceDto.businessPhone());
-            bikeService.setEmail(bikeServiceDto.email());
-            bikeService.setDescription(bikeServiceDto.description());
-            bikeService.setLatitude(bikeServiceDto.latitude());
-            bikeService.setLongitude(bikeServiceDto.longitude());
-            bikeService.setPassword(encoder.encode(bikeServiceDto.password()));
 
-            // Fix for the openingHours JSONB field
-            ObjectMapper objectMapper = new ObjectMapper();
-            String openingHoursJson;
-            if (bikeServiceDto.openingHours() == null || bikeServiceDto.openingHours().isEmpty()) {
-                openingHoursJson = "{}";  // Default empty JSON object
-            } else {
-                openingHoursJson = objectMapper.writeValueAsString(bikeServiceDto.openingHours());
-            }
-            bikeService.setOpeningHours(openingHoursJson);
+        BikeService bikeService = new BikeService();
+        bikeService.setName(bikeServiceDto.name());
+        bikeService.setStreet(bikeServiceDto.street());
+        bikeService.setBuilding(bikeServiceDto.building());
+        bikeService.setFlat(bikeServiceDto.flat());
+        bikeService.setPostalCode(bikeServiceDto.postalCode());
+        bikeService.setCity(bikeServiceDto.city());
+        bikeService.setPhoneNumber(bikeServiceDto.phoneNumber());
+        bikeService.setBusinessPhone(bikeServiceDto.businessPhone());
+        bikeService.setEmail(bikeServiceDto.email());
+        bikeService.setDescription(bikeServiceDto.description());
+        bikeService.setLatitude(bikeServiceDto.latitude());
+        bikeService.setLongitude(bikeServiceDto.longitude());
+        bikeService.setPassword(encoder.encode(bikeServiceDto.password()));
 
-            bikeServiceRepository.save(bikeService);
-            return ResponseEntity.ok(Map.of("message", "Bike service registered successfully!"));
-        } catch (JsonProcessingException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Error processing opening hours data"));
-        } catch (Exception e) {
-            return ResponseEntity.status(500).body(Map.of("message", "Registration error: " + e.getMessage()));
-        }
+        bikeService.setOpeningHours(bikeServiceDto.openingHours());
+
+        bikeServiceRepository.save(bikeService);
+
+        return ResponseEntity.ok(Map.of("message", "Bike service registered successfully!"));
     }
 }

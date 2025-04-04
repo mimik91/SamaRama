@@ -1,5 +1,6 @@
 package com.samarama.bicycle.api.model;
 
+import com.samarama.bicycle.api.utils.OpeningHoursConverter;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -50,6 +51,7 @@ public class BikeService {
     private String password;
 
     @Column(columnDefinition = "jsonb")
+    @Convert(converter = OpeningHoursConverter.class)
     private String openingHours;
 
     private Double latitude;

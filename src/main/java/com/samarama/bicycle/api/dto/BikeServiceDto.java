@@ -16,7 +16,7 @@ public record BikeServiceDto(
         String phoneNumber,
         String businessPhone,
         @Email String email,
-        Map<String, String>openingHours,
+        String openingHours,
         String description,
         Double latitude,
         Double longitude,
