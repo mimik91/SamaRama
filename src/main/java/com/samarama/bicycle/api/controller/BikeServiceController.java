@@ -10,14 +10,20 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
+
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 @CrossOrigin(origins = "*", maxAge = 3600)
 @RestController
 @RequestMapping("/api/bike-services")
 public class BikeServiceController {
+    private static final Logger logger = Logger.getLogger(BikeServiceController.class.getName());
+
     private final BikeServiceRepository bikeServiceRepository;
     private final OpeningHoursRepository openingHoursRepository;
 
@@ -27,15 +33,15 @@ public class BikeServiceController {
         this.openingHoursRepository = openingHoursRepository;
     }
 
-    @GetMapping
-    public ResponseEntity<List<BikeService>> getAllBikeServices() {
-        List<BikeService> services = bikeServiceRepository.findAll();
-        return ResponseEntity.ok(services);
-    }
-
     @GetMapping("/{id}")
     public ResponseEntity<BikeService> getBikeServiceById(@PathVariable Long id) {
+        logger.info("Pobieranie serwisu o ID: " + id);
         Optional<BikeService> service = bikeServiceRepository.findById(id);
+        if (service.isPresent()) {
+            logger.info("Znaleziono serwis: " + service.get().getName());
+        } else {
+            logger.warning("Nie znaleziono serwisu o ID: " + id);
+        }
         return service.map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }

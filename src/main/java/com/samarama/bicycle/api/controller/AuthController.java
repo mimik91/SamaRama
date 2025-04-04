@@ -162,35 +162,4 @@ public class AuthController {
             return ResponseEntity.status(500).body(Map.of("message", "Registration error: " + e.getMessage()));
         }
     }
-
-    @PutMapping("/{id}/opening-hours")
-    @PreAuthorize("hasRole('SERVICEMAN')")
-    public ResponseEntity<?> updateOpeningHours(@PathVariable Long id, @RequestBody Map<String, String> openingHours) {
-        Optional<BikeService> bikeServiceOpt = bikeServiceRepository.findById(id);
-        if (bikeServiceOpt.isEmpty()) {
-            return ResponseEntity.notFound().build();
-        }
-
-        BikeService bikeService = bikeServiceOpt.get();
-        OpeningHours hours = bikeService.getOpeningHours();
-
-        if (hours == null) {
-            hours = new OpeningHours();
-            hours.setBikeService(bikeService);
-        }
-
-        // Update the opening hours
-        hours.setMonday(openingHours.get("monday"));
-        hours.setTuesday(openingHours.get("tuesday"));
-        hours.setWednesday(openingHours.get("wednesday"));
-        hours.setThursday(openingHours.get("thursday"));
-        hours.setFriday(openingHours.get("friday"));
-        hours.setSaturday(openingHours.get("saturday"));
-        hours.setSunday(openingHours.get("sunday"));
-
-        bikeService.setOpeningHours(hours);
-        bikeServiceRepository.save(bikeService);
-
-        return ResponseEntity.ok(Map.of("message", "Opening hours updated successfully"));
-    }
 }

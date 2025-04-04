@@ -1,5 +1,6 @@
 package com.samarama.bicycle.api.model;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -26,5 +27,6 @@ public class OpeningHours {
 
     @OneToOne
     @JoinColumn(name = "bike_service_id")
+    @JsonBackReference // To rozwiązuje problem nieskończonej rekurencji
     private BikeService bikeService;
 }

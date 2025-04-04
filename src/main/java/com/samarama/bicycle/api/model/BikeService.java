@@ -1,5 +1,8 @@
 package com.samarama.bicycle.api.model;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -47,9 +50,11 @@ public class BikeService {
     private String email;
 
     @NotBlank
+    @JsonIgnore // Ignoruj hasło podczas serializacji
     private String password;
 
     @OneToOne(mappedBy = "bikeService", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonManagedReference // To rozwiązuje problem nieskończonej rekurencji
     private OpeningHours openingHours;
 
     private Double latitude;
@@ -63,5 +68,6 @@ public class BikeService {
     private LocalDateTime createdAt = LocalDateTime.now();
 
     @OneToMany(mappedBy = "service", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonIgnore // Ignorujemy serwisowe rekordy w zwykłym wyniku API
     private Set<ServiceRecord> serviceRecords = new HashSet<>();
 }

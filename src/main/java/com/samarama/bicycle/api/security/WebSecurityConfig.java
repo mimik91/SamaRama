@@ -36,6 +36,7 @@ public class WebSecurityConfig {
                         auth.requestMatchers("/api/auth/**").permitAll()
                                 .requestMatchers("/api/bike-services").permitAll()
                                 .requestMatchers("/api/bike-services/{id}").permitAll()
+                                .requestMatchers("/api/map/**").permitAll()
                                 .requestMatchers("/api/test/**").permitAll()
                                 .requestMatchers("/test").permitAll()
                                 .anyRequest().authenticated()
