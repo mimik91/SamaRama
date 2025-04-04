@@ -1,6 +1,5 @@
 package com.samarama.bicycle.api.model;
 
-import com.samarama.bicycle.api.utils.OpeningHoursConverter;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -50,9 +49,8 @@ public class BikeService {
     @NotBlank
     private String password;
 
-    @Column(columnDefinition = "jsonb")
-    @Convert(converter = OpeningHoursConverter.class)
-    private String openingHours;
+    @OneToOne(mappedBy = "bikeService", cascade = CascadeType.ALL, orphanRemoval = true)
+    private OpeningHours openingHours;
 
     private Double latitude;
 
@@ -66,13 +64,4 @@ public class BikeService {
 
     @OneToMany(mappedBy = "service", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private Set<ServiceRecord> serviceRecords = new HashSet<>();
-
-    public void setOpeningHours(String openingHours) {
-        // If null or empty, set to empty JSON object
-        if (openingHours == null || openingHours.isBlank()) {
-            this.openingHours = "{}";
-        } else {
-            this.openingHours = openingHours;
-        }
-    }
 }
