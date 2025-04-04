@@ -11,6 +11,7 @@ public record BikeServiceDto(
         String flat,
         String postalCode,
         String city,
+        @Size(min = 9, max = 9)
         String phoneNumber,
         String businessPhone,
         @Email String email,
