@@ -1,1 +1,0 @@
-ALTER TABLE bicycles ALTER COLUMN frame_number DROP NOT NULL;

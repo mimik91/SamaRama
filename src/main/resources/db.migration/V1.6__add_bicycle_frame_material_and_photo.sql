@@ -1,2 +1,0 @@
-ALTER TABLE bicycles ADD COLUMN frame_material VARCHAR(100);
-ALTER TABLE bicycles ADD COLUMN photo BYTEA;
