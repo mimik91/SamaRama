@@ -53,9 +53,16 @@ public class AuthController {
     @PostMapping("/signin/client")
     public ResponseEntity<?> authenticateClient(@Valid @RequestBody LoginDto loginDto) {
         try {
-            Authentication authentication = authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(loginDto.email(), loginDto.password()));
+            // Utwórz token uwierzytelniania z dodatkowymi informacjami o kontekście
+            UsernamePasswordAuthenticationToken authToken =
+                    new UsernamePasswordAuthenticationToken(loginDto.email(), loginDto.password());
 
+            // Dodaj informację o kontekście
+            Map<String, String> details = new HashMap<>();
+            details.put("loginContext", "client");
+            authToken.setDetails(details);
+
+            Authentication authentication = authenticationManager.authenticate(authToken);
             SecurityContextHolder.getContext().setAuthentication(authentication);
             String jwt = jwtUtils.generateJwtToken(authentication);
 
@@ -81,9 +88,16 @@ public class AuthController {
     @PostMapping("/signin/service")
     public ResponseEntity<?> authenticateService(@Valid @RequestBody LoginDto loginDto) {
         try {
-            Authentication authentication = authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(loginDto.email(), loginDto.password()));
+            // Utwórz token uwierzytelniania z dodatkowymi informacjami o kontekście
+            UsernamePasswordAuthenticationToken authToken =
+                    new UsernamePasswordAuthenticationToken(loginDto.email(), loginDto.password());
 
+            // Dodaj informację o kontekście
+            Map<String, String> details = new HashMap<>();
+            details.put("loginContext", "service");
+            authToken.setDetails(details);
+
+            Authentication authentication = authenticationManager.authenticate(authToken);
             SecurityContextHolder.getContext().setAuthentication(authentication);
             String jwt = jwtUtils.generateJwtToken(authentication);
 
