@@ -1,0 +1,5 @@
+ALTER TABLE bicycles
+  ALTER COLUMN photo DROP NOT NULL;
+
+ALTER TABLE bicycles
+  ALTER COLUMN photo TYPE bytea USING CASE WHEN photo IS NULL THEN NULL ELSE photo::bytea END;

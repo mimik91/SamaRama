@@ -1,5 +1,6 @@
 package com.samarama.bicycle.api.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import jakarta.persistence.Id;
@@ -12,10 +13,13 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Lob;
+import jakarta.persistence.Basic;
+import jakarta.persistence.FetchType;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.DynamicInsert;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -27,13 +31,13 @@ import java.util.Set;
 @AllArgsConstructor
 @Entity
 @Table(name = "bicycles")
+@DynamicInsert // Dodaje tylko niepuste pola do zapytania INSERT
 public class Bicycle {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Usunięto ograniczenie NotBlank dla frameNumber
     @Column(unique = true)
     private String frameNumber;
 
@@ -47,7 +51,8 @@ public class Bicycle {
     private String frameMaterial;
 
     @Lob
-    @Column(name = "photo", columnDefinition = "BYTEA")
+    @Basic(fetch = FetchType.LAZY)
+    @Column(columnDefinition = "bytea")
     private byte[] photo;
 
     @ManyToOne(fetch = FetchType.LAZY)

@@ -1,0 +1,1 @@
+ALTER TABLE bicycles ALTER COLUMN framenumber DROP NOT NULL;

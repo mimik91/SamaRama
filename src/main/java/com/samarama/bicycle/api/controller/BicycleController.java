@@ -1,7 +1,6 @@
 package com.samarama.bicycle.api.controller;
 
 import com.samarama.bicycle.api.dto.BicycleDto;
-import com.samarama.bicycle.api.dto.BicyclePhotoDto;
 import com.samarama.bicycle.api.model.Bicycle;
 import com.samarama.bicycle.api.model.User;
 import com.samarama.bicycle.api.repository.BicycleRepository;
@@ -15,8 +14,17 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import jakarta.persistence.Query;
+import jakarta.transaction.Transactional;
 import jakarta.validation.Valid;
 import java.io.IOException;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -27,6 +35,9 @@ import java.util.Optional;
 public class BicycleController {
     private final BicycleRepository bicycleRepository;
     private final UserRepository userRepository;
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     public BicycleController(BicycleRepository bicycleRepository, UserRepository userRepository) {
         this.bicycleRepository = bicycleRepository;
@@ -46,6 +57,7 @@ public class BicycleController {
 
     @PostMapping
     @PreAuthorize("hasAnyRole('CLIENT', 'SERVICE')")
+    @Transactional
     public ResponseEntity<?> addBicycle(@Valid @RequestBody BicycleDto bicycleDto) {
         // Pobierz informacje o zalogowanym użytkowniku
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -57,45 +69,68 @@ public class BicycleController {
                 .map(GrantedAuthority::getAuthority)
                 .anyMatch(authority -> authority.equals("ROLE_SERVICE"));
 
-        Bicycle bicycle = new Bicycle();
+        // Używamy natywnego SQL, aby mieć pełną kontrolę nad zapytaniem INSERT
+        // i pominąć problematyczną kolumnę photo
+        String sql = "INSERT INTO bicycles(brand, model, type, framematerial, framenumber, owner_id, createdat, productiondate) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
 
-        // Sprawdź i ustaw numer ramy tylko jeśli użytkownik jest serwisantem
-        if (isService) {
-            if (bicycleDto.frameNumber() != null && !bicycleDto.frameNumber().isEmpty()) {
-                // Sprawdź czy podany numer ramy jest już zajęty
+        try {
+            // Walidacja numeru ramy
+            if (isService && bicycleDto.frameNumber() != null && !bicycleDto.frameNumber().isEmpty()) {
                 if (bicycleRepository.existsByFrameNumber(bicycleDto.frameNumber())) {
                     return ResponseEntity.badRequest().body(Map.of("message", "Bicycle with this frame number already exists"));
                 }
-                bicycle.setFrameNumber(bicycleDto.frameNumber());
+            } else if (isClient && bicycleDto.frameNumber() != null && !bicycleDto.frameNumber().isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Clients cannot set frame number. This is reserved for service"));
             }
-            // Jeśli serwisant nie podał numeru ramy, pole zostaje null (co jest teraz dozwolone)
-        } else if (isClient && bicycleDto.frameNumber() != null && !bicycleDto.frameNumber().isEmpty()) {
-            // Jeśli klient próbuje podać numer ramy, zwróć błąd
-            return ResponseEntity.badRequest().body(Map.of("message", "Clients cannot set frame number. This is reserved for service"));
+
+            // Znajdź identyfikator właściciela
+            Long ownerId = null;
+            if (isClient) {
+                String email = getCurrentUserEmail();
+                User user = userRepository.findByEmail(email)
+                        .orElseThrow(() -> new RuntimeException("User not found"));
+                ownerId = user.getId();
+            }
+
+            // Wykonaj zapytanie natywne z pominięciem kolumny photo
+            Object[] params = new Object[] {
+                    bicycleDto.brand(),
+                    bicycleDto.model(),
+                    bicycleDto.type(),
+                    bicycleDto.frameMaterial(),
+                    isService ? bicycleDto.frameNumber() : null,
+                    ownerId,
+                    Timestamp.valueOf(LocalDateTime.now()),
+                    bicycleDto.productionDate() != null ? java.sql.Date.valueOf(bicycleDto.productionDate()) : null
+            };
+
+            // Wykonaj zapytanie i pobierz wygenerowany ID
+            Query query = entityManager.createNativeQuery(sql);
+            for (int i = 0; i < params.length; i++) {
+                query.setParameter(i + 1, params[i]);
+            }
+
+            int rowsAffected = query.executeUpdate();
+
+            if (rowsAffected > 0) {
+                // Pobierz ID ostatnio wstawionego roweru
+                Long bicycleId = (Long) entityManager.createNativeQuery(
+                                "SELECT currval('bicycles_id_seq')")
+                        .getSingleResult();
+
+                return ResponseEntity.ok(Map.of(
+                        "message", "Bicycle added successfully",
+                        "bicycleId", bicycleId,
+                        "frameNumber", isService && bicycleDto.frameNumber() != null ? bicycleDto.frameNumber() : ""
+                ));
+            } else {
+                return ResponseEntity.badRequest().body(Map.of("message", "Failed to add bicycle"));
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body(Map.of("message", "Error adding bicycle: " + e.getMessage()));
         }
-        // Jeśli klient nie podał numeru ramy, pole frameNumber pozostaje null
-
-        // Pozostałe pola
-        bicycle.setBrand(bicycleDto.brand());
-        bicycle.setModel(bicycleDto.model());
-        bicycle.setType(bicycleDto.type());
-        bicycle.setFrameMaterial(bicycleDto.frameMaterial());
-        bicycle.setProductionDate(bicycleDto.productionDate());
-
-        // Przypisanie właściciela jeśli zalogowany jest klient
-        if (isClient) {
-            String email = getCurrentUserEmail();
-            User user = userRepository.findByEmail(email)
-                    .orElseThrow(() -> new RuntimeException("User not found"));
-            bicycle.setOwner(user);
-        }
-
-        bicycleRepository.save(bicycle);
-        return ResponseEntity.ok(Map.of(
-                "message", "Bicycle added successfully",
-                "bicycleId", bicycle.getId(),
-                "frameNumber", bicycle.getFrameNumber() != null ? bicycle.getFrameNumber() : ""
-        ));
     }
 
     @PostMapping(value = "/{id}/photo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -126,9 +161,21 @@ public class BicycleController {
         }
 
         try {
-            bicycle.setPhoto(photo.getBytes());
-            bicycleRepository.save(bicycle);
-            return ResponseEntity.ok(Map.of("message", "Photo uploaded successfully"));
+            // Używamy natywnego SQL do aktualizacji tylko kolumny photo
+            byte[] photoData = photo.getBytes();
+
+            // Aktualizuj za pomocą natywnego zapytania SQL
+            int updated = entityManager.createNativeQuery(
+                            "UPDATE bicycles SET photo = ? WHERE id = ?")
+                    .setParameter(1, photoData)
+                    .setParameter(2, id)
+                    .executeUpdate();
+
+            if (updated > 0) {
+                return ResponseEntity.ok(Map.of("message", "Photo uploaded successfully"));
+            } else {
+                return ResponseEntity.badRequest().body(Map.of("message", "Failed to update photo"));
+            }
         } catch (IOException e) {
             return ResponseEntity.badRequest().body(Map.of("message", "Error processing photo: " + e.getMessage()));
         }

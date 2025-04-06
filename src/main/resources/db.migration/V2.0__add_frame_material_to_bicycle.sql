@@ -1,0 +1,1 @@
+ALTER TABLE bicycles ADD COLUMN frame_material VARCHAR(50);
