@@ -47,24 +47,42 @@ public class BicycleController {
     @PostMapping
     @PreAuthorize("hasAnyRole('CLIENT', 'SERVICE')")
     public ResponseEntity<?> addBicycle(@Valid @RequestBody BicycleDto bicycleDto) {
-        if (bicycleRepository.existsByFrameNumber(bicycleDto.frameNumber())) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Bicycle with this frame number already exists"));
-        }
+        // Pobierz informacje o zalogowanym użytkowniku
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        boolean isClient = authentication.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .anyMatch(authority -> authority.equals("ROLE_CLIENT"));
+
+        boolean isService = authentication.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .anyMatch(authority -> authority.equals("ROLE_SERVICE"));
 
         Bicycle bicycle = new Bicycle();
-        bicycle.setFrameNumber(bicycleDto.frameNumber());
+
+        // Sprawdź i ustaw numer ramy tylko jeśli użytkownik jest serwisantem
+        if (isService) {
+            if (bicycleDto.frameNumber() == null || bicycleDto.frameNumber().isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Frame number is required for service users"));
+            }
+
+            if (bicycleRepository.existsByFrameNumber(bicycleDto.frameNumber())) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Bicycle with this frame number already exists"));
+            }
+
+            bicycle.setFrameNumber(bicycleDto.frameNumber());
+        } else if (isClient && bicycleDto.frameNumber() != null && !bicycleDto.frameNumber().isEmpty()) {
+            // Jeśli klient próbuje podać numer ramy, zwróć błąd
+            return ResponseEntity.badRequest().body(Map.of("message", "Clients cannot set frame number. This is reserved for service"));
+        }
+
+        // Pozostałe pola
         bicycle.setBrand(bicycleDto.brand());
         bicycle.setModel(bicycleDto.model());
         bicycle.setType(bicycleDto.type());
         bicycle.setFrameMaterial(bicycleDto.frameMaterial());
         bicycle.setProductionDate(bicycleDto.productionDate());
 
-        // Sprawdź czy zalogowany użytkownik ma rolę CLIENT
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        boolean isClient = authentication.getAuthorities().stream()
-                .map(GrantedAuthority::getAuthority)
-                .anyMatch(authority -> authority.equals("ROLE_CLIENT"));
-
+        // Przypisanie właściciela jeśli zalogowany jest klient
         if (isClient) {
             String email = getCurrentUserEmail();
             User user = userRepository.findByEmail(email)
@@ -163,5 +181,33 @@ public class BicycleController {
     private String getCurrentUserEmail() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         return authentication.getName();
+    }
+
+    @PatchMapping("/{id}/frame-number")
+    @PreAuthorize("hasRole('SERVICE')")
+    public ResponseEntity<?> updateFrameNumber(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> payload) {
+
+        String frameNumber = payload.get("frameNumber");
+        if (frameNumber == null || frameNumber.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Frame number is required"));
+        }
+
+        // Sprawdź, czy numer ramy jest już używany
+        if (bicycleRepository.existsByFrameNumber(frameNumber)) {
+            return ResponseEntity.badRequest().body(Map.of("message", "This frame number is already in use"));
+        }
+
+        Optional<Bicycle> bicycleOpt = bicycleRepository.findById(id);
+        if (bicycleOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        Bicycle bicycle = bicycleOpt.get();
+        bicycle.setFrameNumber(frameNumber);
+        bicycleRepository.save(bicycle);
+
+        return ResponseEntity.ok(Map.of("message", "Frame number added successfully"));
     }
 }

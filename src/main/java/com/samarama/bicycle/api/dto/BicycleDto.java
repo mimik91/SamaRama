@@ -5,7 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 import java.time.LocalDate;
 
 public record BicycleDto(
-        @NotBlank String frameNumber,
+        String frameNumber, // Usuń @NotBlank
         @NotBlank String brand,
         String model,
         String type,
