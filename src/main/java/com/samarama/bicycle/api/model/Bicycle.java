@@ -11,6 +11,7 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.Lob;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -42,6 +43,14 @@ public class Bicycle {
     private String model;
 
     private String type;
+
+    // Nowe pole - materiał ramy
+    private String frameMaterial;
+
+    // Nowe pole - zdjęcie roweru
+    @Lob
+    @Column(name = "photo", columnDefinition = "BYTEA")
+    private byte[] photo;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "owner_id")

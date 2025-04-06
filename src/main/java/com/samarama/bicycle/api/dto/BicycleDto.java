@@ -9,6 +9,7 @@ public record BicycleDto(
         @NotBlank String brand,
         String model,
         String type,
+        String frameMaterial,
         LocalDate productionDate
 ) {
 }
