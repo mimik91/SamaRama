@@ -61,19 +61,19 @@ public class BicycleController {
 
         // Sprawdź i ustaw numer ramy tylko jeśli użytkownik jest serwisantem
         if (isService) {
-            if (bicycleDto.frameNumber() == null || bicycleDto.frameNumber().isEmpty()) {
-                return ResponseEntity.badRequest().body(Map.of("message", "Frame number is required for service users"));
+            if (bicycleDto.frameNumber() != null && !bicycleDto.frameNumber().isEmpty()) {
+                // Sprawdź czy podany numer ramy jest już zajęty
+                if (bicycleRepository.existsByFrameNumber(bicycleDto.frameNumber())) {
+                    return ResponseEntity.badRequest().body(Map.of("message", "Bicycle with this frame number already exists"));
+                }
+                bicycle.setFrameNumber(bicycleDto.frameNumber());
             }
-
-            if (bicycleRepository.existsByFrameNumber(bicycleDto.frameNumber())) {
-                return ResponseEntity.badRequest().body(Map.of("message", "Bicycle with this frame number already exists"));
-            }
-
-            bicycle.setFrameNumber(bicycleDto.frameNumber());
+            // Jeśli serwisant nie podał numeru ramy, pole zostaje null (co jest teraz dozwolone)
         } else if (isClient && bicycleDto.frameNumber() != null && !bicycleDto.frameNumber().isEmpty()) {
             // Jeśli klient próbuje podać numer ramy, zwróć błąd
             return ResponseEntity.badRequest().body(Map.of("message", "Clients cannot set frame number. This is reserved for service"));
         }
+        // Jeśli klient nie podał numeru ramy, pole frameNumber pozostaje null
 
         // Pozostałe pola
         bicycle.setBrand(bicycleDto.brand());
@@ -93,7 +93,8 @@ public class BicycleController {
         bicycleRepository.save(bicycle);
         return ResponseEntity.ok(Map.of(
                 "message", "Bicycle added successfully",
-                "bicycleId", bicycle.getId()
+                "bicycleId", bicycle.getId(),
+                "frameNumber", bicycle.getFrameNumber() != null ? bicycle.getFrameNumber() : ""
         ));
     }
 

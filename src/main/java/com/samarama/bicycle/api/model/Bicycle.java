@@ -33,6 +33,7 @@ public class Bicycle {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    // Usunięto ograniczenie NotBlank dla frameNumber
     @Column(unique = true)
     private String frameNumber;
 
@@ -43,10 +44,8 @@ public class Bicycle {
 
     private String type;
 
-    // Nowe pole - materiał ramy
     private String frameMaterial;
 
-    // Nowe pole - zdjęcie roweru
     @Lob
     @Column(name = "photo", columnDefinition = "BYTEA")
     private byte[] photo;
