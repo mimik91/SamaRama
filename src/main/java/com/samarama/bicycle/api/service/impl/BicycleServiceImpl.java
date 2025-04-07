@@ -49,8 +49,6 @@ public class BicycleServiceImpl implements BicycleService {
     @Override
     @Transactional
     public ResponseEntity<Map<String, Object>> addBicycle(BicycleDto bicycleDto, boolean isClient, boolean isService) {
-        // Using native SQL to have full control over the INSERT query
-        // and skip the problematic photo column
         String sql = "INSERT INTO bicycles(brand, model, type, framematerial, framenumber, owner_id, createdat, productiondate) " +
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
 
