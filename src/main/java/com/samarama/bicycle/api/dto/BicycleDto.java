@@ -6,7 +6,7 @@ import java.time.LocalDate;
 
 public record BicycleDto(
         String frameNumber,
-        @NotBlank String brand,
+        String brand,
         String model,
         String type,
         String frameMaterial,

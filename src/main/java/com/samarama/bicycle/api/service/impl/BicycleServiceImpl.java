@@ -117,24 +117,34 @@ public class BicycleServiceImpl implements BicycleService {
             return ResponseEntity.badRequest().body(Map.of("message", "Photo exceeds maximum size of 1MB"));
         }
 
+        // Validate file type
+        String contentType = photo.getContentType();
+        if (contentType == null || !contentType.startsWith("image/")) {
+            return ResponseEntity.badRequest().body(Map.of("message", "File must be an image"));
+        }
+
         try {
-            // Use native SQL to update only the photo column
+            // Pobierz dane zdjęcia
             byte[] photoData = photo.getBytes();
 
-            // Update using native SQL query
-            int updated = entityManager.createNativeQuery(
-                            "UPDATE bicycles SET photo = ? WHERE id = ?")
-                    .setParameter(1, photoData)
-                    .setParameter(2, id)
-                    .executeUpdate();
+            // Utwórz nowy obiekt Bicycle tylko do aktualizacji zdjęcia
+            // Dzięki temu unikniemy problemów z innymi polami
+            Bicycle photoUpdate = new Bicycle();
+            photoUpdate.setId(bicycle.getId());
+            photoUpdate.setPhoto(photoData);
 
-            if (updated > 0) {
-                return ResponseEntity.ok(Map.of("message", "Photo uploaded successfully"));
-            } else {
-                return ResponseEntity.badRequest().body(Map.of("message", "Failed to update photo"));
-            }
-        } catch (IOException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Error processing photo: " + e.getMessage()));
+            // Wykonaj częściową aktualizację za pomocą EntityManager
+            entityManager.merge(photoUpdate);
+
+            return ResponseEntity.ok(Map.of(
+                    "message", "Photo uploaded successfully",
+                    "bicycleId", bicycle.getId()
+            ));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body(Map.of(
+                    "message", "Error processing photo: " + e.getMessage()
+            ));
         }
     }
 
