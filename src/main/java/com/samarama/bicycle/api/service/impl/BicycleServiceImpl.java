@@ -49,11 +49,7 @@ public class BicycleServiceImpl implements BicycleService {
     @Override
     @Transactional
     public ResponseEntity<Map<String, Object>> addBicycle(BicycleDto bicycleDto, boolean isClient, boolean isService) {
-        String sql = "INSERT INTO bicycles(brand, model, type, framematerial, framenumber, owner_id, createdat, productiondate) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
-
         try {
-            // Validate frame number
             if (isService && bicycleDto.frameNumber() != null && !bicycleDto.frameNumber().isEmpty()) {
                 if (bicycleRepository.existsByFrameNumber(bicycleDto.frameNumber())) {
                     return ResponseEntity.badRequest().body(Map.of("message", "Bicycle with this frame number already exists"));
@@ -62,49 +58,35 @@ public class BicycleServiceImpl implements BicycleService {
                 return ResponseEntity.badRequest().body(Map.of("message", "Clients cannot set frame number. This is reserved for service"));
             }
 
-            // Find owner ID
-            Long ownerId = null;
+            Bicycle bicycle = new Bicycle();
+            bicycle.setBrand(bicycleDto.brand());
+            bicycle.setModel(bicycleDto.model());
+            bicycle.setType(bicycleDto.type());
+            bicycle.setFrameMaterial(bicycleDto.frameMaterial());
+            bicycle.setProductionDate(bicycleDto.productionDate());
+            bicycle.setCreatedAt(LocalDateTime.now());
+
+            // Set frame number if service
+            if (isService) {
+                bicycle.setFrameNumber(bicycleDto.frameNumber());
+            }
+
+            // Set owner if client
             if (isClient) {
                 String email = getCurrentUserEmail();
                 User user = userRepository.findByEmail(email)
                         .orElseThrow(() -> new RuntimeException("User not found"));
-                ownerId = user.getId();
+                bicycle.setOwner(user);
             }
 
-            // Execute native query skipping the photo column
-            Object[] params = new Object[] {
-                    bicycleDto.brand(),
-                    bicycleDto.model(),
-                    bicycleDto.type(),
-                    bicycleDto.frameMaterial(),
-                    isService ? bicycleDto.frameNumber() : null,
-                    ownerId,
-                    Timestamp.valueOf(LocalDateTime.now()),
-                    bicycleDto.productionDate() != null ? java.sql.Date.valueOf(bicycleDto.productionDate()) : null
-            };
+            // Save the bicycle
+            Bicycle savedBicycle = bicycleRepository.save(bicycle);
 
-            // Execute query and get generated ID
-            Query query = entityManager.createNativeQuery(sql);
-            for (int i = 0; i < params.length; i++) {
-                query.setParameter(i + 1, params[i]);
-            }
-
-            int rowsAffected = query.executeUpdate();
-
-            if (rowsAffected > 0) {
-                // Get ID of the last inserted bicycle
-                Long bicycleId = (Long) entityManager.createNativeQuery(
-                                "SELECT currval('bicycles_id_seq')")
-                        .getSingleResult();
-
-                return ResponseEntity.ok(Map.of(
-                        "message", "Bicycle added successfully",
-                        "bicycleId", bicycleId,
-                        "frameNumber", isService && bicycleDto.frameNumber() != null ? bicycleDto.frameNumber() : ""
-                ));
-            } else {
-                return ResponseEntity.badRequest().body(Map.of("message", "Failed to add bicycle"));
-            }
+            return ResponseEntity.ok(Map.of(
+                    "message", "Bicycle added successfully",
+                    "bicycleId", savedBicycle.getId(),
+                    "frameNumber", isService && bicycleDto.frameNumber() != null ? bicycleDto.frameNumber() : ""
+            ));
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.badRequest().body(Map.of("message", "Error adding bicycle: " + e.getMessage()));
