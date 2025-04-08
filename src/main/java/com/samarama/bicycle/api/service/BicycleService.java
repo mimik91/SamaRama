@@ -75,4 +75,11 @@ public interface BicycleService {
      * @return response with the result of the operation
      */
     ResponseEntity<?> updateFrameNumber(Long id, String frameNumber);
+
+    /**
+     * Delete a bicycle's photo
+     * @param id the bicycle ID
+     * @return response with the result of the operation
+     */
+    ResponseEntity<?> deleteBicyclePhoto(Long id);
 }

@@ -10,7 +10,8 @@ public record BicycleResponseDto(
         String model,
         String type,
         String frameMaterial,
-        LocalDate productionDate
+        LocalDate productionDate,
+        boolean hasPhoto
 ) {
     public static BicycleResponseDto fromEntity(Bicycle entity) {
         return new BicycleResponseDto(
@@ -20,7 +21,8 @@ public record BicycleResponseDto(
                 entity.getModel(),
                 entity.getType(),
                 entity.getFrameMaterial(),
-                entity.getProductionDate()
+                entity.getProductionDate(),
+                entity.getPhoto() != null && entity.getPhoto().getPhotoData() != null
         );
     }
 }

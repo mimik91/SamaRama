@@ -67,6 +67,12 @@ public class BicycleController {
         return bicycleService.getBicyclePhoto(id);
     }
 
+    @DeleteMapping("/{id}/photo")
+    @PreAuthorize("hasRole('CLIENT')")
+    public ResponseEntity<?> deleteBicyclePhoto(@PathVariable Long id) {
+        return bicycleService.deleteBicyclePhoto(id);
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('CLIENT')")
     public ResponseEntity<?> deleteBicycle(@PathVariable Long id) {

@@ -2,13 +2,12 @@ package com.samarama.bicycle.api.service.impl;
 
 import com.samarama.bicycle.api.dto.BicycleDto;
 import com.samarama.bicycle.api.model.Bicycle;
+import com.samarama.bicycle.api.model.BicyclePhoto;
 import com.samarama.bicycle.api.model.User;
+import com.samarama.bicycle.api.repository.BicyclePhotoRepository;
 import com.samarama.bicycle.api.repository.BicycleRepository;
 import com.samarama.bicycle.api.repository.UserRepository;
 import com.samarama.bicycle.api.service.BicycleService;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
-import jakarta.persistence.Query;
 import jakarta.transaction.Transactional;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -18,7 +17,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -27,13 +25,14 @@ import java.util.Optional;
 @Service
 public class BicycleServiceImpl implements BicycleService {
     private final BicycleRepository bicycleRepository;
+    private final BicyclePhotoRepository bicyclePhotoRepository;
     private final UserRepository userRepository;
 
-    @PersistenceContext
-    private EntityManager entityManager;
-
-    public BicycleServiceImpl(BicycleRepository bicycleRepository, UserRepository userRepository) {
+    public BicycleServiceImpl(BicycleRepository bicycleRepository,
+                              BicyclePhotoRepository bicyclePhotoRepository,
+                              UserRepository userRepository) {
         this.bicycleRepository = bicycleRepository;
+        this.bicyclePhotoRepository = bicyclePhotoRepository;
         this.userRepository = userRepository;
     }
 
@@ -127,20 +126,27 @@ public class BicycleServiceImpl implements BicycleService {
             // Pobierz dane zdjęcia
             byte[] photoData = photo.getBytes();
 
-            // Utwórz nowy obiekt Bicycle tylko do aktualizacji zdjęcia
-            // Dzięki temu unikniemy problemów z innymi polami
-            Bicycle photoUpdate = new Bicycle();
-            photoUpdate.setId(bicycle.getId());
-            photoUpdate.setPhoto(photoData);
+            // Sprawdź, czy rower już ma zdjęcie
+            BicyclePhoto bicyclePhoto = bicycle.getPhoto();
 
-            // Wykonaj częściową aktualizację za pomocą EntityManager
-            entityManager.merge(photoUpdate);
+            if (bicyclePhoto == null) {
+                // Jeśli nie ma, utwórz nowe
+                bicyclePhoto = new BicyclePhoto();
+                bicyclePhoto.setBicycle(bicycle);
+                bicycle.setPhoto(bicyclePhoto);
+            }
+
+            // Ustaw dane zdjęcia
+            bicyclePhoto.setPhotoFromFile(photoData, contentType, photo.getSize());
+
+            // Zapisz zdjęcie
+            bicyclePhotoRepository.save(bicyclePhoto);
 
             return ResponseEntity.ok(Map.of(
                     "message", "Photo uploaded successfully",
                     "bicycleId", bicycle.getId()
             ));
-        } catch (Exception e) {
+        } catch (IOException e) {
             e.printStackTrace();
             return ResponseEntity.badRequest().body(Map.of(
                     "message", "Error processing photo: " + e.getMessage()
@@ -150,15 +156,27 @@ public class BicycleServiceImpl implements BicycleService {
 
     @Override
     public ResponseEntity<?> getBicyclePhoto(Long id) {
-        Optional<Bicycle> bicycleOpt = bicycleRepository.findById(id);
-        if (bicycleOpt.isEmpty() || bicycleOpt.get().getPhoto() == null) {
+        Optional<BicyclePhoto> photoOpt = bicyclePhotoRepository.findByBicycleId(id);
+
+        if (photoOpt.isEmpty() || photoOpt.get().getPhotoData() == null) {
             return ResponseEntity.notFound().build();
         }
 
-        Bicycle bicycle = bicycleOpt.get();
+        BicyclePhoto photo = photoOpt.get();
+
+        // Określ typ mediów na podstawie zapisanego contentType lub domyślnie JPEG
+        MediaType mediaType = MediaType.IMAGE_JPEG;
+        if (photo.getContentType() != null && !photo.getContentType().isEmpty()) {
+            try {
+                mediaType = MediaType.parseMediaType(photo.getContentType());
+            } catch (Exception e) {
+                // Jeśli nie można sparsować typu, zostajemy przy domyślnym
+            }
+        }
+
         return ResponseEntity.ok()
-                .contentType(MediaType.IMAGE_JPEG)
-                .body(bicycle.getPhoto());
+                .contentType(mediaType)
+                .body(photo.getPhotoData());
     }
 
     @Override
@@ -270,6 +288,36 @@ public class BicycleServiceImpl implements BicycleService {
         bicycleRepository.save(bicycle);
 
         return ResponseEntity.ok(Map.of("message", "Frame number added successfully"));
+    }
+
+    @Override
+    @Transactional
+    public ResponseEntity<?> deleteBicyclePhoto(Long id) {
+        Optional<Bicycle> bicycleOpt = bicycleRepository.findById(id);
+        if (bicycleOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        Bicycle bicycle = bicycleOpt.get();
+
+        // Check if the bicycle belongs to the user
+        String email = getCurrentUserEmail();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (bicycle.getOwner() == null || !bicycle.getOwner().getId().equals(user.getId())) {
+            return ResponseEntity.status(403).body(Map.of("message", "You do not have permission to delete this bicycle's photo"));
+        }
+
+        // Usuń zdjęcie, jeśli istnieje
+        if (bicycle.getPhoto() != null) {
+            bicyclePhotoRepository.delete(bicycle.getPhoto());
+            bicycle.setPhoto(null);
+            bicycleRepository.save(bicycle);
+            return ResponseEntity.ok(Map.of("message", "Photo deleted successfully"));
+        } else {
+            return ResponseEntity.ok(Map.of("message", "No photo to delete"));
+        }
     }
 
     private String getCurrentUserEmail() {

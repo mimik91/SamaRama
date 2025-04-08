@@ -2,19 +2,7 @@ package com.samarama.bicycle.api.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Table;
-import jakarta.persistence.Id;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Column;
-import jakarta.persistence.CascadeType;
-import jakarta.persistence.OneToMany;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.Lob;
-import jakarta.persistence.Basic;
+import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -31,7 +19,7 @@ import java.util.Set;
 @AllArgsConstructor
 @Entity
 @Table(name = "bicycles")
-@DynamicInsert // Dodaje tylko niepuste pola do zapytania INSERT
+@DynamicInsert
 @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Bicycle {
 
@@ -51,11 +39,8 @@ public class Bicycle {
 
     private String frameMaterial;
 
-    @Lob
-    @Basic(fetch = FetchType.LAZY)
-    @Column(columnDefinition = "bytea")
-    @JsonIgnore
-    private byte[] photo;
+    @OneToOne(mappedBy = "bicycle", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private BicyclePhoto photo;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "owner_id")
@@ -69,4 +54,8 @@ public class Bicycle {
     @OneToMany(mappedBy = "bicycle", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @JsonIgnore
     private Set<ServiceRecord> serviceRecords = new HashSet<>();
+
+    public boolean hasPhoto() {
+        return photo != null;
+    }
 }
