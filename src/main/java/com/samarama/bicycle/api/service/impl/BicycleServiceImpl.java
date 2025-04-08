@@ -186,6 +186,62 @@ public class BicycleServiceImpl implements BicycleService {
     }
 
     @Override
+    public ResponseEntity<Bicycle> getBicycleById(Long id) {
+        Optional<Bicycle> bicycleOpt = bicycleRepository.findById(id);
+
+        if (bicycleOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        Bicycle bicycle = bicycleOpt.get();
+
+        // Check if the bicycle belongs to the authenticated user
+        String email = getCurrentUserEmail();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (bicycle.getOwner() == null || !bicycle.getOwner().getId().equals(user.getId())) {
+            return ResponseEntity.status(403).build();
+        }
+
+        return ResponseEntity.ok(bicycle);
+    }
+
+    @Override
+    @Transactional
+    public ResponseEntity<?> updateBicycle(Long id, BicycleDto bicycleDto) {
+        Optional<Bicycle> bicycleOpt = bicycleRepository.findById(id);
+
+        if (bicycleOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        Bicycle bicycle = bicycleOpt.get();
+
+        // Check if the bicycle belongs to the authenticated user
+        String email = getCurrentUserEmail();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (bicycle.getOwner() == null || !bicycle.getOwner().getId().equals(user.getId())) {
+            return ResponseEntity.status(403).body(Map.of("message", "You do not have permission to update this bicycle"));
+        }
+
+        // Nie aktualizuj numeru ramy - to może tylko serwis
+        // bicycle.setFrameNumber(bicycleDto.frameNumber());
+
+        bicycle.setBrand(bicycleDto.brand());
+        bicycle.setModel(bicycleDto.model());
+        bicycle.setType(bicycleDto.type());
+        bicycle.setFrameMaterial(bicycleDto.frameMaterial());
+        bicycle.setProductionDate(bicycleDto.productionDate());
+
+        bicycleRepository.save(bicycle);
+
+        return ResponseEntity.ok(Map.of("message", "Bicycle updated successfully"));
+    }
+
+    @Override
     public ResponseEntity<?> searchBicycleByFrameNumber(String frameNumber) {
         Optional<Bicycle> bicycle = bicycleRepository.findByFrameNumber(frameNumber);
         return bicycle.map(ResponseEntity::ok)

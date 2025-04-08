@@ -22,11 +22,6 @@ public class ServiceRecordController {
         this.serviceRecordService = serviceRecordService;
     }
 
-    @GetMapping("/bicycle/{bicycleId}")
-    public ResponseEntity<List<ServiceRecord>> getBicycleServiceRecords(@PathVariable Long bicycleId) {
-        return serviceRecordService.getBicycleServiceRecords(bicycleId);
-    }
-
     @PostMapping
     @PreAuthorize("hasRole('SERVICE')")
     public ResponseEntity<?> addServiceRecord(@Valid @RequestBody ServiceRecordDto serviceRecordDto) {
@@ -37,5 +32,12 @@ public class ServiceRecordController {
     private String getCurrentUserEmail() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         return authentication.getName();
+    }
+
+    @GetMapping("/bicycle/{bicycleId}")
+    public ResponseEntity<List<ServiceRecord>> getBicycleServiceRecords(@PathVariable Long bicycleId) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String currentUserEmail = authentication.getName();
+        return serviceRecordService.getBicycleServiceRecords(bicycleId, currentUserEmail);
     }
 }

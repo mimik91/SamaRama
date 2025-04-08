@@ -10,9 +10,10 @@ public interface ServiceRecordService {
     /**
      * Get service records for a specific bicycle
      * @param bicycleId ID of the bicycle
+     * @param userEmail email of the current user
      * @return response with list of service records or appropriate error status
      */
-    ResponseEntity<List<ServiceRecord>> getBicycleServiceRecords(Long bicycleId);
+    ResponseEntity<List<ServiceRecord>> getBicycleServiceRecords(Long bicycleId, String userEmail);
 
     /**
      * Add a new service record

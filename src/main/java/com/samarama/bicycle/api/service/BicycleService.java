@@ -47,6 +47,21 @@ public interface BicycleService {
     ResponseEntity<?> deleteBicycle(Long id);
 
     /**
+     * Get a bicycle by ID
+     * @param id the bicycle ID
+     * @return response with the bicycle
+     */
+    ResponseEntity<Bicycle> getBicycleById(Long id);
+
+    /**
+     * Update a bicycle's details
+     * @param id the bicycle ID
+     * @param bicycleDto the new bicycle data
+     * @return response with the result of the operation
+     */
+    ResponseEntity<?> updateBicycle(Long id, BicycleDto bicycleDto);
+
+    /**
      * Search for a bicycle by frame number
      * @param frameNumber the frame number to search for
      * @return the matching bicycle or not found response

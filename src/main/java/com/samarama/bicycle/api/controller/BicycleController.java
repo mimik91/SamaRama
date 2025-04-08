@@ -68,6 +68,18 @@ public class BicycleController {
         return bicycleService.deleteBicycle(id);
     }
 
+    @GetMapping("/{id}")
+    @PreAuthorize("hasRole('CLIENT')")
+    public ResponseEntity<Bicycle> getBicycleById(@PathVariable Long id) {
+        return bicycleService.getBicycleById(id);
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('CLIENT')")
+    public ResponseEntity<?> updateBicycle(@PathVariable Long id, @Valid @RequestBody BicycleDto bicycleDto) {
+        return bicycleService.updateBicycle(id, bicycleDto);
+    }
+
     @GetMapping("/search")
     @PreAuthorize("hasRole('SERVICE')")
     public ResponseEntity<?> searchBicycleByFrameNumber(@RequestParam String frameNumber) {

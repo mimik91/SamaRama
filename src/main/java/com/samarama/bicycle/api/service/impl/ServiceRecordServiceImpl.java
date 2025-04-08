@@ -39,29 +39,32 @@ public class ServiceRecordServiceImpl implements ServiceRecordService {
     }
 
     @Override
-    public ResponseEntity<List<ServiceRecord>> getBicycleServiceRecords(Long bicycleId) {
-        Bicycle bicycle = bicycleRepository.findById(bicycleId)
-                .orElseThrow(() -> new RuntimeException("Bicycle not found"));
+    public ResponseEntity<List<ServiceRecord>> getBicycleServiceRecords(Long bicycleId, String userEmail) {
+        try {
+            Bicycle bicycle = bicycleRepository.findById(bicycleId)
+                    .orElseThrow(() -> new RuntimeException("Bicycle not found"));
 
-        // Check if the logged-in user has appropriate permissions
-        String email = getCurrentUserEmail();
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        boolean isService = authentication.getAuthorities().stream()
-                .map(GrantedAuthority::getAuthority)
-                .anyMatch(authority -> authority.equals("ROLE_SERVICE"));
+            // Sprawdź, czy użytkownik ma odpowiednie uprawnienia
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            boolean isService = authentication.getAuthorities().stream()
+                    .map(GrantedAuthority::getAuthority)
+                    .anyMatch(authority -> authority.equals("ROLE_SERVICE"));
 
-        // If not a service, check if the user is the bicycle owner
-        if (!isService) {
-            User user = userRepository.findByEmail(email)
-                    .orElseThrow(() -> new RuntimeException("User not found"));
+            // Jeśli nie jest serwisem, sprawdź czy użytkownik jest właścicielem roweru
+            if (!isService) {
+                User user = userRepository.findByEmail(userEmail)
+                        .orElseThrow(() -> new RuntimeException("User not found"));
 
-            if (bicycle.getOwner() == null || !bicycle.getOwner().getId().equals(user.getId())) {
-                return ResponseEntity.status(403).build();
+                if (bicycle.getOwner() == null || !bicycle.getOwner().getId().equals(user.getId())) {
+                    return ResponseEntity.status(403).build();
+                }
             }
-        }
 
-        List<ServiceRecord> records = serviceRecordRepository.findByBicycle(bicycle);
-        return ResponseEntity.ok(records);
+            List<ServiceRecord> records = serviceRecordRepository.findByBicycle(bicycle);
+            return ResponseEntity.ok(records);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).build();
+        }
     }
 
     @Override
