@@ -136,12 +136,10 @@ public class BicycleServiceImpl implements BicycleService {
                 bicycle.setPhoto(bicyclePhoto);
             }
 
-            // Ustaw dane zdjęcia
             bicyclePhoto.setPhotoFromFile(photoData, contentType, photo.getSize());
+            System.out.println("w8");
 
-            // Zapisz zdjęcie
             bicyclePhotoRepository.save(bicyclePhoto);
-
             return ResponseEntity.ok(Map.of(
                     "message", "Photo uploaded successfully",
                     "bicycleId", bicycle.getId()

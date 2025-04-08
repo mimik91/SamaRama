@@ -6,6 +6,7 @@ import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 
 import java.time.LocalDateTime;
 
@@ -24,11 +25,12 @@ public class BicyclePhoto {
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "bicycle_id")
     @JsonIgnore
+    @ToString.Exclude
     private Bicycle bicycle;
 
-    @Lob
     @Basic(fetch = FetchType.LAZY)
-    @Column(columnDefinition = "bytea")
+    @Column(name = "photo")
+    @ToString.Exclude
     private byte[] photoData;
 
     private String contentType;

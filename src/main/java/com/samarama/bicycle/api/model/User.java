@@ -7,6 +7,7 @@ import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 
 import java.time.LocalDateTime;
 import java.util.HashSet;
@@ -58,6 +59,7 @@ public class User {
     private LocalDateTime createdAt = LocalDateTime.now();
 
     @OneToMany(mappedBy = "owner", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @ToString.Exclude
     private Set<Bicycle> bicycles = new HashSet<>();
 
     public boolean hasRole(String role) {

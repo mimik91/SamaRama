@@ -7,6 +7,7 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 import org.hibernate.annotations.DynamicInsert;
 
 import java.time.LocalDate;
@@ -40,11 +41,13 @@ public class Bicycle {
     private String frameMaterial;
 
     @OneToOne(mappedBy = "bicycle", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @ToString.Exclude
     private BicyclePhoto photo;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "owner_id")
     @JsonIgnore
+    @ToString.Exclude
     private User owner;
 
     private LocalDateTime createdAt = LocalDateTime.now();
@@ -53,6 +56,7 @@ public class Bicycle {
 
     @OneToMany(mappedBy = "bicycle", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @JsonIgnore
+    @ToString.Exclude // Wyłącz to pole z generowanego toString()
     private Set<ServiceRecord> serviceRecords = new HashSet<>();
 
     public boolean hasPhoto() {

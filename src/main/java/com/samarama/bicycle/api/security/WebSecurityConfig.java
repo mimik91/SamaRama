@@ -43,9 +43,13 @@ public class WebSecurityConfig {
                                 .requestMatchers("/api/map/**").permitAll()
                                 .requestMatchers("/api/bike-services/**").permitAll()
                                 .requestMatchers("/api/test/**").permitAll()
-                                .requestMatchers("/api/bicycles/**").permitAll()
+                                // Dla standardowego dostępu do rowerów (GET)
+                                .requestMatchers("/api/bicycles").permitAll()
+                                .requestMatchers("/api/bicycles/*/photo").permitAll()
+                                // Tylko authorized users dla modyfikacji rowerów
+                                .requestMatchers("/api/bicycles/*/photo").authenticated()
                                 .requestMatchers("/test").permitAll()
-                                // Pozostałe API powinno być chronione, a nie permitAll
+                                // Pozostałe API powinno być chronione
                                 .anyRequest().authenticated()
                 );
 
