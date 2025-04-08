@@ -43,6 +43,7 @@ public class WebSecurityConfig {
                                 .requestMatchers("/api/map/**").permitAll()
                                 .requestMatchers("/api/bike-services/**").permitAll()
                                 .requestMatchers("/api/test/**").permitAll()
+                                .requestMatchers("/api/bicycles/**").permitAll()
                                 .requestMatchers("/test").permitAll()
                                 // Pozostałe API powinno być chronione, a nie permitAll
                                 .anyRequest().authenticated()
