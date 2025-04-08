@@ -1,6 +1,7 @@
 package com.samarama.bicycle.api.controller;
 
 import com.samarama.bicycle.api.dto.ServiceRecordDto;
+import com.samarama.bicycle.api.dto.ServiceRecordResponseDto;
 import com.samarama.bicycle.api.model.ServiceRecord;
 import com.samarama.bicycle.api.service.ServiceRecordService;
 import org.springframework.http.ResponseEntity;
@@ -11,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @CrossOrigin(origins = "*", maxAge = 3600)
 @RestController
@@ -35,9 +37,18 @@ public class ServiceRecordController {
     }
 
     @GetMapping("/bicycle/{bicycleId}")
-    public ResponseEntity<List<ServiceRecord>> getBicycleServiceRecords(@PathVariable Long bicycleId) {
+    public ResponseEntity<List<ServiceRecordResponseDto>> getBicycleServiceRecords(@PathVariable Long bicycleId) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String currentUserEmail = authentication.getName();
-        return serviceRecordService.getBicycleServiceRecords(bicycleId, currentUserEmail);
+        ResponseEntity<List<ServiceRecord>> response = serviceRecordService.getBicycleServiceRecords(bicycleId, currentUserEmail);
+
+        if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+            List<ServiceRecordResponseDto> dtos = response.getBody().stream()
+                    .map(ServiceRecordResponseDto::fromEntity)
+                    .collect(Collectors.toList());
+            return ResponseEntity.ok(dtos);
+        }
+
+        return ResponseEntity.status(response.getStatusCode()).build();
     }
 }

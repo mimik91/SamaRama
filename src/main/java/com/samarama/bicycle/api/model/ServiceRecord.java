@@ -1,5 +1,6 @@
 package com.samarama.bicycle.api.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import jakarta.persistence.Id;
@@ -22,6 +23,7 @@ import java.time.LocalDate;
 @AllArgsConstructor
 @Entity
 @Table(name = "service_records")
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class ServiceRecord {
 
     @Id
@@ -30,6 +32,7 @@ public class ServiceRecord {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "bicycle_id")
+    @JsonIgnoreProperties({"owner", "serviceRecords", "photo"})
     private Bicycle bicycle;
 
     @NotBlank
@@ -45,5 +48,6 @@ public class ServiceRecord {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "service_id")
+    @JsonIgnoreProperties({"password", "verified", "serviceRecords", "openingHours", "createdAt"})
     private BikeService service;
 }

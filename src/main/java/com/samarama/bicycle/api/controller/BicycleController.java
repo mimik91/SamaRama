@@ -1,6 +1,7 @@
 package com.samarama.bicycle.api.controller;
 
 import com.samarama.bicycle.api.dto.BicycleDto;
+import com.samarama.bicycle.api.dto.BicycleResponseDto;
 import com.samarama.bicycle.api.model.Bicycle;
 import com.samarama.bicycle.api.service.BicycleService;
 import org.springframework.http.MediaType;
@@ -15,6 +16,7 @@ import org.springframework.web.multipart.MultipartFile;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @CrossOrigin(origins = "*", maxAge = 3600)
 @RestController
@@ -28,9 +30,12 @@ public class BicycleController {
 
     @GetMapping
     @PreAuthorize("hasRole('CLIENT')")
-    public ResponseEntity<List<Bicycle>> getUserBicycles() {
+    public ResponseEntity<List<BicycleResponseDto>> getUserBicycles() {
         List<Bicycle> bicycles = bicycleService.getUserBicycles();
-        return ResponseEntity.ok(bicycles);
+        List<BicycleResponseDto> bicycleDtos = bicycles.stream()
+                .map(BicycleResponseDto::fromEntity)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(bicycleDtos);
     }
 
     @PostMapping
@@ -70,8 +75,15 @@ public class BicycleController {
 
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('CLIENT')")
-    public ResponseEntity<Bicycle> getBicycleById(@PathVariable Long id) {
-        return bicycleService.getBicycleById(id);
+    public ResponseEntity<BicycleResponseDto> getBicycleById(@PathVariable Long id) {
+        ResponseEntity<Bicycle> response = bicycleService.getBicycleById(id);
+
+        if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+            BicycleResponseDto dto = BicycleResponseDto.fromEntity(response.getBody());
+            return ResponseEntity.ok(dto);
+        }
+
+        return ResponseEntity.status(response.getStatusCode()).build();
     }
 
     @PutMapping("/{id}")

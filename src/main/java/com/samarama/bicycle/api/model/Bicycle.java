@@ -1,6 +1,7 @@
 package com.samarama.bicycle.api.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import jakarta.persistence.Id;
@@ -14,7 +15,6 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Lob;
 import jakarta.persistence.Basic;
-import jakarta.persistence.FetchType;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -32,6 +32,7 @@ import java.util.Set;
 @Entity
 @Table(name = "bicycles")
 @DynamicInsert // Dodaje tylko niepuste pola do zapytania INSERT
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Bicycle {
 
     @Id
@@ -53,10 +54,12 @@ public class Bicycle {
     @Lob
     @Basic(fetch = FetchType.LAZY)
     @Column(columnDefinition = "bytea")
+    @JsonIgnore
     private byte[] photo;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "owner_id")
+    @JsonIgnore
     private User owner;
 
     private LocalDateTime createdAt = LocalDateTime.now();
@@ -64,5 +67,6 @@ public class Bicycle {
     private LocalDate productionDate;
 
     @OneToMany(mappedBy = "bicycle", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonIgnore
     private Set<ServiceRecord> serviceRecords = new HashSet<>();
 }

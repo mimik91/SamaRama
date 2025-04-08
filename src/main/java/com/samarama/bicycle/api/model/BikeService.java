@@ -2,6 +2,7 @@ package com.samarama.bicycle.api.model;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
@@ -19,6 +20,7 @@ import java.util.Set;
 @AllArgsConstructor
 @Entity
 @Table(name = "bike_services")
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class BikeService {
 
     @Id
