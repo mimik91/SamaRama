@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Service
 public class ServiceRecordServiceImpl implements ServiceRecordService {
@@ -41,8 +42,13 @@ public class ServiceRecordServiceImpl implements ServiceRecordService {
     @Override
     public ResponseEntity<List<ServiceRecord>> getBicycleServiceRecords(Long bicycleId, String userEmail) {
         try {
-            Bicycle bicycle = bicycleRepository.findById(bicycleId)
-                    .orElseThrow(() -> new RuntimeException("Bicycle not found"));
+            // Historia serwisowa istnieje tylko dla kompletnych rowerów (Bicycle)
+            Optional<Bicycle> bicycleOpt = bicycleRepository.findById(bicycleId);
+            if (bicycleOpt.isEmpty()) {
+                return ResponseEntity.notFound().build();
+            }
+
+            Bicycle bicycle = bicycleOpt.get();
 
             // Sprawdź, czy użytkownik ma odpowiednie uprawnienia
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -76,10 +82,28 @@ public class ServiceRecordServiceImpl implements ServiceRecordService {
             return ResponseEntity.badRequest().body(Map.of("message", "Service date cannot be more than a month ago"));
         }
 
-        Bicycle bicycle = bicycleRepository.findById(serviceRecordDto.bicycleId())
-                .orElseThrow(() -> new RuntimeException("Bicycle not found"));
+        // Historia serwisowa istnieje tylko dla kompletnych rowerów (Bicycle)
+        Optional<Bicycle> bicycleOpt = bicycleRepository.findById(serviceRecordDto.bicycleId());
+        if (bicycleOpt.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Bicycle not found or not complete"));
+        }
+
+        Bicycle bicycle = bicycleOpt.get();
+
+        // Sprawdź czy rower ma numer ramy
+        if (bicycle.getFrameNumber() == null || bicycle.getFrameNumber().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Bicycle must have a frame number to add service records"));
+        }
 
         BikeService service = serviceRecordDto.service();
+        if (service == null) {
+            // Możemy próbować pobrać serwis na podstawie emaila zalogowanego użytkownika
+            Optional<BikeService> bikeServiceOpt = bikeServiceRepository.findByEmail(userEmail);
+            if (bikeServiceOpt.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Service not found"));
+            }
+            service = bikeServiceOpt.get();
+        }
 
         ServiceRecord serviceRecord = new ServiceRecord();
         serviceRecord.setBicycle(bicycle);
@@ -87,14 +111,9 @@ public class ServiceRecordServiceImpl implements ServiceRecordService {
         serviceRecord.setDescription(serviceRecordDto.description());
         serviceRecord.setServiceDate(serviceRecordDto.serviceDate());
         serviceRecord.setPrice(serviceRecordDto.price());
-        serviceRecord.setService(serviceRecordDto.service());
+        serviceRecord.setService(service);
 
         serviceRecordRepository.save(serviceRecord);
         return ResponseEntity.ok(Map.of("message", "Service record added successfully"));
-    }
-
-    private String getCurrentUserEmail() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        return authentication.getName();
     }
 }

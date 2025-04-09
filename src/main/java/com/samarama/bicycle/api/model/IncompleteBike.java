@@ -15,9 +15,10 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Entity
 @Table(name = "incomplete_bikes")
+@Inheritance(strategy = InheritanceType.JOINED)
 @DynamicInsert
 @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
-public class IncompleteBike{
+public class IncompleteBike {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -32,7 +33,7 @@ public class IncompleteBike{
 
     private String frameMaterial;
 
-    @OneToOne(mappedBy = "incompleteBike", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @OneToOne(mappedBy = "bike", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @ToString.Exclude
     private BicyclePhoto photo;
 
@@ -47,6 +48,6 @@ public class IncompleteBike{
     private LocalDate productionDate;
 
     public boolean hasPhoto() {
-        return photo != null && photo.getPhotoData() != null;
+        return photo != null && photo.getPhotoData() != null && photo.getPhotoData().length > 0;
     }
 }

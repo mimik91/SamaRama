@@ -1,7 +1,8 @@
 package com.samarama.bicycle.api.controller;
 
 import com.samarama.bicycle.api.dto.BicycleDto;
-import com.samarama.bicycle.api.dto.BicycleResponseDto;
+import com.samarama.bicycle.api.dto.IncompleteBikeDto;
+import com.samarama.bicycle.api.dto.IncompleteBikeResponseDto;
 import com.samarama.bicycle.api.model.Bicycle;
 import com.samarama.bicycle.api.service.BicycleService;
 import org.springframework.http.MediaType;
@@ -16,7 +17,6 @@ import org.springframework.web.multipart.MultipartFile;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @CrossOrigin(origins = "*", maxAge = 3600)
 @RestController
@@ -30,17 +30,14 @@ public class BicycleController {
 
     @GetMapping
     @PreAuthorize("hasRole('CLIENT')")
-    public ResponseEntity<List<BicycleResponseDto>> getUserBicycles() {
-        List<Bicycle> bicycles = bicycleService.getUserBicycles();
-        List<BicycleResponseDto> bicycleDtos = bicycles.stream()
-                .map(BicycleResponseDto::fromEntity)
-                .collect(Collectors.toList());
-        return ResponseEntity.ok(bicycleDtos);
+    public ResponseEntity<List<IncompleteBikeResponseDto>> getUserBikes() {
+        List<IncompleteBikeResponseDto> bikes = bicycleService.getAllUserBikes();
+        return ResponseEntity.ok(bikes);
     }
 
     @PostMapping
     @PreAuthorize("hasAnyRole('CLIENT', 'SERVICE')")
-    public ResponseEntity<?> addBicycle(@Valid @RequestBody BicycleDto bicycleDto) {
+    public ResponseEntity<?> addBike(@Valid @RequestBody BicycleDto bicycleDto) {
         // Get information about the authenticated user
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         boolean isClient = authentication.getAuthorities().stream()
@@ -51,51 +48,118 @@ public class BicycleController {
                 .map(GrantedAuthority::getAuthority)
                 .anyMatch(authority -> authority.equals("ROLE_SERVICE"));
 
-        return bicycleService.addBicycle(bicycleDto, isClient, isService);
+        // Dla klienta zawsze tworzymy IncompleteBike
+        if (isClient) {
+            IncompleteBikeDto incompleteBikeDto = new IncompleteBikeDto(
+                    bicycleDto.brand(),
+                    bicycleDto.model(),
+                    bicycleDto.type(),
+                    bicycleDto.frameMaterial(),
+                    bicycleDto.productionDate()
+            );
+            return bicycleService.addIncompleteBike(incompleteBikeDto);
+        }
+        // Dla serwisu, używamy starej metody (która rozróżnia czy tworzymy Bicycle czy IncompleteBike)
+        else if (isService) {
+            return bicycleService.addBicycle(bicycleDto, isClient, isService);
+        }
+
+        return ResponseEntity.badRequest().body(Map.of("message", "Invalid request"));
     }
 
     @PostMapping(value = "/{id}/photo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasRole('CLIENT')")
     public ResponseEntity<?> uploadBicyclePhoto(
             @PathVariable Long id,
-            @RequestParam("photo") MultipartFile photo) {
-        return bicycleService.uploadBicyclePhoto(id, photo);
+            @RequestParam("photo") MultipartFile photo,
+            @RequestParam(value = "isComplete", defaultValue = "true") boolean isComplete) {
+
+        if (isComplete) {
+            return bicycleService.uploadBicyclePhoto(id, photo);
+        } else {
+            return bicycleService.uploadIncompleteBikePhoto(id, photo);
+        }
     }
 
     @GetMapping("/{id}/photo")
-    public ResponseEntity<?> getBicyclePhoto(@PathVariable Long id) {
-        return bicycleService.getBicyclePhoto(id);
+    public ResponseEntity<?> getBicyclePhoto(
+            @PathVariable Long id,
+            @RequestParam(value = "isComplete", defaultValue = "true") boolean isComplete) {
+
+        if (isComplete) {
+            return bicycleService.getBicyclePhoto(id);
+        } else {
+            return bicycleService.getIncompleteBikePhoto(id);
+        }
     }
 
     @DeleteMapping("/{id}/photo")
     @PreAuthorize("hasRole('CLIENT')")
-    public ResponseEntity<?> deleteBicyclePhoto(@PathVariable Long id) {
-        return bicycleService.deleteBicyclePhoto(id);
+    public ResponseEntity<?> deleteBicyclePhoto(
+            @PathVariable Long id,
+            @RequestParam(value = "isComplete", defaultValue = "true") boolean isComplete) {
+
+        if (isComplete) {
+            return bicycleService.deleteBicyclePhoto(id);
+        } else {
+            return bicycleService.deleteIncompleteBikePhoto(id);
+        }
     }
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('CLIENT')")
-    public ResponseEntity<?> deleteBicycle(@PathVariable Long id) {
-        return bicycleService.deleteBicycle(id);
+    public ResponseEntity<?> deleteBicycle(
+            @PathVariable Long id,
+            @RequestParam(value = "isComplete", defaultValue = "true") boolean isComplete) {
+
+        if (isComplete) {
+            return bicycleService.deleteBicycle(id);
+        } else {
+            return bicycleService.deleteIncompleteBike(id);
+        }
     }
 
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('CLIENT')")
-    public ResponseEntity<BicycleResponseDto> getBicycleById(@PathVariable Long id) {
-        ResponseEntity<Bicycle> response = bicycleService.getBicycleById(id);
+    public ResponseEntity<IncompleteBikeResponseDto> getBicycleById(
+            @PathVariable Long id,
+            @RequestParam(value = "isComplete", required = false) Boolean isComplete) {
 
-        if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-            BicycleResponseDto dto = BicycleResponseDto.fromEntity(response.getBody());
-            return ResponseEntity.ok(dto);
+        // Jeśli parametr isComplete nie jest podany, spróbujmy znaleźć rower w obu typach
+        if (isComplete == null) {
+            // Najpierw sprawdzamy Bicycle (kompletny)
+            ResponseEntity<IncompleteBikeResponseDto> response = bicycleService.getBikeById(id, true);
+            if (response.getStatusCode().is2xxSuccessful()) {
+                return response;
+            }
+
+            // Jeśli nie znaleziono w Bicycle, sprawdź IncompleteBike
+            return bicycleService.getBikeById(id, false);
         }
 
-        return ResponseEntity.status(response.getStatusCode()).build();
+        // Jeśli parametr isComplete jest podany, użyj jego wartości
+        return bicycleService.getBikeById(id, isComplete);
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('CLIENT')")
-    public ResponseEntity<?> updateBicycle(@PathVariable Long id, @Valid @RequestBody BicycleDto bicycleDto) {
-        return bicycleService.updateBicycle(id, bicycleDto);
+    public ResponseEntity<?> updateBicycle(
+            @PathVariable Long id,
+            @Valid @RequestBody BicycleDto bicycleDto,
+            @RequestParam(value = "isComplete", defaultValue = "true") boolean isComplete) {
+
+        if (isComplete) {
+            return bicycleService.updateBicycle(id, bicycleDto);
+        } else {
+            IncompleteBikeDto incompleteBikeDto = new IncompleteBikeDto(
+                    bicycleDto.brand(),
+                    bicycleDto.model(),
+                    bicycleDto.type(),
+                    bicycleDto.frameMaterial(),
+                    bicycleDto.productionDate()
+            );
+            return bicycleService.updateIncompleteBike(id, incompleteBikeDto);
+        }
     }
 
     @GetMapping("/search")
@@ -111,5 +175,14 @@ public class BicycleController {
             @RequestBody Map<String, String> payload) {
         String frameNumber = payload.get("frameNumber");
         return bicycleService.updateFrameNumber(id, frameNumber);
+    }
+
+    @PostMapping("/{id}/convert")
+    @PreAuthorize("hasRole('SERVICE')")
+    public ResponseEntity<?> convertToComplete(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> payload) {
+        String frameNumber = payload.get("frameNumber");
+        return bicycleService.convertToComplete(id, frameNumber);
     }
 }

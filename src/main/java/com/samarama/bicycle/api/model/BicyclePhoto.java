@@ -23,13 +23,13 @@ public class BicyclePhoto {
     private Long id;
 
     @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "bicycle_id")
+    @JoinColumn(name = "bike_id")
     @JsonIgnore
     @ToString.Exclude
-    private Bicycle bicycle;
+    private IncompleteBike bike;
 
     @Basic(fetch = FetchType.LAZY)
-    @Column(name = "photo")
+    @Column(name = "photo_data")
     @ToString.Exclude
     private byte[] photoData;
 

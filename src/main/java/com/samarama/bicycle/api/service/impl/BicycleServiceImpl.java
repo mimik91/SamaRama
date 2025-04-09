@@ -1,11 +1,15 @@
 package com.samarama.bicycle.api.service.impl;
 
 import com.samarama.bicycle.api.dto.BicycleDto;
+import com.samarama.bicycle.api.dto.IncompleteBikeDto;
+import com.samarama.bicycle.api.dto.IncompleteBikeResponseDto;
 import com.samarama.bicycle.api.model.Bicycle;
 import com.samarama.bicycle.api.model.BicyclePhoto;
+import com.samarama.bicycle.api.model.IncompleteBike;
 import com.samarama.bicycle.api.model.User;
 import com.samarama.bicycle.api.repository.BicyclePhotoRepository;
 import com.samarama.bicycle.api.repository.BicycleRepository;
+import com.samarama.bicycle.api.repository.IncompleteBikeRepository;
 import com.samarama.bicycle.api.repository.UserRepository;
 import com.samarama.bicycle.api.service.BicycleService;
 import jakarta.transaction.Transactional;
@@ -18,22 +22,61 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 public class BicycleServiceImpl implements BicycleService {
     private final BicycleRepository bicycleRepository;
+    private final IncompleteBikeRepository incompleteBikeRepository;
     private final BicyclePhotoRepository bicyclePhotoRepository;
     private final UserRepository userRepository;
 
-    public BicycleServiceImpl(BicycleRepository bicycleRepository,
-                              BicyclePhotoRepository bicyclePhotoRepository,
-                              UserRepository userRepository) {
+    public BicycleServiceImpl(
+            BicycleRepository bicycleRepository,
+            IncompleteBikeRepository incompleteBikeRepository,
+            BicyclePhotoRepository bicyclePhotoRepository,
+            UserRepository userRepository
+    ) {
         this.bicycleRepository = bicycleRepository;
+        this.incompleteBikeRepository = incompleteBikeRepository;
         this.bicyclePhotoRepository = bicyclePhotoRepository;
         this.userRepository = userRepository;
+    }
+
+    @Override
+    public List<IncompleteBikeResponseDto> getAllUserBikes() {
+        String email = getCurrentUserEmail();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        List<IncompleteBikeResponseDto> result = new ArrayList<>();
+
+        // Dodaj kompletne rowery (Bicycle)
+        List<Bicycle> bicycles = bicycleRepository.findByOwner(user);
+        result.addAll(bicycles.stream()
+                .map(IncompleteBikeResponseDto::fromBicycleEntity)
+                .collect(Collectors.toList()));
+
+        // Dodaj niekompletne rowery (IncompleteBike)
+        List<IncompleteBike> incompleteBikes = incompleteBikeRepository.findByOwner(user);
+        result.addAll(incompleteBikes.stream()
+                .map(IncompleteBikeResponseDto::fromEntity)
+                .collect(Collectors.toList()));
+
+        return result;
+    }
+
+    @Override
+    public List<IncompleteBike> getUserIncompleteBikes() {
+        String email = getCurrentUserEmail();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        return incompleteBikeRepository.findByOwner(user);
     }
 
     @Override
@@ -43,6 +86,87 @@ public class BicycleServiceImpl implements BicycleService {
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
         return bicycleRepository.findByOwner(user);
+    }
+
+    @Override
+    @Transactional
+    public ResponseEntity<Map<String, Object>> addIncompleteBike(IncompleteBikeDto incompleteBikeDto) {
+        try {
+            IncompleteBike incompleteBike = new IncompleteBike();
+            incompleteBike.setBrand(incompleteBikeDto.brand());
+            incompleteBike.setModel(incompleteBikeDto.model());
+            incompleteBike.setType(incompleteBikeDto.type());
+            incompleteBike.setFrameMaterial(incompleteBikeDto.frameMaterial());
+            incompleteBike.setProductionDate(incompleteBikeDto.productionDate());
+            incompleteBike.setCreatedAt(LocalDateTime.now());
+
+            // Set owner
+            String email = getCurrentUserEmail();
+            User user = userRepository.findByEmail(email)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+            incompleteBike.setOwner(user);
+
+            // Save the incomplete bike
+            IncompleteBike savedBike = incompleteBikeRepository.save(incompleteBike);
+
+            return ResponseEntity.ok(Map.of(
+                    "message", "Incomplete bike added successfully",
+                    "bikeId", savedBike.getId()
+            ));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body(Map.of("message", "Error adding incomplete bike: " + e.getMessage()));
+        }
+    }
+
+    @Override
+    @Transactional
+    public ResponseEntity<Map<String, Object>> convertToComplete(Long incompleteBikeId, String frameNumber) {
+        if (frameNumber == null || frameNumber.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Frame number is required"));
+        }
+
+        // Check if the frame number is already in use
+        if (bicycleRepository.existsByFrameNumber(frameNumber)) {
+            return ResponseEntity.badRequest().body(Map.of("message", "This frame number is already in use"));
+        }
+
+        Optional<IncompleteBike> incompleteBikeOpt = incompleteBikeRepository.findById(incompleteBikeId);
+        if (incompleteBikeOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        IncompleteBike incompleteBike = incompleteBikeOpt.get();
+
+        // Create a new Bicycle from the IncompleteBike
+        Bicycle bicycle = new Bicycle();
+        bicycle.setBrand(incompleteBike.getBrand());
+        bicycle.setModel(incompleteBike.getModel());
+        bicycle.setType(incompleteBike.getType());
+        bicycle.setFrameMaterial(incompleteBike.getFrameMaterial());
+        bicycle.setProductionDate(incompleteBike.getProductionDate());
+        bicycle.setOwner(incompleteBike.getOwner());
+        bicycle.setCreatedAt(incompleteBike.getCreatedAt());
+        bicycle.setFrameNumber(frameNumber);
+
+        // Handle photo if present
+        BicyclePhoto photo = incompleteBike.getPhoto();
+        if (photo != null) {
+            photo.setBike(bicycle);
+            bicycle.setPhoto(photo);
+        }
+
+        // Save the new Bicycle
+        Bicycle savedBicycle = bicycleRepository.save(bicycle);
+
+        // Delete the IncompleteBike
+        incompleteBikeRepository.delete(incompleteBike);
+
+        return ResponseEntity.ok(Map.of(
+                "message", "Bike converted to complete successfully",
+                "bicycleId", savedBicycle.getId(),
+                "frameNumber", frameNumber
+        ));
     }
 
     @Override
@@ -57,35 +181,52 @@ public class BicycleServiceImpl implements BicycleService {
                 return ResponseEntity.badRequest().body(Map.of("message", "Clients cannot set frame number. This is reserved for service"));
             }
 
-            Bicycle bicycle = new Bicycle();
-            bicycle.setBrand(bicycleDto.brand());
-            bicycle.setModel(bicycleDto.model());
-            bicycle.setType(bicycleDto.type());
-            bicycle.setFrameMaterial(bicycleDto.frameMaterial());
-            bicycle.setProductionDate(bicycleDto.productionDate());
-            bicycle.setCreatedAt(LocalDateTime.now());
-
-            // Set frame number if service
-            if (isService) {
-                bicycle.setFrameNumber(bicycleDto.frameNumber());
-            }
-
-            // Set owner if client
+            // Dla klientów, zawsze tworzy IncompleteBike
             if (isClient) {
+                IncompleteBike incompleteBike = new IncompleteBike();
+                incompleteBike.setBrand(bicycleDto.brand());
+                incompleteBike.setModel(bicycleDto.model());
+                incompleteBike.setType(bicycleDto.type());
+                incompleteBike.setFrameMaterial(bicycleDto.frameMaterial());
+                incompleteBike.setProductionDate(bicycleDto.productionDate());
+                incompleteBike.setCreatedAt(LocalDateTime.now());
+
+                // Set owner
                 String email = getCurrentUserEmail();
                 User user = userRepository.findByEmail(email)
                         .orElseThrow(() -> new RuntimeException("User not found"));
-                bicycle.setOwner(user);
+                incompleteBike.setOwner(user);
+
+                // Save the incomplete bike
+                IncompleteBike savedBike = incompleteBikeRepository.save(incompleteBike);
+
+                return ResponseEntity.ok(Map.of(
+                        "message", "Incomplete bike added successfully",
+                        "bikeId", savedBike.getId()
+                ));
+            }
+            // Dla serwisu, tworzy od razu Bicycle jeśli podano numer ramy
+            else if (isService) {
+                Bicycle bicycle = new Bicycle();
+                bicycle.setBrand(bicycleDto.brand());
+                bicycle.setModel(bicycleDto.model());
+                bicycle.setType(bicycleDto.type());
+                bicycle.setFrameMaterial(bicycleDto.frameMaterial());
+                bicycle.setProductionDate(bicycleDto.productionDate());
+                bicycle.setCreatedAt(LocalDateTime.now());
+                bicycle.setFrameNumber(bicycleDto.frameNumber());
+
+                // Save the bicycle
+                Bicycle savedBicycle = bicycleRepository.save(bicycle);
+
+                return ResponseEntity.ok(Map.of(
+                        "message", "Bicycle added successfully",
+                        "bicycleId", savedBicycle.getId(),
+                        "frameNumber", bicycleDto.frameNumber() != null ? bicycleDto.frameNumber() : ""
+                ));
             }
 
-            // Save the bicycle
-            Bicycle savedBicycle = bicycleRepository.save(bicycle);
-
-            return ResponseEntity.ok(Map.of(
-                    "message", "Bicycle added successfully",
-                    "bicycleId", savedBicycle.getId(),
-                    "frameNumber", isService && bicycleDto.frameNumber() != null ? bicycleDto.frameNumber() : ""
-            ));
+            return ResponseEntity.badRequest().body(Map.of("message", "Invalid request"));
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.badRequest().body(Map.of("message", "Error adding bicycle: " + e.getMessage()));
@@ -111,6 +252,32 @@ public class BicycleServiceImpl implements BicycleService {
             return ResponseEntity.status(403).body(Map.of("message", "You do not have permission to update this bicycle"));
         }
 
+        return uploadPhoto(photo, bicycle, null);
+    }
+
+    @Override
+    @Transactional
+    public ResponseEntity<?> uploadIncompleteBikePhoto(Long id, MultipartFile photo) {
+        Optional<IncompleteBike> bikeOpt = incompleteBikeRepository.findById(id);
+        if (bikeOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        IncompleteBike bike = bikeOpt.get();
+
+        // Check if the bike belongs to the user
+        String email = getCurrentUserEmail();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (bike.getOwner() == null || !bike.getOwner().getId().equals(user.getId())) {
+            return ResponseEntity.status(403).body(Map.of("message", "You do not have permission to update this bike"));
+        }
+
+        return uploadPhoto(photo, null, bike);
+    }
+
+    private ResponseEntity<?> uploadPhoto(MultipartFile photo, Bicycle bicycle, IncompleteBike incompleteBike) {
         // Check file size - max 1MB
         if (photo.getSize() > 1024 * 1024) {
             return ResponseEntity.badRequest().body(Map.of("message", "Photo exceeds maximum size of 1MB"));
@@ -123,26 +290,50 @@ public class BicycleServiceImpl implements BicycleService {
         }
 
         try {
-            // Pobierz dane zdjęcia
+            // Get photo data
             byte[] photoData = photo.getBytes();
 
-            // Sprawdź, czy rower już ma zdjęcie
-            BicyclePhoto bicyclePhoto = bicycle.getPhoto();
+            // Wybierz odpowiedni rower do powiązania ze zdjęciem (bicycle ma priorytet)
+            IncompleteBike bikeToUse = bicycle != null ? bicycle : incompleteBike;
+
+            if (bikeToUse == null) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Invalid request - no bike specified"));
+            }
+
+            // Check if the bike already has a photo
+            BicyclePhoto bicyclePhoto = null;
+
+            if (bicycle != null) {
+                bicyclePhoto = bicycle.getPhoto();
+            } else if (incompleteBike != null) {
+                bicyclePhoto = incompleteBike.getPhoto();
+            } else {
+                return ResponseEntity.badRequest().body(Map.of("message", "Invalid request"));
+            }
 
             if (bicyclePhoto == null) {
-                // Jeśli nie ma, utwórz nowe
+                // If no photo, create a new one
                 bicyclePhoto = new BicyclePhoto();
-                bicyclePhoto.setBicycle(bicycle);
-                bicycle.setPhoto(bicyclePhoto);
+
+                if (bicycle != null) {
+                    bicyclePhoto.setBike(bicycle);
+                    bicycle.setPhoto(bicyclePhoto);
+                } else {
+                    bicyclePhoto.setBike(incompleteBike);
+                    incompleteBike.setPhoto(bicyclePhoto);
+                }
             }
 
             bicyclePhoto.setPhotoFromFile(photoData, contentType, photo.getSize());
-            System.out.println("w8");
-
             bicyclePhotoRepository.save(bicyclePhoto);
+
+            String entityType = bikeToUse instanceof Bicycle ? "bicycle" : "incomplete bike";
+            Long entityId = bikeToUse.getId();
+
             return ResponseEntity.ok(Map.of(
                     "message", "Photo uploaded successfully",
-                    "bicycleId", bicycle.getId()
+                    "entityType", entityType,
+                    "entityId", entityId
             ));
         } catch (IOException e) {
             e.printStackTrace();
@@ -154,13 +345,36 @@ public class BicycleServiceImpl implements BicycleService {
 
     @Override
     public ResponseEntity<?> getBicyclePhoto(Long id) {
-        Optional<BicyclePhoto> photoOpt = bicyclePhotoRepository.findByBicycleId(id);
+        // Używamy nowego repozytorium dla zdjęć rowerów
+        Optional<Bicycle> bicycleOpt = bicycleRepository.findById(id);
 
-        if (photoOpt.isEmpty() || photoOpt.get().getPhotoData() == null) {
+        if (bicycleOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
 
-        BicyclePhoto photo = photoOpt.get();
+        Bicycle bicycle = bicycleOpt.get();
+        return getBikePhoto(bicycle);
+    }
+
+    @Override
+    public ResponseEntity<?> getIncompleteBikePhoto(Long id) {
+        // Używamy nowego repozytorium dla zdjęć rowerów niekompletnych
+        Optional<IncompleteBike> bikeOpt = incompleteBikeRepository.findById(id);
+
+        if (bikeOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        IncompleteBike bike = bikeOpt.get();
+        return getBikePhoto(bike);
+    }
+
+    private ResponseEntity<?> getBikePhoto(IncompleteBike bike) {
+        BicyclePhoto photo = bike.getPhoto();
+
+        if (photo == null || photo.getPhotoData() == null) {
+            return ResponseEntity.notFound().build();
+        }
 
         // Określ typ mediów na podstawie zapisanego contentType lub domyślnie JPEG
         MediaType mediaType = MediaType.IMAGE_JPEG;
@@ -202,6 +416,30 @@ public class BicycleServiceImpl implements BicycleService {
     }
 
     @Override
+    @Transactional
+    public ResponseEntity<?> deleteIncompleteBike(Long id) {
+        Optional<IncompleteBike> bikeOpt = incompleteBikeRepository.findById(id);
+
+        if (bikeOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        IncompleteBike bike = bikeOpt.get();
+
+        // Check if the bike belongs to the user
+        String email = getCurrentUserEmail();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (bike.getOwner() == null || !bike.getOwner().getId().equals(user.getId())) {
+            return ResponseEntity.status(403).body(Map.of("message", "You do not have permission to delete this bike"));
+        }
+
+        incompleteBikeRepository.delete(bike);
+        return ResponseEntity.ok(Map.of("message", "Incomplete bike deleted successfully"));
+    }
+
+    @Override
     public ResponseEntity<Bicycle> getBicycleById(Long id) {
         Optional<Bicycle> bicycleOpt = bicycleRepository.findById(id);
 
@@ -221,6 +459,110 @@ public class BicycleServiceImpl implements BicycleService {
         }
 
         return ResponseEntity.ok(bicycle);
+    }
+
+    @Override
+    public ResponseEntity<IncompleteBike> getIncompleteBikeById(Long id) {
+        Optional<IncompleteBike> bikeOpt = incompleteBikeRepository.findById(id);
+
+        if (bikeOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        IncompleteBike bike = bikeOpt.get();
+
+        // Check if the bike belongs to the authenticated user
+        String email = getCurrentUserEmail();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (bike.getOwner() == null || !bike.getOwner().getId().equals(user.getId())) {
+            return ResponseEntity.status(403).build();
+        }
+
+        return ResponseEntity.ok(bike);
+    }
+
+    @Override
+    public ResponseEntity<IncompleteBikeResponseDto> getBikeById(Long id, boolean isComplete) {
+        // Najpierw spróbuj znaleźć rower w określonym typie (zgodnie z parametrem isComplete)
+        if (isComplete) {
+            Optional<Bicycle> bicycleOpt = bicycleRepository.findById(id);
+
+            if (bicycleOpt.isPresent()) {
+                Bicycle bicycle = bicycleOpt.get();
+
+                // Check if the bicycle belongs to the authenticated user
+                String email = getCurrentUserEmail();
+                User user = userRepository.findByEmail(email)
+                        .orElseThrow(() -> new RuntimeException("User not found"));
+
+                if (bicycle.getOwner() == null || !bicycle.getOwner().getId().equals(user.getId())) {
+                    return ResponseEntity.status(403).build();
+                }
+
+                return ResponseEntity.ok(IncompleteBikeResponseDto.fromBicycleEntity(bicycle));
+            }
+        } else {
+            Optional<IncompleteBike> bikeOpt = incompleteBikeRepository.findById(id);
+
+            if (bikeOpt.isPresent()) {
+                IncompleteBike bike = bikeOpt.get();
+
+                // Check if the bike belongs to the authenticated user
+                String email = getCurrentUserEmail();
+                User user = userRepository.findByEmail(email)
+                        .orElseThrow(() -> new RuntimeException("User not found"));
+
+                if (bike.getOwner() == null || !bike.getOwner().getId().equals(user.getId())) {
+                    return ResponseEntity.status(403).build();
+                }
+
+                return ResponseEntity.ok(IncompleteBikeResponseDto.fromEntity(bike));
+            }
+        }
+
+        // Jeśli nie znaleziono roweru w preferowanym typie, spróbujmy w drugim typie
+        if (isComplete) {
+            // Nie znaleziono w Bicycle, spróbuj w IncompleteBike
+            Optional<IncompleteBike> bikeOpt = incompleteBikeRepository.findById(id);
+
+            if (bikeOpt.isPresent()) {
+                IncompleteBike bike = bikeOpt.get();
+
+                // Check if the bike belongs to the authenticated user
+                String email = getCurrentUserEmail();
+                User user = userRepository.findByEmail(email)
+                        .orElseThrow(() -> new RuntimeException("User not found"));
+
+                if (bike.getOwner() == null || !bike.getOwner().getId().equals(user.getId())) {
+                    return ResponseEntity.status(403).build();
+                }
+
+                return ResponseEntity.ok(IncompleteBikeResponseDto.fromEntity(bike));
+            }
+        } else {
+            // Nie znaleziono w IncompleteBike, spróbuj w Bicycle
+            Optional<Bicycle> bicycleOpt = bicycleRepository.findById(id);
+
+            if (bicycleOpt.isPresent()) {
+                Bicycle bicycle = bicycleOpt.get();
+
+                // Check if the bicycle belongs to the authenticated user
+                String email = getCurrentUserEmail();
+                User user = userRepository.findByEmail(email)
+                        .orElseThrow(() -> new RuntimeException("User not found"));
+
+                if (bicycle.getOwner() == null || !bicycle.getOwner().getId().equals(user.getId())) {
+                    return ResponseEntity.status(403).build();
+                }
+
+                return ResponseEntity.ok(IncompleteBikeResponseDto.fromBicycleEntity(bicycle));
+            }
+        }
+
+        // Rower nie został znaleziony w żadnym z typów
+        return ResponseEntity.notFound().build();
     }
 
     @Override
@@ -255,6 +597,37 @@ public class BicycleServiceImpl implements BicycleService {
         bicycleRepository.save(bicycle);
 
         return ResponseEntity.ok(Map.of("message", "Bicycle updated successfully"));
+    }
+
+    @Override
+    @Transactional
+    public ResponseEntity<?> updateIncompleteBike(Long id, IncompleteBikeDto incompleteBikeDto) {
+        Optional<IncompleteBike> bikeOpt = incompleteBikeRepository.findById(id);
+
+        if (bikeOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        IncompleteBike bike = bikeOpt.get();
+
+        // Check if the bike belongs to the authenticated user
+        String email = getCurrentUserEmail();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (bike.getOwner() == null || !bike.getOwner().getId().equals(user.getId())) {
+            return ResponseEntity.status(403).body(Map.of("message", "You do not have permission to update this bike"));
+        }
+
+        bike.setBrand(incompleteBikeDto.brand());
+        bike.setModel(incompleteBikeDto.model());
+        bike.setType(incompleteBikeDto.type());
+        bike.setFrameMaterial(incompleteBikeDto.frameMaterial());
+        bike.setProductionDate(incompleteBikeDto.productionDate());
+
+        incompleteBikeRepository.save(bike);
+
+        return ResponseEntity.ok(Map.of("message", "Incomplete bike updated successfully"));
     }
 
     @Override
@@ -297,21 +670,43 @@ public class BicycleServiceImpl implements BicycleService {
         }
 
         Bicycle bicycle = bicycleOpt.get();
+        return deleteBikePhoto(bicycle);
+    }
 
-        // Check if the bicycle belongs to the user
+    @Override
+    @Transactional
+    public ResponseEntity<?> deleteIncompleteBikePhoto(Long id) {
+        Optional<IncompleteBike> bikeOpt = incompleteBikeRepository.findById(id);
+        if (bikeOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        IncompleteBike bike = bikeOpt.get();
+        return deleteBikePhoto(bike);
+    }
+
+    private ResponseEntity<?> deleteBikePhoto(IncompleteBike bike) {
+        // Check if the bike belongs to the user
         String email = getCurrentUserEmail();
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        if (bicycle.getOwner() == null || !bicycle.getOwner().getId().equals(user.getId())) {
-            return ResponseEntity.status(403).body(Map.of("message", "You do not have permission to delete this bicycle's photo"));
+        if (bike.getOwner() == null || !bike.getOwner().getId().equals(user.getId())) {
+            return ResponseEntity.status(403).body(Map.of("message", "You do not have permission to delete this bike's photo"));
         }
 
         // Usuń zdjęcie, jeśli istnieje
-        if (bicycle.getPhoto() != null) {
-            bicyclePhotoRepository.delete(bicycle.getPhoto());
-            bicycle.setPhoto(null);
-            bicycleRepository.save(bicycle);
+        if (bike.getPhoto() != null) {
+            bicyclePhotoRepository.delete(bike.getPhoto());
+            bike.setPhoto(null);
+
+            // Zapisz odpowiedni obiekt
+            if (bike instanceof Bicycle) {
+                bicycleRepository.save((Bicycle) bike);
+            } else {
+                incompleteBikeRepository.save(bike);
+            }
+
             return ResponseEntity.ok(Map.of("message", "Photo deleted successfully"));
         } else {
             return ResponseEntity.ok(Map.of("message", "No photo to delete"));
