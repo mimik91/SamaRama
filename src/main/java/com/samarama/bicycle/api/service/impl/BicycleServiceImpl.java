@@ -236,23 +236,41 @@ public class BicycleServiceImpl implements BicycleService {
     @Override
     @Transactional
     public ResponseEntity<?> uploadBicyclePhoto(Long id, MultipartFile photo) {
+        // Najpierw sprawdź, czy istnieje niekompletny rower
+        Optional<IncompleteBike> incompleteBikeOpt = incompleteBikeRepository.findById(id);
+        if (incompleteBikeOpt.isPresent()) {
+            IncompleteBike bike = incompleteBikeOpt.get();
+
+            // Sprawdź uprawnienia
+            String email = getCurrentUserEmail();
+            User user = userRepository.findByEmail(email)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            if (bike.getOwner() == null || !bike.getOwner().getId().equals(user.getId())) {
+                return ResponseEntity.status(403).body(Map.of("message", "You do not have permission to update this bike"));
+            }
+
+            return uploadPhoto(photo, null, bike);
+        }
+
+        // Jeśli nie znaleziono niekompletnego roweru, sprawdź kompletny
         Optional<Bicycle> bicycleOpt = bicycleRepository.findById(id);
-        if (bicycleOpt.isEmpty()) {
-            return ResponseEntity.notFound().build();
+        if (bicycleOpt.isPresent()) {
+            Bicycle bicycle = bicycleOpt.get();
+
+            // Sprawdź uprawnienia
+            String email = getCurrentUserEmail();
+            User user = userRepository.findByEmail(email)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            if (bicycle.getOwner() == null || !bicycle.getOwner().getId().equals(user.getId())) {
+                return ResponseEntity.status(403).body(Map.of("message", "You do not have permission to update this bicycle"));
+            }
+
+            return uploadPhoto(photo, bicycle, null);
         }
 
-        Bicycle bicycle = bicycleOpt.get();
-
-        // Check if the bicycle belongs to the user
-        String email = getCurrentUserEmail();
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-
-        if (bicycle.getOwner() == null || !bicycle.getOwner().getId().equals(user.getId())) {
-            return ResponseEntity.status(403).body(Map.of("message", "You do not have permission to update this bicycle"));
-        }
-
-        return uploadPhoto(photo, bicycle, null);
+        return ResponseEntity.notFound().build();
     }
 
     @Override
@@ -345,15 +363,22 @@ public class BicycleServiceImpl implements BicycleService {
 
     @Override
     public ResponseEntity<?> getBicyclePhoto(Long id) {
-        // Używamy nowego repozytorium dla zdjęć rowerów
-        Optional<Bicycle> bicycleOpt = bicycleRepository.findById(id);
-
-        if (bicycleOpt.isEmpty()) {
-            return ResponseEntity.notFound().build();
+        // Najpierw sprawdź, czy istnieje zdjęcie dla niekompletnego roweru
+        Optional<IncompleteBike> incompleteBikeOpt = incompleteBikeRepository.findById(id);
+        if (incompleteBikeOpt.isPresent() && incompleteBikeOpt.get().getPhoto() != null) {
+            IncompleteBike bike = incompleteBikeOpt.get();
+            return getBikePhoto(bike);
         }
 
-        Bicycle bicycle = bicycleOpt.get();
-        return getBikePhoto(bicycle);
+        // Jeśli nie znaleziono niekompletnego roweru lub nie ma zdjęcia, sprawdź kompletny rower
+        Optional<Bicycle> bicycleOpt = bicycleRepository.findById(id);
+        if (bicycleOpt.isPresent()) {
+            Bicycle bicycle = bicycleOpt.get();
+            return getBikePhoto(bicycle);
+        }
+
+        // Jeśli nie znaleziono żadnego roweru, zwróć 404
+        return ResponseEntity.notFound().build();
     }
 
     @Override

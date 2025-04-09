@@ -71,26 +71,14 @@ public class BicycleController {
     @PreAuthorize("hasRole('CLIENT')")
     public ResponseEntity<?> uploadBicyclePhoto(
             @PathVariable Long id,
-            @RequestParam("photo") MultipartFile photo,
-            @RequestParam(value = "isComplete", defaultValue = "true") boolean isComplete) {
+            @RequestParam("photo") MultipartFile photo) {
 
-        if (isComplete) {
-            return bicycleService.uploadBicyclePhoto(id, photo);
-        } else {
-            return bicycleService.uploadIncompleteBikePhoto(id, photo);
-        }
+        return bicycleService.uploadBicyclePhoto(id, photo);
     }
 
     @GetMapping("/{id}/photo")
-    public ResponseEntity<?> getBicyclePhoto(
-            @PathVariable Long id,
-            @RequestParam(value = "isComplete", defaultValue = "true") boolean isComplete) {
-
-        if (isComplete) {
-            return bicycleService.getBicyclePhoto(id);
-        } else {
-            return bicycleService.getIncompleteBikePhoto(id);
-        }
+    public ResponseEntity<?> getBicyclePhoto(@PathVariable Long id) {
+        return bicycleService.getBicyclePhoto(id);
     }
 
     @DeleteMapping("/{id}/photo")
