@@ -46,6 +46,11 @@ public class WebSecurityConfig {
                                 // Dla standardowego dostępu do rowerów (GET)
                                 .requestMatchers("/api/bicycles").permitAll()
                                 .requestMatchers("/api/bicycles/*/photo").permitAll()
+                                .requestMatchers("/api/auth/**").permitAll()
+                                .requestMatchers("/api/map/**").permitAll()
+                                .requestMatchers("/api/bike-services/**").permitAll()
+                                .requestMatchers("/api/enumerations/**").permitAll() // Dodana ta linia
+                                .requestMatchers("/api/test/**").permitAll()
                                 // Tylko authorized users dla modyfikacji rowerów
                                 .requestMatchers("/api/bicycles/*/photo").authenticated()
                                 .requestMatchers("/test").permitAll()
