@@ -53,6 +53,7 @@ public class WebSecurityConfig {
                                 .requestMatchers("/api/test/**").permitAll()
                                 // Tylko authorized users dla modyfikacji rowerów
                                 .requestMatchers("/api/bicycles/*/photo").authenticated()
+                                .requestMatchers("/api/service-orders/package-price/**").permitAll()
                                 .requestMatchers("/test").permitAll()
                                 // Pozostałe API powinno być chronione
                                 .anyRequest().authenticated()
