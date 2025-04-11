@@ -1,6 +1,7 @@
 package com.samarama.bicycle.api.service.impl;
 
 import com.samarama.bicycle.api.model.BicycleEnumeration;
+import com.samarama.bicycle.api.model.ServiceOrder;
 import com.samarama.bicycle.api.repository.BicycleEnumerationRepository;
 import com.samarama.bicycle.api.service.BicycleEnumerationService;
 import jakarta.annotation.PostConstruct;
@@ -19,6 +20,15 @@ public class BicycleEnumerationServiceImpl implements BicycleEnumerationService 
     public static final String BRAND = "BRAND";
     public static final String BIKE_TYPE = "BIKE_TYPE";
     public static final String FRAME_MATERIAL = "FRAME_MATERIAL";
+
+    // Stałe dla pakietów serwisowych
+    public static final String SERVICE_PACKAGE = "SERVICE_PACKAGE";
+    public static final String SERVICE_PACKAGE_BASIC = "SERVICE_PACKAGE_BASIC";
+    public static final String SERVICE_PACKAGE_EXTENDED = "SERVICE_PACKAGE_EXTENDED";
+    public static final String SERVICE_PACKAGE_FULL = "SERVICE_PACKAGE_FULL";
+
+    // Stałe dla statusów zamówień
+    public static final String ORDER_STATUS = "ORDER_STATUS";
 
     public BicycleEnumerationServiceImpl(BicycleEnumerationRepository enumerationRepository) {
         this.enumerationRepository = enumerationRepository;
@@ -98,6 +108,71 @@ public class BicycleEnumerationServiceImpl implements BicycleEnumerationService 
                     "Chrom-molibden", "Magnez", "Kompozyt"
             );
             saveEnumeration(FRAME_MATERIAL, frameMaterials);
+        }
+
+        // Typy pakietów serwisowych
+        if (!enumerationRepository.existsByType(SERVICE_PACKAGE)) {
+            List<String> servicePackages = Arrays.asList(
+                    "BASIC", "EXTENDED", "FULL"
+            );
+            saveEnumeration(SERVICE_PACKAGE, servicePackages);
+        }
+
+        // Pakiet podstawowy - szczegóły
+        if (!enumerationRepository.existsByType(SERVICE_PACKAGE_BASIC)) {
+            List<String> features = Arrays.asList(
+                    "Ocena stanu technicznego roweru",
+                    "Regulacja hamulców",
+                    "Regulacja przerzutek",
+                    "Smarowanie łańcucha",
+                    "Sprawdzenie ciśnienia w ogumieniu",
+                    "Sprawdzenie poprawności skręcenia roweru",
+                    "Kontrola luzu sterów",
+                    "Kontrola połączeń śrubowych",
+                    "Sprawdzenie linek, pancerzy",
+                    "Sprawdzenie stanu opon",
+                    "Kasowanie luzów i regulacja elementów ruchomych"
+            );
+            saveEnumeration(SERVICE_PACKAGE_BASIC, features);
+        }
+
+        // Pakiet rozszerzony - szczegóły
+        if (!enumerationRepository.existsByType(SERVICE_PACKAGE_EXTENDED)) {
+            List<String> features = Arrays.asList(
+                    "Wszystkie elementy przeglądu podstawowego",
+                    "Czyszczenie i smarowanie łańcucha, kasety",
+                    "Wymiana smaru w sterach, piastach, suporcie",
+                    "Kontrola kół",
+                    "Kontrola działania amortyzatora",
+                    "W cenie wymiana klocków, linek, pancerzy, dętek, opon, łańcucha, kasety lub wolnobiegu. Do ceny należy doliczyć koszt części, które wymagają wymiany."
+            );
+            saveEnumeration(SERVICE_PACKAGE_EXTENDED, features);
+        }
+
+        // Pakiet pełny - szczegóły
+        if (!enumerationRepository.existsByType(SERVICE_PACKAGE_FULL)) {
+            List<String> features = Arrays.asList(
+                    "Wszystkie elementy przeglądu rozszerzonego",
+                    "Mycie roweru",
+                    "Czyszczenie i konserwacja przerzutek",
+                    "Czyszczenie i smarowanie łańcucha, kasety, korby",
+                    "Wymiana smaru w sterach, piastach, suporcie",
+                    "Wymiana linek i pancerzy",
+                    "Kontrola luzu łożysk suportu, steru, piast",
+                    "Sprawdzenie połączeń gwintowych",
+                    "Zewnętrzna konserwacja goleni amortyzatora",
+                    "Centrowanie kół",
+                    "Linki i pancerze oraz mycie roweru są wliczone w cenę przeglądu"
+            );
+            saveEnumeration(SERVICE_PACKAGE_FULL, features);
+        }
+
+        // Statusy zamówień
+        if (!enumerationRepository.existsByType(ORDER_STATUS)) {
+            List<String> orderStatuses = Arrays.asList(
+                    "PENDING", "CONFIRMED", "PICKED_UP", "IN_SERVICE", "COMPLETED", "DELIVERED", "CANCELLED"
+            );
+            saveEnumeration(ORDER_STATUS, orderStatuses);
         }
     }
 }
