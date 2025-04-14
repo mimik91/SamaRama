@@ -53,6 +53,10 @@ public class JwtTokenFilter extends OncePerRequestFilter {
                         // Dla ścieżek związanych z rowerami, przydziel rolę CLIENT jeśli nie ma innych
                         authorities = Collections.singletonList(new SimpleGrantedAuthority("ROLE_CLIENT"));
                         logger.info("Added ROLE_CLIENT based on request URI: " + requestUri);
+                    } else if (requestUri.contains("/api/service-orders")) {
+                        // Dla service-orders, przydziel rolę CLIENT
+                        authorities = Collections.singletonList(new SimpleGrantedAuthority("ROLE_CLIENT"));
+                        logger.info("Added ROLE_CLIENT based on request URI: " + requestUri);
                     } else if (requestUri.contains("/api/service")) {
                         // Dla ścieżek związanych z serwisem, przydziel rolę SERVICE jeśli nie ma innych
                         authorities = Collections.singletonList(new SimpleGrantedAuthority("ROLE_SERVICE"));

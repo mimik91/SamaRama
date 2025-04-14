@@ -1,12 +1,12 @@
 package com.samarama.bicycle.api.service.impl;
 
 import com.samarama.bicycle.api.dto.ServiceOrderDto;
-import com.samarama.bicycle.api.model.Bicycle;
 import com.samarama.bicycle.api.model.BikeService;
+import com.samarama.bicycle.api.model.IncompleteBike;
 import com.samarama.bicycle.api.model.ServiceOrder;
 import com.samarama.bicycle.api.model.User;
-import com.samarama.bicycle.api.repository.BicycleRepository;
 import com.samarama.bicycle.api.repository.BikeServiceRepository;
+import com.samarama.bicycle.api.repository.IncompleteBikeRepository;
 import com.samarama.bicycle.api.repository.ServiceOrderRepository;
 import com.samarama.bicycle.api.repository.UserRepository;
 import com.samarama.bicycle.api.service.ServiceOrderService;
@@ -28,7 +28,7 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
 
     private final ServiceOrderRepository serviceOrderRepository;
     private final UserRepository userRepository;
-    private final BicycleRepository bicycleRepository;
+    private final IncompleteBikeRepository incompleteBikeRepository;
     private final BikeServiceRepository bikeServiceRepository;
 
     // Ceny pakietów usług
@@ -42,11 +42,11 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
 
     public ServiceOrderServiceImpl(ServiceOrderRepository serviceOrderRepository,
                                    UserRepository userRepository,
-                                   BicycleRepository bicycleRepository,
+                                   IncompleteBikeRepository incompleteBikeRepository,
                                    BikeServiceRepository bikeServiceRepository) {
         this.serviceOrderRepository = serviceOrderRepository;
         this.userRepository = userRepository;
-        this.bicycleRepository = bicycleRepository;
+        this.incompleteBikeRepository = incompleteBikeRepository;
         this.bikeServiceRepository = bikeServiceRepository;
     }
 
@@ -57,17 +57,17 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
             User user = userRepository.findByEmail(userEmail)
                     .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + userEmail));
 
-            // Sprawdź czy rower istnieje i należy do użytkownika
-            Optional<Bicycle> bicycleOpt = bicycleRepository.findById(serviceOrderDto.bicycleId());
-            if (bicycleOpt.isEmpty()) {
+            // Szukamy roweru w tabeli incomplete_bikes
+            Optional<IncompleteBike> bikeOpt = incompleteBikeRepository.findById(serviceOrderDto.bicycleId());
+            if (bikeOpt.isEmpty()) {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND)
                         .body(Map.of("message", "Bicycle not found"));
             }
 
-            Bicycle bicycle = bicycleOpt.get();
+            IncompleteBike bike = bikeOpt.get();
 
             // Sprawdź czy rower należy do użytkownika
-            if (bicycle.getOwner() == null || !bicycle.getOwner().getId().equals(user.getId())) {
+            if (bike.getOwner() == null || !bike.getOwner().getId().equals(user.getId())) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN)
                         .body(Map.of("message", "You do not have permission to order service for this bicycle"));
             }
@@ -90,7 +90,7 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
 
             // Utwórz nowe zamówienie serwisu
             ServiceOrder serviceOrder = new ServiceOrder();
-            serviceOrder.setBicycle(bicycle);
+            serviceOrder.setBicycle(bike);
             serviceOrder.setClient(user);
             serviceOrder.setService(bikeService);
             serviceOrder.setServicePackage(serviceOrderDto.servicePackage());
@@ -129,19 +129,19 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + userEmail));
 
-        Optional<Bicycle> bicycleOpt = bicycleRepository.findById(bicycleId);
-        if (bicycleOpt.isEmpty()) {
+        Optional<IncompleteBike> bikeOpt = incompleteBikeRepository.findById(bicycleId);
+        if (bikeOpt.isEmpty()) {
             return List.of();
         }
 
-        Bicycle bicycle = bicycleOpt.get();
+        IncompleteBike bike = bikeOpt.get();
 
         // Sprawdź czy rower należy do użytkownika
-        if (bicycle.getOwner() == null || !bicycle.getOwner().getId().equals(user.getId())) {
+        if (bike.getOwner() == null || !bike.getOwner().getId().equals(user.getId())) {
             return List.of();
         }
 
-        return serviceOrderRepository.findByBicycle(bicycle);
+        return serviceOrderRepository.findByBicycle(bike);
     }
 
     @Override

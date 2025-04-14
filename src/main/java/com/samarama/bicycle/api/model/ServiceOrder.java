@@ -26,9 +26,10 @@ public class ServiceOrder {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    // Zmieniono z Bicycle na IncompleteBike
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "bicycle_id")
-    private Bicycle bicycle;
+    private IncompleteBike bicycle;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")

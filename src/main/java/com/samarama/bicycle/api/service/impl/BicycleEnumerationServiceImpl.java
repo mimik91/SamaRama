@@ -1,7 +1,6 @@
 package com.samarama.bicycle.api.service.impl;
 
 import com.samarama.bicycle.api.model.BicycleEnumeration;
-import com.samarama.bicycle.api.model.ServiceOrder;
 import com.samarama.bicycle.api.repository.BicycleEnumerationRepository;
 import com.samarama.bicycle.api.service.BicycleEnumerationService;
 import jakarta.annotation.PostConstruct;
@@ -26,6 +25,21 @@ public class BicycleEnumerationServiceImpl implements BicycleEnumerationService 
     public static final String SERVICE_PACKAGE_BASIC = "SERVICE_PACKAGE_BASIC";
     public static final String SERVICE_PACKAGE_EXTENDED = "SERVICE_PACKAGE_EXTENDED";
     public static final String SERVICE_PACKAGE_FULL = "SERVICE_PACKAGE_FULL";
+
+    // Stałe dla cen pakietów serwisowych
+    public static final String SERVICE_PACKAGE_BASIC_PRICE = "SERVICE_PACKAGE_BASIC_PRICE";
+    public static final String SERVICE_PACKAGE_EXTENDED_PRICE = "SERVICE_PACKAGE_EXTENDED_PRICE";
+    public static final String SERVICE_PACKAGE_FULL_PRICE = "SERVICE_PACKAGE_FULL_PRICE";
+
+    // Stałe dla nazw pakietów serwisowych
+    public static final String SERVICE_PACKAGE_BASIC_NAME = "SERVICE_PACKAGE_BASIC_NAME";
+    public static final String SERVICE_PACKAGE_EXTENDED_NAME = "SERVICE_PACKAGE_EXTENDED_NAME";
+    public static final String SERVICE_PACKAGE_FULL_NAME = "SERVICE_PACKAGE_FULL_NAME";
+
+    // Stałe dla opisów pakietów serwisowych
+    public static final String SERVICE_PACKAGE_BASIC_DESC = "SERVICE_PACKAGE_BASIC_DESC";
+    public static final String SERVICE_PACKAGE_EXTENDED_DESC = "SERVICE_PACKAGE_EXTENDED_DESC";
+    public static final String SERVICE_PACKAGE_FULL_DESC = "SERVICE_PACKAGE_FULL_DESC";
 
     // Stałe dla statusów zamówień
     public static final String ORDER_STATUS = "ORDER_STATUS";
@@ -116,6 +130,48 @@ public class BicycleEnumerationServiceImpl implements BicycleEnumerationService 
                     "BASIC", "EXTENDED", "FULL"
             );
             saveEnumeration(SERVICE_PACKAGE, servicePackages);
+        }
+
+        // Ceny pakietów serwisowych
+        if (!enumerationRepository.existsByType(SERVICE_PACKAGE_BASIC_PRICE)) {
+            saveEnumeration(SERVICE_PACKAGE_BASIC_PRICE, Collections.singletonList("200"));
+        }
+
+        if (!enumerationRepository.existsByType(SERVICE_PACKAGE_EXTENDED_PRICE)) {
+            saveEnumeration(SERVICE_PACKAGE_EXTENDED_PRICE, Collections.singletonList("350"));
+        }
+
+        if (!enumerationRepository.existsByType(SERVICE_PACKAGE_FULL_PRICE)) {
+            saveEnumeration(SERVICE_PACKAGE_FULL_PRICE, Collections.singletonList("600"));
+        }
+
+        // Nazwy pakietów serwisowych
+        if (!enumerationRepository.existsByType(SERVICE_PACKAGE_BASIC_NAME)) {
+            saveEnumeration(SERVICE_PACKAGE_BASIC_NAME, Collections.singletonList("Przegląd podstawowy"));
+        }
+
+        if (!enumerationRepository.existsByType(SERVICE_PACKAGE_EXTENDED_NAME)) {
+            saveEnumeration(SERVICE_PACKAGE_EXTENDED_NAME, Collections.singletonList("Przegląd rozszerzony"));
+        }
+
+        if (!enumerationRepository.existsByType(SERVICE_PACKAGE_FULL_NAME)) {
+            saveEnumeration(SERVICE_PACKAGE_FULL_NAME, Collections.singletonList("Przegląd pełny"));
+        }
+
+        // Opisy pakietów serwisowych
+        if (!enumerationRepository.existsByType(SERVICE_PACKAGE_BASIC_DESC)) {
+            saveEnumeration(SERVICE_PACKAGE_BASIC_DESC,
+                    Collections.singletonList("Podstawowe sprawdzenie stanu roweru i regulacje"));
+        }
+
+        if (!enumerationRepository.existsByType(SERVICE_PACKAGE_EXTENDED_DESC)) {
+            saveEnumeration(SERVICE_PACKAGE_EXTENDED_DESC,
+                    Collections.singletonList("Rozszerzony przegląd z czyszczeniem i wymianą podstawowych części"));
+        }
+
+        if (!enumerationRepository.existsByType(SERVICE_PACKAGE_FULL_DESC)) {
+            saveEnumeration(SERVICE_PACKAGE_FULL_DESC,
+                    Collections.singletonList("Kompleksowy przegląd i konserwacja całego roweru"));
         }
 
         // Pakiet podstawowy - szczegóły
