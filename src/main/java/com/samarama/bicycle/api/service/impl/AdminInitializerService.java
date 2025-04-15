@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
+import java.util.Set;
 
 @Service
 public class AdminInitializerService {
@@ -29,18 +30,6 @@ public class AdminInitializerService {
     @Value("${admin.lastName:Admin}")
     private String adminLastName;
 
-    @Value("${moderator.email:moderator@example.com}")
-    private String moderatorEmail;
-
-    @Value("${moderator.password:misiek}")
-    private String moderatorPassword;
-
-    @Value("${moderator.firstName:Moderator}")
-    private String moderatorFirstName;
-
-    @Value("${moderator.lastName:System}")
-    private String moderatorLastName;
-
     public AdminInitializerService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
@@ -48,15 +37,7 @@ public class AdminInitializerService {
 
     @PostConstruct
     @Transactional
-    public void initializeAdminAndModerator() {
-        // Initialize Admin
-        initializeAdmin();
-
-        // Initialize Moderator
-        initializeModerator();
-    }
-
-    private void initializeAdmin() {
+    public void initializeAdmin() {
         Optional<User> existingAdmin = userRepository.findByEmail(adminEmail);
 
         if (existingAdmin.isEmpty()) {
@@ -68,55 +49,23 @@ public class AdminInitializerService {
             admin.setVerified(true);
             admin.setCreatedAt(LocalDateTime.now());
 
-            // Add both CLIENT and ADMIN roles
-            admin.addRole("ROLE_CLIENT");
-            admin.addRole("ROLE_ADMIN");
+            // Add ONLY the ADMIN role, not CLIENT
+            admin.setRoles(Set.of("ROLE_ADMIN"));
 
             userRepository.save(admin);
 
             System.out.println("Administrator account created: " + adminEmail);
         } else {
-            System.out.println("Administrator account already exists: " + adminEmail);
-
-            // Ensure the existing user has the ADMIN role
             User admin = existingAdmin.get();
-            if (!admin.hasRole("ROLE_ADMIN")) {
-                admin.addRole("ROLE_ADMIN");
+
+            // Replace all existing roles with just ADMIN role
+            if (!admin.getRoles().equals(Set.of("ROLE_ADMIN"))) {
+                admin.setRoles(Set.of("ROLE_ADMIN"));
                 userRepository.save(admin);
-                System.out.println("Added ADMIN role to existing user: " + adminEmail);
+                System.out.println("Updated roles for admin user: " + adminEmail);
             }
         }
-    }
 
-    private void initializeModerator() {
-        Optional<User> existingModerator = userRepository.findByEmail(moderatorEmail);
-
-        if (existingModerator.isEmpty()) {
-            User moderator = new User();
-            moderator.setEmail(moderatorEmail);
-            moderator.setFirstName(moderatorFirstName);
-            moderator.setLastName(moderatorLastName);
-            moderator.setPassword(passwordEncoder.encode(moderatorPassword));
-            moderator.setVerified(true);
-            moderator.setCreatedAt(LocalDateTime.now());
-
-            // Add both CLIENT and MODERATOR roles
-            moderator.addRole("ROLE_CLIENT");
-            moderator.addRole("ROLE_MODERATOR");
-
-            userRepository.save(moderator);
-
-            System.out.println("Moderator account created: " + moderatorEmail);
-        } else {
-            System.out.println("Moderator account already exists: " + moderatorEmail);
-
-            // Ensure the existing user has the MODERATOR role
-            User moderator = existingModerator.get();
-            if (!moderator.hasRole("ROLE_MODERATOR")) {
-                moderator.addRole("ROLE_MODERATOR");
-                userRepository.save(moderator);
-                System.out.println("Added MODERATOR role to existing user: " + moderatorEmail);
-            }
-        }
+        // Moderator initialization code has been removed
     }
 }
