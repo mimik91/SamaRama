@@ -69,7 +69,13 @@ public class AuthServiceImpl implements AuthService {
             response.put("email", user.getEmail());
             response.put("firstName", user.getFirstName());
             response.put("lastName", user.getLastName());
-            response.put("role", "CLIENT");
+            if (user.hasRole("ROLE_ADMIN")) {
+                response.put("role", "ADMIN");
+            } else if (user.hasRole("ROLE_MODERATOR")) {
+                response.put("role", "MODERATOR");
+            } else {
+                response.put("role", "CLIENT");
+            }
 
             return ResponseEntity.ok(response);
         } catch (BadCredentialsException e) {

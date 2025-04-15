@@ -18,8 +18,8 @@ import java.time.LocalDateTime;
 @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class ServiceOrder {
 
-    public enum ServicePackage {
-        BASIC, EXTENDED, FULL
+    public enum OrderStatus {
+        PENDING, CONFIRMED, PICKED_UP, IN_SERVICE, COMPLETED, DELIVERED, CANCELLED
     }
 
     @Id
@@ -39,9 +39,14 @@ public class ServiceOrder {
     @JoinColumn(name = "service_id")
     private BikeService service;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    // Zmiana z enum na referencję do encji ServicePackage
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "service_package_id")
     private ServicePackage servicePackage;
+
+    // Zachowanie kompatybilności wstecznej - kolumna przechowująca kod pakietu
+    @Column(name = "service_package_code")
+    private String servicePackageCode;
 
     @Column(nullable = false)
     private LocalDate pickupDate;
@@ -67,8 +72,4 @@ public class ServiceOrder {
 
     // Opcjonalne uwagi od serwisu
     private String serviceNotes;
-
-    public enum OrderStatus {
-        PENDING, CONFIRMED, PICKED_UP, IN_SERVICE, COMPLETED, DELIVERED, CANCELLED
-    }
 }
