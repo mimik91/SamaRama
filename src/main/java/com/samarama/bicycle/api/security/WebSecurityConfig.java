@@ -49,12 +49,13 @@ public class WebSecurityConfig {
                                 .requestMatchers("/api/auth/**").permitAll()
                                 .requestMatchers("/api/map/**").permitAll()
                                 .requestMatchers("/api/bike-services/**").permitAll()
-                                .requestMatchers("/api/enumerations/**").permitAll() // Dodana ta linia
-                                .requestMatchers("/api/test/**").permitAll()
-                                // Tylko authorized users dla modyfikacji rowerów
-                                .requestMatchers("/api/bicycles/*/photo").authenticated()
+                                .requestMatchers("/api/enumerations/**").permitAll()
                                 .requestMatchers("/api/service-orders/package-price/**").permitAll()
                                 .requestMatchers("/test").permitAll()
+                                // Admin routes require ADMIN or MODERATOR role
+                                .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "MODERATOR")
+                                // Tylko authorized users dla modyfikacji rowerów
+                                .requestMatchers("/api/bicycles/*/photo").authenticated()
                                 // Pozostałe API powinno być chronione
                                 .anyRequest().authenticated()
                 );

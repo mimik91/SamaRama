@@ -30,14 +30,14 @@ public class JwtUtils {
     public String generateJwtToken(Authentication authentication) {
         UserDetails userPrincipal = (UserDetails) authentication.getPrincipal();
 
-        // Zbierz role użytkownika z autentykacji
+        // Collect user roles from authentication
         List<String> roles = authentication.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
                 .collect(Collectors.toList());
 
-        // Jeśli nie ma ról, sprawdź jaką metodą się zalogował
+        // If no roles found, check how the user logged in
         if (roles.isEmpty()) {
-            // Sprawdź kontekst logowania (jeśli loguje się przez /signin/client, dodaj ROLE_CLIENT)
+            // Check login context
             Object details = authentication.getDetails();
             if (details instanceof Map) {
                 Object loginContext = ((Map<?, ?>) details).get("loginContext");
@@ -45,19 +45,32 @@ public class JwtUtils {
                     roles.add("ROLE_CLIENT");
                 } else if ("service".equals(loginContext)) {
                     roles.add("ROLE_SERVICE");
+                } else if ("admin".equals(loginContext)) {
+                    roles.add("ROLE_ADMIN");
+                } else if ("moderator".equals(loginContext)) {
+                    roles.add("ROLE_MODERATOR");
                 }
             }
         }
 
+        // Add additional metadata for special roles
         Map<String, Object> claims = new HashMap<>();
         claims.put("roles", roles);
 
+        // Include roles for admin/moderator for easier access
+        if (roles.contains("ROLE_ADMIN")) {
+            claims.put("isAdmin", true);
+        }
+        if (roles.contains("ROLE_MODERATOR")) {
+            claims.put("isModerator", true);
+        }
+
         return Jwts.builder()
-                .claims(claims)  // Zamiast setClaims
-                .subject(userPrincipal.getUsername())  // Zamiast setSubject
-                .issuedAt(new Date())  // Zamiast setIssuedAt
-                .expiration(new Date((new Date()).getTime() + jwtExpirationMs))  // Zamiast setExpiration
-                .signWith(key())  // Zamiast signWith z dwoma parametrami
+                .claims(claims)
+                .subject(userPrincipal.getUsername())
+                .issuedAt(new Date())
+                .expiration(new Date((new Date()).getTime() + jwtExpirationMs))
+                .signWith(key())
                 .compact();
     }
 

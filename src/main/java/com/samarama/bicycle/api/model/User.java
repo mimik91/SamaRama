@@ -21,7 +21,7 @@ import java.util.Set;
 public class User {
 
     public enum UserRole {
-        CLIENT, SERVICEMAN
+        CLIENT, SERVICEMAN, ADMIN, MODERATOR
     }
 
     @Id

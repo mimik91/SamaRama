@@ -44,31 +44,25 @@ public class JwtTokenFilter extends OncePerRequestFilter {
                     String email = jwtUtils.getUserNameFromJwtToken(jwt);
                     logger.info("JWT token for user: " + email);
 
-                    // Główna zmiana - pobierz role BEZPOŚREDNIO z tokenu JWT
-                    Collection<SimpleGrantedAuthority> authorities;
+                    // Get authorities directly from JWT token
+                    Collection<SimpleGrantedAuthority> authorities = jwtUtils.getRolesFromJwtToken(jwt);
+                    logger.info("JWT token roles: " + authorities);
 
-                    // Sprawdź ścieżkę URL, aby określić kontekst
+                    // Special handling for admin panel
                     String requestUri = request.getRequestURI();
-                    if (requestUri.contains("/api/bicycles")) {
-                        // Dla ścieżek związanych z rowerami, przydziel rolę CLIENT jeśli nie ma innych
-                        authorities = Collections.singletonList(new SimpleGrantedAuthority("ROLE_CLIENT"));
-                        logger.info("Added ROLE_CLIENT based on request URI: " + requestUri);
-                    } else if (requestUri.contains("/api/service-orders")) {
-                        // Dla service-orders, przydziel rolę CLIENT
-                        authorities = Collections.singletonList(new SimpleGrantedAuthority("ROLE_CLIENT"));
-                        logger.info("Added ROLE_CLIENT based on request URI: " + requestUri);
-                    } else if (requestUri.contains("/api/service")) {
-                        // Dla ścieżek związanych z serwisem, przydziel rolę SERVICE jeśli nie ma innych
-                        authorities = Collections.singletonList(new SimpleGrantedAuthority("ROLE_SERVICE"));
-                        logger.info("Added ROLE_SERVICE based on request URI: " + requestUri);
-                    } else {
-                        // W przeciwnym razie próbuj odczytać z tokena
-                        authorities = jwtUtils.getRolesFromJwtToken(jwt);
+                    if (requestUri.contains("/api/admin")) {
+                        // Check if user has ADMIN or MODERATOR role
+                        boolean hasAdminRole = authorities.stream()
+                                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN") || a.getAuthority().equals("ROLE_MODERATOR"));
+
+                        if (!hasAdminRole) {
+                            logger.warning("Unauthorized access attempt to admin API: " + email);
+                            response.sendError(HttpServletResponse.SC_FORBIDDEN, "Access denied");
+                            return;
+                        }
                     }
 
-                    logger.info("Assigned authorities: " + authorities);
-
-                    // Utwórz autentykację bez korzystania z UserDetailsService
+                    // Create authentication
                     UserDetails userDetails = new User(email, "", authorities);
                     UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                             userDetails, null, authorities);
