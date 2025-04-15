@@ -3,6 +3,7 @@ package com.samarama.bicycle.api.service.impl;
 import com.samarama.bicycle.api.model.BicycleEnumeration;
 import com.samarama.bicycle.api.repository.BicycleEnumerationRepository;
 import com.samarama.bicycle.api.service.BicycleEnumerationService;
+import com.samarama.bicycle.api.service.ServicePackageService;
 import jakarta.annotation.PostConstruct;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,18 +15,19 @@ import java.util.stream.Collectors;
 public class BicycleEnumerationServiceImpl implements BicycleEnumerationService {
 
     private final BicycleEnumerationRepository enumerationRepository;
-    private final ServicePackageServiceImpl servicePackageService;
+    private final ServicePackageService servicePackageService;
 
     // Stałe dla standardowych typów
     public static final String BRAND = "BRAND";
     public static final String BIKE_TYPE = "BIKE_TYPE";
     public static final String FRAME_MATERIAL = "FRAME_MATERIAL";
+    public static final String SERVICE_PACKAGE = "SERVICE_PACKAGE";
 
     // Stałe dla statusów zamówień
     public static final String ORDER_STATUS = "ORDER_STATUS";
 
     public BicycleEnumerationServiceImpl(BicycleEnumerationRepository enumerationRepository,
-                                         ServicePackageServiceImpl servicePackageService) {
+                                         ServicePackageService servicePackageService) {
         this.enumerationRepository = enumerationRepository;
         this.servicePackageService = servicePackageService;
     }
@@ -39,18 +41,40 @@ public class BicycleEnumerationServiceImpl implements BicycleEnumerationService 
     @Transactional(readOnly = true)
     public Map<String, List<String>> getAllEnumerations() {
         List<BicycleEnumeration> enumerations = enumerationRepository.findAll();
-        return enumerations.stream()
+
+        Map<String, List<String>> result = enumerations.stream()
                 .collect(Collectors.toMap(
                         BicycleEnumeration::getType,
                         enumeration -> enumeration.getValues().stream()
                                 .sorted(String.CASE_INSENSITIVE_ORDER)  // Sortowanie alfabetyczne
                                 .collect(Collectors.toList())
                 ));
+
+        // Add service package codes from the ServicePackageService
+        if (!result.containsKey(SERVICE_PACKAGE)) {
+            var servicePackages = servicePackageService.getActiveServicePackages();
+            if (!servicePackages.isEmpty()) {
+                List<String> packageCodes = servicePackages.stream()
+                        .map(pkg -> pkg.getCode())
+                        .collect(Collectors.toList());
+                result.put(SERVICE_PACKAGE, packageCodes);
+            }
+        }
+
+        return result;
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<String> getEnumerationValues(String type) {
+        // Special case for SERVICE_PACKAGE
+        if (SERVICE_PACKAGE.equals(type)) {
+            var servicePackages = servicePackageService.getActiveServicePackages();
+            return servicePackages.stream()
+                    .map(pkg -> pkg.getCode())
+                    .collect(Collectors.toList());
+        }
+
         return enumerationRepository.findByType(type)
                 .map(enumeration -> {
                     List<String> sortedValues = new ArrayList<>(enumeration.getValues());
@@ -64,6 +88,14 @@ public class BicycleEnumerationServiceImpl implements BicycleEnumerationService 
     @Override
     @Transactional
     public BicycleEnumeration saveEnumeration(String type, List<String> values) {
+        // Special case for SERVICE_PACKAGE - don't allow direct updates
+        if (SERVICE_PACKAGE.equals(type)) {
+            throw new UnsupportedOperationException(
+                    "Service packages cannot be updated directly through the enumeration API. " +
+                            "Please use the ServicePackageController to manage service packages."
+            );
+        }
+
         BicycleEnumeration enumeration = enumerationRepository.findByType(type)
                 .orElse(new BicycleEnumeration(type, new ArrayList<>()));
 

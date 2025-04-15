@@ -5,9 +5,6 @@ import com.samarama.bicycle.api.model.*;
 import com.samarama.bicycle.api.repository.*;
 import com.samarama.bicycle.api.service.ServiceOrderService;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -201,23 +198,17 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
     }
 
     @Override
-    public ResponseEntity<?> getServicePackagePrice(ServiceOrder.ServicePackage servicePackage) {
-        // To make this backward compatible with the enum version
-        String packageCode = servicePackage.toString();
+    public ResponseEntity<?> getServicePackagePrice(String servicePackageCode) {
+        // Fixed method to accept a String servicePackageCode instead of enum
 
-        Optional<ServicePackage> packageEntity = servicePackageRepository.findByCode(packageCode);
+        Optional<ServicePackage> packageEntity = servicePackageRepository.findByCode(servicePackageCode);
         if (packageEntity.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("message", "Invalid service package"));
         }
 
         return ResponseEntity.ok(Map.of(
-                "servicePackage", packageCode,
+                "servicePackage", servicePackageCode,
                 "price", packageEntity.get().getPrice()
         ));
-    }
-
-    // Metoda pomocnicza do konwersji między starym enum a kodem pakietu
-    private String convertEnumToCode(ServiceOrder.ServicePackage packageEnum) {
-        return packageEnum.name();
     }
 }

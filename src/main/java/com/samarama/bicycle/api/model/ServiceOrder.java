@@ -26,7 +26,6 @@ public class ServiceOrder {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Zmieniono z Bicycle na IncompleteBike
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "bicycle_id")
     private IncompleteBike bicycle;
@@ -39,7 +38,6 @@ public class ServiceOrder {
     @JoinColumn(name = "service_id")
     private BikeService service;
 
-    // Zmiana z enum na referencję do encji ServicePackage
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "service_package_id")
     private ServicePackage servicePackage;

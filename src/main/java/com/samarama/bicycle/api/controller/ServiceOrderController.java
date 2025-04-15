@@ -1,7 +1,13 @@
 package com.samarama.bicycle.api.controller;
 
 import com.samarama.bicycle.api.dto.ServiceOrderDto;
+import com.samarama.bicycle.api.dto.ServiceRecordResponseDto;
+import com.samarama.bicycle.api.model.Bicycle;
+import com.samarama.bicycle.api.model.IncompleteBike;
 import com.samarama.bicycle.api.model.ServiceOrder;
+import com.samarama.bicycle.api.model.ServiceRecord;
+import com.samarama.bicycle.api.repository.BicycleRepository;
+import com.samarama.bicycle.api.repository.IncompleteBikeRepository;
 import com.samarama.bicycle.api.service.ServiceOrderService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -12,6 +18,8 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 @CrossOrigin(origins = "*", maxAge = 3600)
 @RestController
@@ -19,9 +27,17 @@ import java.util.Map;
 public class ServiceOrderController {
 
     private final ServiceOrderService serviceOrderService;
+    private final BicycleRepository bicycleRepository;
+    private final IncompleteBikeRepository incompleteBikeRepository;
 
-    public ServiceOrderController(ServiceOrderService serviceOrderService) {
+    public ServiceOrderController(
+            ServiceOrderService serviceOrderService,
+            BicycleRepository bicycleRepository,
+            IncompleteBikeRepository incompleteBikeRepository
+    ) {
         this.serviceOrderService = serviceOrderService;
+        this.bicycleRepository = bicycleRepository;
+        this.incompleteBikeRepository = incompleteBikeRepository;
     }
 
     @PostMapping
@@ -31,18 +47,42 @@ public class ServiceOrderController {
         return serviceOrderService.createServiceOrder(serviceOrderDto, email);
     }
 
+    private String getCurrentUserEmail() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        return authentication.getName();
+    }
+
+    @GetMapping("/bicycle/{bicycleId}")
+    public ResponseEntity<List<ServiceOrder>> getBicycleServiceOrders(@PathVariable Long bicycleId) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String currentUserEmail = authentication.getName();
+
+        // Najpierw sprawdź, czy istnieje kompletny rower o podanym ID
+        Optional<Bicycle> bicycleOpt = bicycleRepository.findById(bicycleId);
+
+        if (bicycleOpt.isPresent()) {
+            // Jeśli znaleziono kompletny rower, pobierz jego historię zamówień
+            List<ServiceOrder> orders = serviceOrderService.getBicycleServiceOrders(bicycleId, currentUserEmail);
+            return ResponseEntity.ok(orders);
+        } else {
+            // Jeśli nie znaleziono kompletnego roweru, sprawdź czy istnieje niekompletny rower
+            Optional<IncompleteBike> incompleteBikeOpt = incompleteBikeRepository.findById(bicycleId);
+
+            if (incompleteBikeOpt.isPresent()) {
+                // Dla niekompletnych rowerów, zwracamy pustą listę zamówień
+                return ResponseEntity.ok(List.of());
+            }
+
+            // Jeśli nie znaleziono żadnego roweru, zwróć 404
+            return ResponseEntity.notFound().build();
+        }
+    }
+
     @GetMapping
     @PreAuthorize("hasRole('CLIENT')")
     public List<ServiceOrder> getUserServiceOrders() {
         String email = getCurrentUserEmail();
         return serviceOrderService.getUserServiceOrders(email);
-    }
-
-    @GetMapping("/bicycle/{bicycleId}")
-    @PreAuthorize("hasRole('CLIENT')")
-    public List<ServiceOrder> getBicycleServiceOrders(@PathVariable Long bicycleId) {
-        String email = getCurrentUserEmail();
-        return serviceOrderService.getBicycleServiceOrders(bicycleId, email);
     }
 
     @GetMapping("/{orderId}")
@@ -59,18 +99,8 @@ public class ServiceOrderController {
         return serviceOrderService.cancelServiceOrder(orderId, email);
     }
 
-    @GetMapping("/package-price/{packageType}")
-    public ResponseEntity<?> getServicePackagePrice(@PathVariable String packageType) {
-        try {
-            ServiceOrder.ServicePackage servicePackage = ServiceOrder.ServicePackage.valueOf(packageType.toUpperCase());
-            return serviceOrderService.getServicePackagePrice(servicePackage);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Invalid service package type"));
-        }
-    }
-
-    private String getCurrentUserEmail() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        return authentication.getName();
+    @GetMapping("/package-price/{packageCode}")
+    public ResponseEntity<?> getServicePackagePrice(@PathVariable String packageCode) {
+        return serviceOrderService.getServicePackagePrice(packageCode);
     }
 }

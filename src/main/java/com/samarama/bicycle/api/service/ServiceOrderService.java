@@ -49,8 +49,8 @@ public interface ServiceOrderService {
 
     /**
      * Get price for a service package
-     * @param servicePackage the service package enum (legacy method)
+     * @param servicePackageCode the service package code (legacy method)
      * @return the price for the service package
      */
-    ResponseEntity<?> getServicePackagePrice(ServiceOrder.ServicePackage servicePackage);
+    ResponseEntity<?> getServicePackagePrice(String servicePackageCode);
 }
