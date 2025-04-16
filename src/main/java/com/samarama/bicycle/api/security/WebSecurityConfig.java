@@ -51,6 +51,7 @@ public class WebSecurityConfig {
                                 .requestMatchers("/api/bike-services/**").permitAll()
                                 .requestMatchers("/api/enumerations/**").permitAll()
                                 .requestMatchers("/api/service-orders/package-price/**").permitAll()
+                                .requestMatchers("/api/account/**").permitAll()
                                 .requestMatchers("/test").permitAll()
                                 // Admin routes require ADMIN or MODERATOR role
                                 .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "MODERATOR")
