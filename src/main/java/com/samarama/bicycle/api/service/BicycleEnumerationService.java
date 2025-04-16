@@ -14,7 +14,7 @@ public interface BicycleEnumerationService {
 
     /**
      * Get values for specific enumeration type
-     * @param type enumeration type (e.g. "BRAND", "BIKE_TYPE", "FRAME_MATERIAL", "SERVICE_PACKAGE")
+     * @param type enumeration type (e.g. "BRAND", "BIKE_TYPE", "FRAME_MATERIAL")
      * @return list of values or empty list if not found
      */
     List<String> getEnumerationValues(String type);
@@ -24,7 +24,6 @@ public interface BicycleEnumerationService {
      * @param type enumeration type
      * @param values list of values
      * @return updated enumeration
-     * @throws UnsupportedOperationException if trying to update SERVICE_PACKAGE directly
      */
     BicycleEnumeration saveEnumeration(String type, List<String> values);
 

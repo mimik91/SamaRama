@@ -1,11 +1,9 @@
 package com.samarama.bicycle.api.controller;
 
 import com.samarama.bicycle.api.service.BicycleEnumerationService;
-import com.samarama.bicycle.api.service.ServicePackageService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -15,12 +13,9 @@ import java.util.Map;
 public class BicycleEnumerationController {
 
     private final BicycleEnumerationService enumerationService;
-    private final ServicePackageService servicePackageService;
 
-    public BicycleEnumerationController(BicycleEnumerationService enumerationService,
-                                        ServicePackageService servicePackageService) {
+    public BicycleEnumerationController(BicycleEnumerationService enumerationService) {
         this.enumerationService = enumerationService;
-        this.servicePackageService = servicePackageService;
     }
 
     @GetMapping
@@ -33,16 +28,6 @@ public class BicycleEnumerationController {
     public ResponseEntity<List<String>> getEnumerationByType(@PathVariable String type) {
         List<String> values = enumerationService.getEnumerationValues(type);
         return ResponseEntity.ok(values);
-    }
-
-    @GetMapping("/{type}/metadata")
-    public ResponseEntity<Map<String, Object>> getEnumerationMetadata(@PathVariable String type) {
-        Map<String, Object> metadata = new HashMap<>();
-        var packages = servicePackageService.getActiveServicePackages();
-        for (var pkg : packages) {
-            metadata.put(pkg.getCode(), pkg.getPrice().toString());
-        }
-        return ResponseEntity.ok(metadata);
     }
 
     @PostMapping("/{type}")
