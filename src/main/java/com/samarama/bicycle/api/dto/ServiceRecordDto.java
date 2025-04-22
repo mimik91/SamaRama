@@ -12,7 +12,6 @@ public record ServiceRecordDto(
         @NotBlank String name,
         @NotBlank String description,
         @NotNull LocalDate serviceDate,
-        BigDecimal price,
-        @NotNull BikeService service
+        BigDecimal price
 ) {
 }

@@ -16,13 +16,6 @@ public interface AuthService {
     ResponseEntity<Map<String, Object>> authenticateClient(LoginDto loginDto);
 
     /**
-     * Authenticate bike service user
-     * @param loginDto credentials for authentication
-     * @return authentication response with token and service details
-     */
-    ResponseEntity<Map<String, Object>> authenticateService(LoginDto loginDto);
-
-    /**
      * Register a new client user
      * @param registrationDto user registration data
      * @return registration result

@@ -35,10 +35,6 @@ public class ServiceOrder {
     private User client;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "service_id")
-    private BikeService service;
-
-    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "service_package_id")
     private ServicePackage servicePackage;
 

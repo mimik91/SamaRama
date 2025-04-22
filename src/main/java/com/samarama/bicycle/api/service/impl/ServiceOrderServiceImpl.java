@@ -21,18 +21,15 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
     private final ServiceOrderRepository serviceOrderRepository;
     private final IncompleteBikeRepository incompleteBikeRepository;
     private final UserRepository userRepository;
-    private final BikeServiceRepository bikeServiceRepository;
     private final ServicePackageRepository servicePackageRepository;
 
     public ServiceOrderServiceImpl(ServiceOrderRepository serviceOrderRepository,
                                    IncompleteBikeRepository incompleteBikeRepository,
                                    UserRepository userRepository,
-                                   BikeServiceRepository bikeServiceRepository,
                                    ServicePackageRepository servicePackageRepository) {
         this.serviceOrderRepository = serviceOrderRepository;
         this.incompleteBikeRepository = incompleteBikeRepository;
         this.userRepository = userRepository;
-        this.bikeServiceRepository = bikeServiceRepository;
         this.servicePackageRepository = servicePackageRepository;
     }
 
@@ -137,17 +134,12 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
 
         // For simplicity we'll just use the first available service
         // In a real app, we'd have a proper service selection mechanism
-        List<BikeService> services = bikeServiceRepository.findAll();
-        if (services.isEmpty()) {
-            return ResponseEntity.status(500).body(Map.of("message", "No service providers available"));
-        }
-        BikeService bikeService = services.get(0);
+
 
         // Create the service order
         ServiceOrder serviceOrder = new ServiceOrder();
         serviceOrder.setBicycle(bike);
         serviceOrder.setClient(user);
-        serviceOrder.setService(bikeService);
         serviceOrder.setServicePackage(servicePackage);
         serviceOrder.setServicePackageCode(servicePackage.getCode()); // Store the code for backward compatibility
         serviceOrder.setPickupDate(serviceOrderDto.pickupDate());

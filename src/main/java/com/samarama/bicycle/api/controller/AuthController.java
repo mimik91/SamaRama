@@ -25,10 +25,6 @@ public class AuthController {
         return authService.authenticateClient(loginDto);
     }
 
-    @PostMapping("/signin/service")
-    public ResponseEntity<Map<String, Object>> authenticateService(@Valid @RequestBody LoginDto loginDto) {
-        return authService.authenticateService(loginDto);
-    }
 
     @PostMapping("/signup/client")
     public ResponseEntity<Map<String, String>> registerClient(@Valid @RequestBody UserRegistrationDto registrationDto) {

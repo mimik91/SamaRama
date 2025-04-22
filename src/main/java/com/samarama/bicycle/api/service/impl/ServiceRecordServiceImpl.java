@@ -2,11 +2,9 @@ package com.samarama.bicycle.api.service.impl;
 
 import com.samarama.bicycle.api.dto.ServiceRecordDto;
 import com.samarama.bicycle.api.model.Bicycle;
-import com.samarama.bicycle.api.model.BikeService;
 import com.samarama.bicycle.api.model.ServiceRecord;
 import com.samarama.bicycle.api.model.User;
 import com.samarama.bicycle.api.repository.BicycleRepository;
-import com.samarama.bicycle.api.repository.BikeServiceRepository;
 import com.samarama.bicycle.api.repository.ServiceRecordRepository;
 import com.samarama.bicycle.api.repository.UserRepository;
 import com.samarama.bicycle.api.service.ServiceRecordService;
@@ -27,16 +25,13 @@ public class ServiceRecordServiceImpl implements ServiceRecordService {
     private final ServiceRecordRepository serviceRecordRepository;
     private final BicycleRepository bicycleRepository;
     private final UserRepository userRepository;
-    private final BikeServiceRepository bikeServiceRepository;
 
     public ServiceRecordServiceImpl(ServiceRecordRepository serviceRecordRepository,
                                     BicycleRepository bicycleRepository,
-                                    UserRepository userRepository,
-                                    BikeServiceRepository bikeServiceRepository) {
+                                    UserRepository userRepository) {
         this.serviceRecordRepository = serviceRecordRepository;
         this.bicycleRepository = bicycleRepository;
         this.userRepository = userRepository;
-        this.bikeServiceRepository = bikeServiceRepository;
     }
 
     @Override
@@ -95,23 +90,13 @@ public class ServiceRecordServiceImpl implements ServiceRecordService {
             return ResponseEntity.badRequest().body(Map.of("message", "Bicycle must have a frame number to add service records"));
         }
 
-        BikeService service = serviceRecordDto.service();
-        if (service == null) {
-            // Możemy próbować pobrać serwis na podstawie emaila zalogowanego użytkownika
-            Optional<BikeService> bikeServiceOpt = bikeServiceRepository.findByEmail(userEmail);
-            if (bikeServiceOpt.isEmpty()) {
-                return ResponseEntity.badRequest().body(Map.of("message", "Service not found"));
-            }
-            service = bikeServiceOpt.get();
-        }
-
         ServiceRecord serviceRecord = new ServiceRecord();
         serviceRecord.setBicycle(bicycle);
         serviceRecord.setName(serviceRecordDto.name());
         serviceRecord.setDescription(serviceRecordDto.description());
         serviceRecord.setServiceDate(serviceRecordDto.serviceDate());
         serviceRecord.setPrice(serviceRecordDto.price());
-        serviceRecord.setService(service);
+
 
         serviceRecordRepository.save(serviceRecord);
         return ResponseEntity.ok(Map.of("message", "Service record added successfully"));
