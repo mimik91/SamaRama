@@ -1,6 +1,5 @@
 package com.samarama.bicycle.api.security;
 
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -17,14 +16,10 @@ public class AuthenticationConfig {
 
     private final PasswordEncoder passwordEncoder;
     private final UserDetailsService userDetailsService;
-    private final UserDetailsService bikeServiceDetailsService;
 
-    public AuthenticationConfig(PasswordEncoder passwordEncoder,
-                                @Qualifier("userDetailsService") UserDetailsService userDetailsService,
-                                @Qualifier("bikeServiceDetailsService") UserDetailsService bikeServiceDetailsService) {
+    public AuthenticationConfig(PasswordEncoder passwordEncoder, UserDetailsService userDetailsService){
         this.passwordEncoder = passwordEncoder;
         this.userDetailsService = userDetailsService;
-        this.bikeServiceDetailsService = bikeServiceDetailsService;
     }
 
     @Bean
@@ -38,7 +33,6 @@ public class AuthenticationConfig {
     @Bean
     public AuthenticationProvider bikeServiceAuthenticationProvider() {
         DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
-        provider.setUserDetailsService(bikeServiceDetailsService);
         provider.setPasswordEncoder(passwordEncoder);
         return provider;
     }

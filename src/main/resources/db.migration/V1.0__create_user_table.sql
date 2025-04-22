@@ -7,7 +7,7 @@ CREATE TABLE users (
     password VARCHAR(120) NOT NULL,
     role VARCHAR(20) DEFAULT 'CLIENT',
     verified BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     PRIMARY KEY (id),
     UNIQUE (email)
 );

@@ -5,8 +5,6 @@ CREATE TABLE service_records (
     description TEXT NOT NULL,
     service_date DATE NOT NULL,
     price DECIMAL(10, 2),
-    service_id BIGINT NOT NULL,
     PRIMARY KEY (id),
-    FOREIGN KEY (bicycle_id) REFERENCES bicycles(id),
-    FOREIGN KEY (service_id) REFERENCES bike_services(id)
+    FOREIGN KEY (bicycle_id) REFERENCES bicycles(id)
 );

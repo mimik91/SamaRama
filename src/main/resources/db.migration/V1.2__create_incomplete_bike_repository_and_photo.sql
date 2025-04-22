@@ -5,7 +5,7 @@ CREATE TABLE incomplete_bikes (
     type VARCHAR(40),
     frame_material VARCHAR(100),
     owner_id BIGINT,
-    created_at TIMESTAMP NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     production_date DATE,
     PRIMARY KEY (id),
     FOREIGN KEY (owner_id) REFERENCES users(id)

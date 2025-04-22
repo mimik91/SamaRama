@@ -26,7 +26,7 @@ BEGIN
             CURRENT_TIMESTAMP
         ) RETURNING id INTO admin_id;
 
-        -- Add ONLY ROLE_ADMIN to the admin user (no ROLE_CLIENT)
+        -- Add ROLE_ADMIN to the admin user
         INSERT INTO user_roles (user_id, role) VALUES (admin_id, 'ROLE_ADMIN');
 
         RAISE NOTICE 'Admin user created with ID %', admin_id;
@@ -41,6 +41,4 @@ BEGIN
         INSERT INTO user_roles (user_id, role) VALUES (admin_id, 'ROLE_ADMIN');
         RAISE NOTICE 'Updated roles for existing admin user with ID %', admin_id;
     END IF;
-
-    -- No moderator user is created in this updated migration
 END $$;
