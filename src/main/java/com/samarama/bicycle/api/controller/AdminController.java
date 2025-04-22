@@ -1,7 +1,6 @@
 package com.samarama.bicycle.api.controller;
 
 import com.samarama.bicycle.api.model.User;
-import com.samarama.bicycle.api.repository.BikeServiceRepository;
 import com.samarama.bicycle.api.repository.IncompleteBikeRepository;
 import com.samarama.bicycle.api.repository.ServiceOrderRepository;
 import com.samarama.bicycle.api.repository.UserRepository;
@@ -25,18 +24,15 @@ import java.util.stream.Collectors;
 public class AdminController {
 
     private final UserRepository userRepository;
-    private final BikeServiceRepository bikeServiceRepository;
     private final IncompleteBikeRepository incompleteBikeRepository;
     private final ServiceOrderRepository serviceOrderRepository;
     private final BicycleEnumerationService enumerationService;
 
     public AdminController(UserRepository userRepository,
-                           BikeServiceRepository bikeServiceRepository,
                            IncompleteBikeRepository incompleteBikeRepository,
                            ServiceOrderRepository serviceOrderRepository,
                            BicycleEnumerationService enumerationService) {
         this.userRepository = userRepository;
-        this.bikeServiceRepository = bikeServiceRepository;
         this.incompleteBikeRepository = incompleteBikeRepository;
         this.serviceOrderRepository = serviceOrderRepository;
         this.enumerationService = enumerationService;
@@ -69,7 +65,6 @@ public class AdminController {
         // Count entities
         stats.put("totalUsers", userRepository.count());
         stats.put("totalBicycles", incompleteBikeRepository.count());
-        stats.put("totalServices", bikeServiceRepository.count());
         stats.put("pendingOrders", serviceOrderRepository.count());
 
         return ResponseEntity.ok(stats);
@@ -78,11 +73,6 @@ public class AdminController {
     @GetMapping("/users")
     public ResponseEntity<?> getAllUsers() {
         return ResponseEntity.ok(userRepository.findAll());
-    }
-
-    @GetMapping("/services")
-    public ResponseEntity<?> getAllServices() {
-        return ResponseEntity.ok(bikeServiceRepository.findAll());
     }
 
     @GetMapping("/bicycles")

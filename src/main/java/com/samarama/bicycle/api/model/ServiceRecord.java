@@ -45,9 +45,4 @@ public class ServiceRecord {
     private LocalDate serviceDate;
 
     private BigDecimal price;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "service_id")
-    @JsonIgnoreProperties({"password", "verified", "serviceRecords", "openingHours", "createdAt"})
-    private BikeService service;
 }

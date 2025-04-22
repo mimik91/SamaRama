@@ -22,12 +22,4 @@ public record ServiceRecordResponseDto(
                 entity.getPrice()
         );
     }
-
-    // Uproszczone DTO dla usługi serwisowej
-    public record BikeServiceDto(
-            Long id,
-            String name,
-            String email,
-            String phoneNumber
-    ) {}
 }

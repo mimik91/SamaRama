@@ -1,6 +1,5 @@
 package com.samarama.bicycle.api.dto;
 
-import com.samarama.bicycle.api.model.BikeService;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 

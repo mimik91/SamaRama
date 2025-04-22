@@ -40,7 +40,6 @@ public class WebSecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth ->
                         auth.requestMatchers("/api/auth/**").permitAll()
-                                .requestMatchers("/api/bike-services/**").permitAll()
                                 .requestMatchers("/api/test/**").permitAll()
                                 // Dla standardowego dostępu do rowerów (GET)
                                 .requestMatchers("/api/bicycles").permitAll()
