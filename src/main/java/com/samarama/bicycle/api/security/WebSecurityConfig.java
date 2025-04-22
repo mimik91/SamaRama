@@ -53,6 +53,8 @@ public class WebSecurityConfig {
                                 .requestMatchers("/api/service-orders/package-price/**").permitAll()
                                 .requestMatchers("/api/account/**").permitAll()
                                 .requestMatchers("/test").permitAll()
+                                .requestMatchers("/api/account/public/**").permitAll()
+                                .requestMatchers("/api/account/**").authenticated()
                                 // Admin routes require ADMIN or MODERATOR role
                                 .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "MODERATOR")
                                 // Tylko authorized users dla modyfikacji rowerów
