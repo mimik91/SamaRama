@@ -18,7 +18,7 @@ import java.util.Set;
 @AllArgsConstructor
 @Entity
 @Table(name = "users")
-public class User {
+public class User extends IncompleteUser{
 
     public enum UserRole {
         CLIENT, SERVICEMAN, ADMIN, MODERATOR
@@ -34,11 +34,9 @@ public class User {
     @Column(unique = true)
     private String email;
 
-    @NotBlank
     @Size(max = 50)
     private String firstName;
 
-    @NotBlank
     @Size(max = 50)
     private String lastName;
 
