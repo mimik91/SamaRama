@@ -41,7 +41,7 @@ public class IncompleteBike {
     @JoinColumn(name = "owner_id")
     @JsonIgnore
     @ToString.Exclude
-    private User owner;
+    private IncompleteUser owner;
 
     private LocalDateTime createdAt = LocalDateTime.now();
 

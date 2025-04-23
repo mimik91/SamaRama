@@ -25,17 +25,19 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
     private final BicycleRepository bicycleRepository;
     private final UserRepository userRepository;
     private final ServicePackageRepository servicePackageRepository;
+    private final IncompleteUserRepository incompleteUserRepository;
 
     public ServiceOrderServiceImpl(ServiceOrderRepository serviceOrderRepository,
                                    IncompleteBikeRepository incompleteBikeRepository,
                                    BicycleRepository bicycleRepository,
                                    UserRepository userRepository,
-                                   ServicePackageRepository servicePackageRepository) {
+                                   ServicePackageRepository servicePackageRepository, IncompleteUserRepository incompleteUserRepository) {
         this.serviceOrderRepository = serviceOrderRepository;
         this.incompleteBikeRepository = incompleteBikeRepository;
         this.bicycleRepository = bicycleRepository;
         this.userRepository = userRepository;
         this.servicePackageRepository = servicePackageRepository;
+        this.incompleteUserRepository = incompleteUserRepository;
     }
 
     @Override
@@ -100,10 +102,20 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
             return ResponseEntity.badRequest().body(Map.of("message", "Pickup date cannot be more than a month in the future"));
         }
 
-        // Get the current user
-        User user = userRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new RuntimeException("User not found with email: " + userEmail));
+        Optional<User> userOpt = userRepository.findByEmail(userEmail);
+        IncompleteUser user;
 
+        if (userOpt.isPresent()) {
+            user = userOpt.get();
+        } else {
+            user = incompleteUserRepository.findByEmail(userEmail)
+                    .orElseGet(() -> {
+                        // Jeśli nie istnieje, tworzymy nowego IncompleteUser
+                        IncompleteUser newUser = new IncompleteUser();
+                        newUser.setEmail(userEmail);
+                        return incompleteUserRepository.save(newUser);
+                    });
+        }
         // Get the service package
         ServicePackage servicePackage = null;
 

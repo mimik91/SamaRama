@@ -44,7 +44,7 @@ public class IncompleteUser {
 
     @OneToMany(mappedBy = "owner", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @ToString.Exclude
-    private Set<Bicycle> bicycles = new HashSet<>();
+    private Set<IncompleteBike> bicycles = new HashSet<>();
 
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "user_roles", joinColumns = @JoinColumn(name = "user_id"))
@@ -58,6 +58,4 @@ public class IncompleteUser {
     public void addRole(String role) {
         roles.add(role);
     }
-
-
 }

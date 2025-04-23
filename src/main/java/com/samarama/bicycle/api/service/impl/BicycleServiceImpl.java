@@ -3,14 +3,8 @@ package com.samarama.bicycle.api.service.impl;
 import com.samarama.bicycle.api.dto.BicycleDto;
 import com.samarama.bicycle.api.dto.IncompleteBikeDto;
 import com.samarama.bicycle.api.dto.IncompleteBikeResponseDto;
-import com.samarama.bicycle.api.model.Bicycle;
-import com.samarama.bicycle.api.model.BicyclePhoto;
-import com.samarama.bicycle.api.model.IncompleteBike;
-import com.samarama.bicycle.api.model.User;
-import com.samarama.bicycle.api.repository.BicyclePhotoRepository;
-import com.samarama.bicycle.api.repository.BicycleRepository;
-import com.samarama.bicycle.api.repository.IncompleteBikeRepository;
-import com.samarama.bicycle.api.repository.UserRepository;
+import com.samarama.bicycle.api.model.*;
+import com.samarama.bicycle.api.repository.*;
 import com.samarama.bicycle.api.service.BicycleService;
 import jakarta.transaction.Transactional;
 import org.springframework.http.MediaType;
@@ -30,22 +24,26 @@ import java.util.stream.Collectors;
 
 @Service
 public class BicycleServiceImpl implements BicycleService {
+    private final IncompleteUserRepository incompleteUserRepository;
     private final BicycleRepository bicycleRepository;
     private final IncompleteBikeRepository incompleteBikeRepository;
     private final BicyclePhotoRepository bicyclePhotoRepository;
     private final UserRepository userRepository;
 
     public BicycleServiceImpl(
-            BicycleRepository bicycleRepository,
+            IncompleteUserRepository incompleteUserRepository, BicycleRepository bicycleRepository,
             IncompleteBikeRepository incompleteBikeRepository,
             BicyclePhotoRepository bicyclePhotoRepository,
             UserRepository userRepository
     ) {
+        this.incompleteUserRepository = incompleteUserRepository;
         this.bicycleRepository = bicycleRepository;
         this.incompleteBikeRepository = incompleteBikeRepository;
         this.bicyclePhotoRepository = bicyclePhotoRepository;
         this.userRepository = userRepository;
     }
+
+
 
     @Override
     public List<IncompleteBikeResponseDto> getAllUserBikes() {
@@ -100,11 +98,19 @@ public class BicycleServiceImpl implements BicycleService {
             incompleteBike.setProductionDate(incompleteBikeDto.productionDate());
             incompleteBike.setCreatedAt(LocalDateTime.now());
 
-            // Set owner
+            // Szukamy najpierw w userRepository, potem w incompleteUserRepository
             String email = getCurrentUserEmail();
-            User user = userRepository.findByEmail(email)
-                    .orElseThrow(() -> new RuntimeException("User not found"));
-            incompleteBike.setOwner(user);
+            Optional<User> userOpt = userRepository.findByEmail(email);
+
+            IncompleteUser owner;
+            if (userOpt.isPresent()) {
+                owner = userOpt.get();
+            } else {
+                owner = incompleteUserRepository.findByEmail(email)
+                        .orElseThrow(() -> new RuntimeException("User not found"));
+            }
+
+            incompleteBike.setOwner(owner);
 
             // Save the incomplete bike
             IncompleteBike savedBike = incompleteBikeRepository.save(incompleteBike);
