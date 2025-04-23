@@ -32,7 +32,7 @@ public class ServiceOrder {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
-    private User client;
+    private IncompleteUser client;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "service_package_id")
