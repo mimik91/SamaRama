@@ -5,9 +5,10 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
 import java.time.LocalDate;
+import java.util.List;
 
 public record ServiceOrderDto(
-        @NotNull Long bicycleId,
+        @NotNull List<Long> bicycleIds,
 
         // Może być albo id pakietu albo kod pakietu (dla kompatybilności)
         Long servicePackageId,

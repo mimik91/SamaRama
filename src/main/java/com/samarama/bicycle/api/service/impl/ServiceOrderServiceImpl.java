@@ -13,6 +13,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
+import java.util.ArrayList;
 
 @Service
 public class ServiceOrderServiceImpl implements ServiceOrderService {
@@ -20,15 +22,18 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
 
     private final ServiceOrderRepository serviceOrderRepository;
     private final IncompleteBikeRepository incompleteBikeRepository;
+    private final BicycleRepository bicycleRepository;
     private final UserRepository userRepository;
     private final ServicePackageRepository servicePackageRepository;
 
     public ServiceOrderServiceImpl(ServiceOrderRepository serviceOrderRepository,
                                    IncompleteBikeRepository incompleteBikeRepository,
+                                   BicycleRepository bicycleRepository,
                                    UserRepository userRepository,
                                    ServicePackageRepository servicePackageRepository) {
         this.serviceOrderRepository = serviceOrderRepository;
         this.incompleteBikeRepository = incompleteBikeRepository;
+        this.bicycleRepository = bicycleRepository;
         this.userRepository = userRepository;
         this.servicePackageRepository = servicePackageRepository;
     }
@@ -95,22 +100,9 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
             return ResponseEntity.badRequest().body(Map.of("message", "Pickup date cannot be more than a month in the future"));
         }
 
-        // Get the bicycle (incomplete bike)
-        Optional<IncompleteBike> bikeOpt = incompleteBikeRepository.findById(serviceOrderDto.bicycleId());
-        if (bikeOpt.isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Bicycle not found"));
-        }
-
-        IncompleteBike bike = bikeOpt.get();
-
         // Get the current user
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new RuntimeException("User not found with email: " + userEmail));
-
-        // Verify ownership of the bicycle
-        if (bike.getOwner() == null || !bike.getOwner().getId().equals(user.getId())) {
-            return ResponseEntity.status(403).body(Map.of("message", "You do not have permission to order service for this bicycle"));
-        }
 
         // Get the service package
         ServicePackage servicePackage = null;
@@ -132,29 +124,86 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
             return ResponseEntity.badRequest().body(Map.of("message", "Invalid service package"));
         }
 
-        // For simplicity we'll just use the first available service
-        // In a real app, we'd have a proper service selection mechanism
+        // Validate that the list of bicycle IDs is not empty
+        if (serviceOrderDto.bicycleIds() == null || serviceOrderDto.bicycleIds().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "No bicycles selected for service"));
+        }
 
+        // Zbieramy wszystkie rowery (zarówno kompletne jak i niekompletne)
+        List<IncompleteBike> userBikes = new ArrayList<>();
+        
+        // 1. Sprawdź kompletne rowery w repozytorium Bicycle
+        List<Bicycle> completeBikes = bicycleRepository.findAllById(serviceOrderDto.bicycleIds());
+        for (Bicycle bike : completeBikes) {
+            if (bike.getOwner() != null && bike.getOwner().getId().equals(user.getId())) {
+                userBikes.add(bike); // Bicycle dziedziczy po IncompleteBike, więc można dodać bezpośrednio
+            } else {
+                logger.warning("User " + userEmail + " does not have permission for complete bicycle ID: " + bike.getId());
+            }
+        }
+        
+        // 2. Sprawdź niekompletne rowery, które nie są kompletne (unikając duplikatów)
+        // Zbierz ID już znalezionych kompletnych rowerów
+        List<Long> foundBikeIds = completeBikes.stream().map(IncompleteBike::getId).collect(Collectors.toList());
+        
+        // Znajdź tylko te niekompletne rowery, których nie ma w kompletnych
+        List<Long> remainingIds = serviceOrderDto.bicycleIds().stream()
+                .filter(id -> !foundBikeIds.contains(id))
+                .collect(Collectors.toList());
+        
+        if (!remainingIds.isEmpty()) {
+            List<IncompleteBike> incompleteBikes = incompleteBikeRepository.findAllById(remainingIds);
+            for (IncompleteBike bike : incompleteBikes) {
+                if (bike.getOwner() != null && bike.getOwner().getId().equals(user.getId())) {
+                    userBikes.add(bike);
+                } else {
+                    logger.warning("User " + userEmail + " does not have permission for incomplete bicycle ID: " + bike.getId());
+                }
+            }
+        }
+        
+        if (userBikes.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "No valid bicycles found or you don't have permission for any of the selected bicycles"));
+        }
+        
+        // Utwórz wszystkie obiekty ServiceOrder
+        ServicePackage finalServicePackage = servicePackage;
+        List<ServiceOrder> serviceOrders = userBikes.stream()
+                .map(bike -> {
+                    ServiceOrder serviceOrder = new ServiceOrder();
+                    serviceOrder.setBicycle(bike);
+                    serviceOrder.setClient(user);
+                    serviceOrder.setServicePackage(finalServicePackage);
+                    serviceOrder.setServicePackageCode(finalServicePackage.getCode()); // Store the code for backward compatibility
+                    serviceOrder.setPickupDate(serviceOrderDto.pickupDate());
+                    serviceOrder.setPickupAddress(serviceOrderDto.pickupAddress());
+                    serviceOrder.setPickupLatitude(serviceOrderDto.pickupLatitude());
+                    serviceOrder.setPickupLongitude(serviceOrderDto.pickupLongitude());
+                    serviceOrder.setPrice(finalServicePackage.getPrice());
+                    serviceOrder.setAdditionalNotes(serviceOrderDto.additionalNotes());
+                    serviceOrder.setStatus(ServiceOrder.OrderStatus.PENDING);
+                    return serviceOrder;
+                })
+                .collect(Collectors.toList());
+        
+        // Zapisz wszystkie ServiceOrder jedną operacją
+        List<ServiceOrder> savedOrders = serviceOrderRepository.saveAll(serviceOrders);
+        
+        // Pobierz identyfikatory zapisanych zamówień
+        List<Long> createdOrderIds = savedOrders.stream()
+                .map(ServiceOrder::getId)
+                .collect(Collectors.toList());
 
-        // Create the service order
-        ServiceOrder serviceOrder = new ServiceOrder();
-        serviceOrder.setBicycle(bike);
-        serviceOrder.setClient(user);
-        serviceOrder.setServicePackage(servicePackage);
-        serviceOrder.setServicePackageCode(servicePackage.getCode()); // Store the code for backward compatibility
-        serviceOrder.setPickupDate(serviceOrderDto.pickupDate());
-        serviceOrder.setPickupAddress(serviceOrderDto.pickupAddress());
-        serviceOrder.setPickupLatitude(serviceOrderDto.pickupLatitude());
-        serviceOrder.setPickupLongitude(serviceOrderDto.pickupLongitude());
-        serviceOrder.setPrice(servicePackage.getPrice());
-        serviceOrder.setAdditionalNotes(serviceOrderDto.additionalNotes());
-        serviceOrder.setStatus(ServiceOrder.OrderStatus.PENDING);
-
-        ServiceOrder savedOrder = serviceOrderRepository.save(serviceOrder);
+        // Sprawdź czy były rowery, których nie udało się znaleźć w bazie danych
+        int foundBikes = completeBikes.size() + (remainingIds.isEmpty() ? 0 : incompleteBikeRepository.findAllById(remainingIds).size());
+        if (foundBikes < serviceOrderDto.bicycleIds().size()) {
+            logger.warning("Some bicycle IDs were not found in the database: " + 
+                (serviceOrderDto.bicycleIds().size() - foundBikes) + " bikes missing");
+        }
 
         return ResponseEntity.ok(Map.of(
-                "message", "Service order created successfully",
-                "orderId", savedOrder.getId()
+                "message", "Service orders created successfully",
+                "orderIds", createdOrderIds
         ));
     }
 

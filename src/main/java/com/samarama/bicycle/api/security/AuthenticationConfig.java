@@ -9,7 +9,7 @@ import org.springframework.security.authentication.dao.DaoAuthenticationProvider
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
-import java.util.Arrays;
+import java.util.Collections;
 
 @Configuration
 public class AuthenticationConfig {
@@ -31,17 +31,7 @@ public class AuthenticationConfig {
     }
 
     @Bean
-    public AuthenticationProvider bikeServiceAuthenticationProvider() {
-        DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
-        provider.setPasswordEncoder(passwordEncoder);
-        return provider;
-    }
-
-    @Bean
     public AuthenticationManager authenticationManager() {
-        return new ProviderManager(Arrays.asList(
-                userAuthenticationProvider(),
-                bikeServiceAuthenticationProvider()
-        ));
+        return new ProviderManager(Collections.singletonList(userAuthenticationProvider()));
     }
 }

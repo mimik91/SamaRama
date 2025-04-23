@@ -41,7 +41,6 @@ public class ServiceOrderController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('CLIENT')")
     public ResponseEntity<?> createServiceOrder(@Valid @RequestBody ServiceOrderDto serviceOrderDto) {
         String email = getCurrentUserEmail();
         return serviceOrderService.createServiceOrder(serviceOrderDto, email);
@@ -49,7 +48,14 @@ public class ServiceOrderController {
 
     private String getCurrentUserEmail() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        return authentication.getName();
+        if (authentication == null) {
+            throw new RuntimeException("Authentication is null - user not authenticated");
+        }
+        String email = authentication.getName();
+        System.out.println("Current user email: " + email);
+        System.out.println("Authentication type: " + authentication.getClass().getName());
+        System.out.println("Authorities: " + authentication.getAuthorities());
+        return email;
     }
 
     @GetMapping("/bicycle/{bicycleId}")
