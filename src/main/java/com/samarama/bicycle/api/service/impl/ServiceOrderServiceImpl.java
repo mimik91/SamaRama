@@ -26,18 +26,22 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
     private final UserRepository userRepository;
     private final ServicePackageRepository servicePackageRepository;
     private final IncompleteUserRepository incompleteUserRepository;
+    private final CityValidator cityValidator; // Add the CityValidator
 
     public ServiceOrderServiceImpl(ServiceOrderRepository serviceOrderRepository,
                                    IncompleteBikeRepository incompleteBikeRepository,
                                    BicycleRepository bicycleRepository,
                                    UserRepository userRepository,
-                                   ServicePackageRepository servicePackageRepository, IncompleteUserRepository incompleteUserRepository) {
+                                   ServicePackageRepository servicePackageRepository,
+                                   IncompleteUserRepository incompleteUserRepository,
+                                   CityValidator cityValidator) { // Inject the CityValidator
         this.serviceOrderRepository = serviceOrderRepository;
         this.incompleteBikeRepository = incompleteBikeRepository;
         this.bicycleRepository = bicycleRepository;
         this.userRepository = userRepository;
         this.servicePackageRepository = servicePackageRepository;
         this.incompleteUserRepository = incompleteUserRepository;
+        this.cityValidator = cityValidator; // Set the CityValidator
     }
 
     @Override
@@ -102,6 +106,12 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
             return ResponseEntity.badRequest().body(Map.of("message", "Pickup date cannot be more than a month in the future"));
         }
 
+        // Validate city from the address
+        String city = cityValidator.extractCityFromAddress(serviceOrderDto.pickupAddress());
+        if (city == null || !cityValidator.isValidCity(city)) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Invalid city. Please select a city from the provided list."));
+        }
+
         Optional<User> userOpt = userRepository.findByEmail(userEmail);
         IncompleteUser user;
 
@@ -143,7 +153,7 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
 
         // Zbieramy wszystkie rowery (zarówno kompletne jak i niekompletne)
         List<IncompleteBike> userBikes = new ArrayList<>();
-        
+
         // 1. Sprawdź kompletne rowery w repozytorium Bicycle
         List<Bicycle> completeBikes = bicycleRepository.findAllById(serviceOrderDto.bicycleIds());
         for (Bicycle bike : completeBikes) {
@@ -153,16 +163,16 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
                 logger.warning("User " + userEmail + " does not have permission for complete bicycle ID: " + bike.getId());
             }
         }
-        
+
         // 2. Sprawdź niekompletne rowery, które nie są kompletne (unikając duplikatów)
         // Zbierz ID już znalezionych kompletnych rowerów
         List<Long> foundBikeIds = completeBikes.stream().map(IncompleteBike::getId).collect(Collectors.toList());
-        
+
         // Znajdź tylko te niekompletne rowery, których nie ma w kompletnych
         List<Long> remainingIds = serviceOrderDto.bicycleIds().stream()
                 .filter(id -> !foundBikeIds.contains(id))
                 .collect(Collectors.toList());
-        
+
         if (!remainingIds.isEmpty()) {
             List<IncompleteBike> incompleteBikes = incompleteBikeRepository.findAllById(remainingIds);
             for (IncompleteBike bike : incompleteBikes) {
@@ -173,11 +183,11 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
                 }
             }
         }
-        
+
         if (userBikes.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("message", "No valid bicycles found or you don't have permission for any of the selected bicycles"));
         }
-        
+
         // Utwórz wszystkie obiekty ServiceOrder
         ServicePackage finalServicePackage = servicePackage;
         List<ServiceOrder> serviceOrders = userBikes.stream()
@@ -197,10 +207,10 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
                     return serviceOrder;
                 })
                 .collect(Collectors.toList());
-        
+
         // Zapisz wszystkie ServiceOrder jedną operacją
         List<ServiceOrder> savedOrders = serviceOrderRepository.saveAll(serviceOrders);
-        
+
         // Pobierz identyfikatory zapisanych zamówień
         List<Long> createdOrderIds = savedOrders.stream()
                 .map(ServiceOrder::getId)
@@ -209,8 +219,8 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
         // Sprawdź czy były rowery, których nie udało się znaleźć w bazie danych
         int foundBikes = completeBikes.size() + (remainingIds.isEmpty() ? 0 : incompleteBikeRepository.findAllById(remainingIds).size());
         if (foundBikes < serviceOrderDto.bicycleIds().size()) {
-            logger.warning("Some bicycle IDs were not found in the database: " + 
-                (serviceOrderDto.bicycleIds().size() - foundBikes) + " bikes missing");
+            logger.warning("Some bicycle IDs were not found in the database: " +
+                    (serviceOrderDto.bicycleIds().size() - foundBikes) + " bikes missing");
         }
 
         return ResponseEntity.ok(Map.of(
