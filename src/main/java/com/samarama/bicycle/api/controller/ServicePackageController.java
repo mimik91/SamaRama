@@ -41,6 +41,7 @@ public class ServicePackageController {
      * Pobierz tylko aktywne pakiety serwisowe (publiczny endpoint)
      */
     @GetMapping("/active")
+    @PreAuthorize("permitAll()")
     public ResponseEntity<List<ServicePackageDto>> getActiveServicePackages() {
         List<ServicePackageDto> packages = servicePackageService.getActiveServicePackages().stream()
                 .map(ServicePackageDto::fromEntity)

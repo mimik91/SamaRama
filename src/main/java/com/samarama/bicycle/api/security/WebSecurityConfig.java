@@ -34,6 +34,7 @@ public class WebSecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        // In WebSecurityConfig.java
         http.cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
                 .exceptionHandling(exception -> exception.authenticationEntryPoint(unauthorizedHandler))
@@ -41,7 +42,9 @@ public class WebSecurityConfig {
                 .authorizeHttpRequests(auth ->
                         auth.requestMatchers("/api/auth/**").permitAll()
                                 .requestMatchers("/api/test/**").permitAll()
-                                // Dla standardowego dostępu do rowerów (GET)
+                                // Add this line to permit access to the service packages endpoint
+                                .requestMatchers("/api/service-packages/active").permitAll()
+                                // For standard access to bikes (GET)
                                 .requestMatchers("/api/bicycles").permitAll()
                                 .requestMatchers("/api/bicycles/*/photo").permitAll()
                                 .requestMatchers("/api/auth/**").permitAll()
@@ -53,9 +56,9 @@ public class WebSecurityConfig {
                                 .requestMatchers("/api/account/**").authenticated()
                                 // Admin routes require ADMIN or MODERATOR role
                                 .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "MODERATOR")
-                                // Tylko authorized users dla modyfikacji rowerów
+                                // Only authorized users for modifying bikes
                                 .requestMatchers("/api/bicycles/*/photo").authenticated()
-                                // Pozostałe API powinno być chronione
+                                // Remaining API should be protected
                                 .anyRequest().authenticated()
                 );
 
