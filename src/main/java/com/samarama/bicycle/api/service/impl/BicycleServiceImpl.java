@@ -24,6 +24,7 @@ import java.util.stream.Collectors;
 
 @Service
 public class BicycleServiceImpl implements BicycleService {
+    private final ServiceOrderRepository serviceOrderRepository;
     private final IncompleteUserRepository incompleteUserRepository;
     private final BicycleRepository bicycleRepository;
     private final IncompleteBikeRepository incompleteBikeRepository;
@@ -31,11 +32,12 @@ public class BicycleServiceImpl implements BicycleService {
     private final UserRepository userRepository;
 
     public BicycleServiceImpl(
-            IncompleteUserRepository incompleteUserRepository, BicycleRepository bicycleRepository,
+            ServiceOrderRepository serviceOrderRepository, IncompleteUserRepository incompleteUserRepository, BicycleRepository bicycleRepository,
             IncompleteBikeRepository incompleteBikeRepository,
             BicyclePhotoRepository bicyclePhotoRepository,
             UserRepository userRepository
     ) {
+        this.serviceOrderRepository = serviceOrderRepository;
         this.incompleteUserRepository = incompleteUserRepository;
         this.bicycleRepository = bicycleRepository;
         this.incompleteBikeRepository = incompleteBikeRepository;
@@ -484,6 +486,14 @@ public class BicycleServiceImpl implements BicycleService {
             return ResponseEntity.status(403).body(Map.of("message", "You do not have permission to delete this bicycle"));
         }
 
+        // Check if there are related service orders
+//        List<ServiceOrder> relatedOrders = serviceOrderRepository.findByBicycle(bicycle);
+//        if (!relatedOrders.isEmpty()) {
+//            return ResponseEntity.badRequest().body(Map.of(
+//                    "message", "Cannot delete this bicycle because it has related service orders. Please cancel all orders first."
+//            ));
+//        }
+
         bicycleRepository.delete(bicycle);
         return ResponseEntity.ok(Map.of("message", "Bicycle deleted successfully"));
     }
@@ -507,6 +517,14 @@ public class BicycleServiceImpl implements BicycleService {
         if (bike.getOwner() == null || !bike.getOwner().getId().equals(user.getId())) {
             return ResponseEntity.status(403).body(Map.of("message", "You do not have permission to delete this bike"));
         }
+
+        // Check if there are related service orders
+//        List<ServiceOrder> relatedOrders = serviceOrderRepository.findByBicycle(bike);
+//        if (!relatedOrders.isEmpty()) {
+//            return ResponseEntity.badRequest().body(Map.of(
+//                    "message", "Cannot delete this bicycle because it has related service orders. Please cancel all orders first."
+//            ));
+//        }
 
         incompleteBikeRepository.delete(bike);
         return ResponseEntity.ok(Map.of("message", "Incomplete bike deleted successfully"));
