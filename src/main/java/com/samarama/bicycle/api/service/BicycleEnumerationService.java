@@ -26,9 +26,4 @@ public interface BicycleEnumerationService {
      * @return updated enumeration
      */
     BicycleEnumeration saveEnumeration(String type, List<String> values);
-
-    /**
-     * Initialize default enumerations if they don't exist
-     */
-    void initializeDefaultEnumerations();
 }

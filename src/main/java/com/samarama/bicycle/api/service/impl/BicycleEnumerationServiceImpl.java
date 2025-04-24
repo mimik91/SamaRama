@@ -69,47 +69,4 @@ public class BicycleEnumerationServiceImpl implements BicycleEnumerationService 
         return enumerationRepository.save(enumeration);
     }
 
-    @Override
-    @Transactional
-    public void initializeDefaultEnumerations() {
-        // Marki rowerów
-        if (!enumerationRepository.existsByType(BRAND)) {
-            List<String> brands = Arrays.asList(
-                    "Trek", "Specialized", "Giant", "Cannondale", "Scott",
-                    "Merida", "Cube", "Canyon", "Bianchi", "BMC",
-                    "Kross", "Orbea", "Ghost", "Fuji", "GT",
-                    "Pinarello", "Cervelo", "Focus", "Felt", "Lapierre",
-                    "Romet", "Kellys", "Unibike", "Kona", "Marin",
-                    "Santa Cruz", "Norco", "Commencal", "YT", "Devinci"
-            );
-            saveEnumeration(BRAND, brands);
-        }
-
-        // Typy rowerów
-        if (!enumerationRepository.existsByType(BIKE_TYPE)) {
-            List<String> bikeTypes = Arrays.asList(
-                    "Górski (MTB)", "Szosowy", "Gravel", "Miejski",
-                    "Trekkingowy", "BMX", "Dziecięcy", "Elektryczny",
-                    "Fatbike", "Crossowy", "Fitness", "Składany"
-            );
-            saveEnumeration(BIKE_TYPE, bikeTypes);
-        }
-
-        // Materiały ram
-        if (!enumerationRepository.existsByType(FRAME_MATERIAL)) {
-            List<String> frameMaterials = Arrays.asList(
-                    "Aluminium", "Karbon (carbon)", "Stal", "Tytan",
-                    "Chrom-molibden", "Magnez", "Kompozyt"
-            );
-            saveEnumeration(FRAME_MATERIAL, frameMaterials);
-        }
-
-        // Statusy zamówień
-        if (!enumerationRepository.existsByType(ORDER_STATUS)) {
-            List<String> orderStatuses = Arrays.asList(
-                    "PENDING", "CONFIRMED", "PICKED_UP", "IN_SERVICE", "COMPLETED", "DELIVERED", "CANCELLED"
-            );
-            saveEnumeration(ORDER_STATUS, orderStatuses);
-        }
-    }
 }
