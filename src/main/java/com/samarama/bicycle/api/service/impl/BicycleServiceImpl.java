@@ -486,16 +486,17 @@ public class BicycleServiceImpl implements BicycleService {
             return ResponseEntity.status(403).body(Map.of("message", "You do not have permission to delete this bicycle"));
         }
 
-        // Check if there are related service orders
-//        List<ServiceOrder> relatedOrders = serviceOrderRepository.findByBicycle(bicycle);
-//        if (!relatedOrders.isEmpty()) {
-//            return ResponseEntity.badRequest().body(Map.of(
-//                    "message", "Cannot delete this bicycle because it has related service orders. Please cancel all orders first."
-//            ));
-//        }
+        // Find and delete all related service orders
+        List<ServiceOrder> relatedOrders = serviceOrderRepository.findByBicycle(bicycle);
+        if (!relatedOrders.isEmpty()) {
+            serviceOrderRepository.deleteAll(relatedOrders);
+        }
 
-        bicycleRepository.delete(bicycle);
-        return ResponseEntity.ok(Map.of("message", "Bicycle deleted successfully"));
+        // For complete bicycles, just detach from the user instead of deleting
+        bicycle.setOwner(null);
+        bicycleRepository.save(bicycle);
+
+        return ResponseEntity.ok(Map.of("message", "Bicycle detached successfully"));
     }
 
     @Override
@@ -518,15 +519,15 @@ public class BicycleServiceImpl implements BicycleService {
             return ResponseEntity.status(403).body(Map.of("message", "You do not have permission to delete this bike"));
         }
 
-        // Check if there are related service orders
-//        List<ServiceOrder> relatedOrders = serviceOrderRepository.findByBicycle(bike);
-//        if (!relatedOrders.isEmpty()) {
-//            return ResponseEntity.badRequest().body(Map.of(
-//                    "message", "Cannot delete this bicycle because it has related service orders. Please cancel all orders first."
-//            ));
-//        }
+        // Find and delete all related service orders
+        List<ServiceOrder> relatedOrders = serviceOrderRepository.findByBicycle(bike);
+        if (!relatedOrders.isEmpty()) {
+            serviceOrderRepository.deleteAll(relatedOrders);
+        }
 
+        // For incomplete bikes, we actually delete them from the database
         incompleteBikeRepository.delete(bike);
+
         return ResponseEntity.ok(Map.of("message", "Incomplete bike deleted successfully"));
     }
 
