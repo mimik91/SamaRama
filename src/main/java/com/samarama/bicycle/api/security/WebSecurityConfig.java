@@ -42,6 +42,8 @@ public class WebSecurityConfig {
                 .authorizeHttpRequests(auth ->
                         auth.requestMatchers("/api/auth/**").permitAll()
                                 .requestMatchers("/api/test/**").permitAll()
+                                // Allow access to guest orders endpoint
+                                .requestMatchers("/api/guest-orders/**").permitAll()
                                 // Add this line to permit access to the service packages endpoint
                                 .requestMatchers("/api/service-packages/active").permitAll()
                                 // For standard access to bikes (GET)

@@ -27,11 +27,6 @@ public class BicycleEnumerationServiceImpl implements BicycleEnumerationService 
         this.enumerationRepository = enumerationRepository;
     }
 
-    @PostConstruct
-    public void init() {
-        initializeDefaultEnumerations();
-    }
-
     @Override
     @Transactional(readOnly = true)
     public Map<String, List<String>> getAllEnumerations() {
