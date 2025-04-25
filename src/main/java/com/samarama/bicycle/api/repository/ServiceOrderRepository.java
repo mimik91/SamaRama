@@ -1,9 +1,6 @@
 package com.samarama.bicycle.api.repository;
 
-import com.samarama.bicycle.api.model.IncompleteBike;
-import com.samarama.bicycle.api.model.ServiceOrder;
-import com.samarama.bicycle.api.model.ServicePackage;
-import com.samarama.bicycle.api.model.User;
+import com.samarama.bicycle.api.model.*;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
@@ -15,8 +12,8 @@ import java.util.List;
 public interface ServiceOrderRepository extends JpaRepository<ServiceOrder, Long> {
     // Zmieniono z Bicycle na IncompleteBike
     List<ServiceOrder> findByBicycle(IncompleteBike bicycle);
-    List<ServiceOrder> findByClient(User client);
-    List<ServiceOrder> findByClientAndStatus(User client, ServiceOrder.OrderStatus status);
+    List<ServiceOrder> findByClient(IncompleteUser client);
+    List<ServiceOrder> findByClientAndStatus(IncompleteUser client, ServiceOrder.OrderStatus status);
 
     // Nowe metody do znajdowania zamówień po pakiecie
     List<ServiceOrder> findByServicePackage(ServicePackage servicePackage);

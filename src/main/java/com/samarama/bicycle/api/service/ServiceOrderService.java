@@ -1,8 +1,8 @@
 package com.samarama.bicycle.api.service;
 
 import com.samarama.bicycle.api.dto.ServiceOrderDto;
+import com.samarama.bicycle.api.dto.ServiceOrderResponseDto;
 import com.samarama.bicycle.api.model.ServiceOrder;
-import com.samarama.bicycle.api.model.ServicePackage;
 import org.springframework.http.ResponseEntity;
 
 import java.util.List;
@@ -11,25 +11,25 @@ public interface ServiceOrderService {
     /**
      * Get service orders for the current user
      * @param userEmail email of the current user
-     * @return list of service orders
+     * @return list of service order DTOs
      */
-    List<ServiceOrder> getUserServiceOrders(String userEmail);
+    List<ServiceOrderResponseDto> getUserServiceOrders(String userEmail);
 
     /**
      * Get service orders for a specific bicycle
      * @param bicycleId ID of the bicycle
      * @param userEmail email of the current user
-     * @return list of service orders
+     * @return list of service order DTOs
      */
-    List<ServiceOrder> getBicycleServiceOrders(Long bicycleId, String userEmail);
+    List<ServiceOrderResponseDto> getBicycleServiceOrders(Long bicycleId, String userEmail);
 
     /**
      * Get a service order by ID
      * @param orderId ID of the service order
      * @param userEmail email of the current user
-     * @return the service order or not found
+     * @return the service order DTO or not found
      */
-    ResponseEntity<ServiceOrder> getServiceOrderById(Long orderId, String userEmail);
+    ResponseEntity<ServiceOrderResponseDto> getServiceOrderById(Long orderId, String userEmail);
 
     /**
      * Create a new service order
@@ -53,4 +53,8 @@ public interface ServiceOrderService {
      * @return the price for the service package
      */
     ResponseEntity<?> getServicePackagePrice(String servicePackageCode);
+
+    long countServiceOrders();
+
+    List<ServiceOrderResponseDto> getAllServiceOrders();
 }

@@ -1,10 +1,13 @@
 package com.samarama.bicycle.api.controller;
 
+import com.samarama.bicycle.api.dto.ServiceOrderResponseDto;
 import com.samarama.bicycle.api.model.User;
 import com.samarama.bicycle.api.repository.IncompleteBikeRepository;
 import com.samarama.bicycle.api.repository.ServiceOrderRepository;
 import com.samarama.bicycle.api.repository.UserRepository;
 import com.samarama.bicycle.api.service.BicycleEnumerationService;
+import com.samarama.bicycle.api.service.ServiceOrderService;
+import com.samarama.bicycle.api.service.impl.ServiceOrderServiceImpl;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -13,6 +16,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -25,16 +29,16 @@ public class AdminController {
 
     private final UserRepository userRepository;
     private final IncompleteBikeRepository incompleteBikeRepository;
-    private final ServiceOrderRepository serviceOrderRepository;
+    private final ServiceOrderService serviceOrderService;
     private final BicycleEnumerationService enumerationService;
 
     public AdminController(UserRepository userRepository,
                            IncompleteBikeRepository incompleteBikeRepository,
-                           ServiceOrderRepository serviceOrderRepository,
+                           ServiceOrderService serviceOrderService,
                            BicycleEnumerationService enumerationService) {
         this.userRepository = userRepository;
         this.incompleteBikeRepository = incompleteBikeRepository;
-        this.serviceOrderRepository = serviceOrderRepository;
+        this.serviceOrderService = serviceOrderService;
         this.enumerationService = enumerationService;
     }
 
@@ -65,7 +69,7 @@ public class AdminController {
         // Count entities
         stats.put("totalUsers", userRepository.count());
         stats.put("totalBicycles", incompleteBikeRepository.count());
-        stats.put("pendingOrders", serviceOrderRepository.count());
+        stats.put("pendingOrders", serviceOrderService.countServiceOrders());
 
         return ResponseEntity.ok(stats);
     }
@@ -81,8 +85,8 @@ public class AdminController {
     }
 
     @GetMapping("/orders")
-    public ResponseEntity<?> getAllOrders() {
-        return ResponseEntity.ok(serviceOrderRepository.findAll());
+    public List<ServiceOrderResponseDto> getAllOrders() {
+        return serviceOrderService.getAllServiceOrders();
     }
 
     @GetMapping("/enumerations")
