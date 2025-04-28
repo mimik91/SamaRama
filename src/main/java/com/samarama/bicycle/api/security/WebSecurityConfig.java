@@ -54,6 +54,8 @@ public class WebSecurityConfig {
                                 .requestMatchers("/api/bicycles/*/photo").permitAll()
                                 .requestMatchers("/api/enumerations/**").permitAll()
                                 .requestMatchers("/api/service-orders/package-price/**").permitAll()
+                                .requestMatchers("/api/service-slots/availability/**").permitAll()
+                                .requestMatchers("/api/service-slots/check-availability").permitAll()
                                 .requestMatchers("/api/account/**").permitAll()
                                 .requestMatchers("/test").permitAll()
                                 .requestMatchers("/api/account/public/**").permitAll()

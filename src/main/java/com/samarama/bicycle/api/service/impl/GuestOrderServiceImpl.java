@@ -5,6 +5,7 @@ import com.samarama.bicycle.api.dto.GuestServiceOrderDto;
 import com.samarama.bicycle.api.model.*;
 import com.samarama.bicycle.api.repository.*;
 import com.samarama.bicycle.api.service.GuestOrderService;
+import com.samarama.bicycle.api.service.ServiceSlotService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,18 +23,21 @@ public class GuestOrderServiceImpl implements GuestOrderService {
     private final ServicePackageRepository servicePackageRepository;
     private final ServiceOrderRepository serviceOrderRepository;
     private final CityValidator cityValidator;
+    private final ServiceSlotService serviceSlotService;
 
     public GuestOrderServiceImpl(
             IncompleteUserRepository incompleteUserRepository,
             IncompleteBikeRepository incompleteBikeRepository,
             ServicePackageRepository servicePackageRepository,
             ServiceOrderRepository serviceOrderRepository,
-            CityValidator cityValidator) {
+            CityValidator cityValidator,
+            ServiceSlotService serviceSlotService) {
         this.incompleteUserRepository = incompleteUserRepository;
         this.incompleteBikeRepository = incompleteBikeRepository;
         this.servicePackageRepository = servicePackageRepository;
         this.serviceOrderRepository = serviceOrderRepository;
         this.cityValidator = cityValidator;
+        this.serviceSlotService = serviceSlotService;
     }
 
     @Override
@@ -41,25 +45,50 @@ public class GuestOrderServiceImpl implements GuestOrderService {
     public ResponseEntity<?> processGuestOrder(GuestServiceOrderDto orderDto) {
         // Walidacja danych wejściowych
         if (orderDto.bicycles() == null || orderDto.bicycles().isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("message", "No bicycles provided"));
+            return ResponseEntity.badRequest().body(Map.of("message", "Brak rowerów w zamówieniu"));
         }
 
         // Walidacja pakietu serwisowego
         Optional<ServicePackage> packageOpt = servicePackageRepository.findById(orderDto.servicePackageId());
         if (packageOpt.isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Invalid service package"));
+            return ResponseEntity.badRequest().body(Map.of("message", "Nieprawidłowy pakiet serwisowy"));
         }
         ServicePackage servicePackage = packageOpt.get();
 
         // Walidacja miasta
         String city = orderDto.city();
         if (city == null || !cityValidator.isValidCity(city)) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Invalid city"));
+            return ResponseEntity.badRequest().body(Map.of("message", "Nieprawidłowe miasto"));
         }
 
         // Walidacja daty odbioru
         if (orderDto.pickupDate() == null || orderDto.pickupDate().isBefore(LocalDate.now())) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Invalid pickup date"));
+            return ResponseEntity.badRequest().body(Map.of("message", "Nieprawidłowa data odbioru"));
+        }
+
+        // Walidacja dostępnych slotów serwisowych
+        int bikesCount = orderDto.bicycles().size();
+
+        // Sprawdź, czy liczba rowerów nie przekracza limitu na jedno zamówienie
+        if (!serviceSlotService.isWithinMaxBikesPerOrder(orderDto.pickupDate(), bikesCount)) {
+            int maxPerOrder = serviceSlotService.getMaxBikesPerOrder(orderDto.pickupDate());
+            return ResponseEntity.badRequest().body(Map.of(
+                    "message", "Przekroczono maksymalną liczbę rowerów na jedno zamówienie (" + maxPerOrder + "). Proszę rozłożyć zamówienie na kilka dni.",
+                    "maxBikesPerOrder", maxPerOrder
+            ));
+        }
+
+        // Sprawdź, czy są dostępne sloty serwisowe na wybrany dzień
+        if (!serviceSlotService.areSlotsAvailable(orderDto.pickupDate(), bikesCount)) {
+            int maxPerDay = serviceSlotService.getMaxBikesPerDay(orderDto.pickupDate());
+            int booked = serviceOrderRepository.countBikesScheduledForDate(orderDto.pickupDate());
+            int available = Math.max(0, maxPerDay - booked);
+
+            return ResponseEntity.badRequest().body(Map.of(
+                    "message", "Brak wystarczającej liczby wolnych miejsc na wybrany dzień. Dostępne miejsca: " + available + ". Proszę wybrać inny termin lub zmniejszyć liczbę rowerów.",
+                    "availableBikes", available,
+                    "maxBikesPerDay", maxPerDay
+            ));
         }
 
         // 1. Tworzenie użytkownika tymczasowego (IncompleteUser)
@@ -80,7 +109,7 @@ public class GuestOrderServiceImpl implements GuestOrderService {
                 .collect(Collectors.toList());
 
         return ResponseEntity.ok(Map.of(
-                "message", "Service orders created successfully",
+                "message", "Zamówienia serwisowe zostały utworzone pomyślnie",
                 "orderIds", orderIds,
                 "userId", incompleteUser.getId()
         ));
@@ -112,7 +141,10 @@ public class GuestOrderServiceImpl implements GuestOrderService {
             IncompleteBike bike = new IncompleteBike();
             bike.setBrand(bikeDto.brand());
             bike.setModel(bikeDto.model());
-            // Moglibyśmy dodać więcej pól, jeśli będą potrzebne
+            // Możemy dodać dodatkowe informacje do pola notatek
+            if (bikeDto.additionalInfo() != null && !bikeDto.additionalInfo().isEmpty()) {
+                bike.setType(bikeDto.additionalInfo());
+            }
             bike.setOwner(owner);
             bike.setCreatedAt(LocalDateTime.now());
 

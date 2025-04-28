@@ -5,14 +5,14 @@ import com.samarama.bicycle.api.dto.ServiceOrderResponseDto;
 import com.samarama.bicycle.api.model.*;
 import com.samarama.bicycle.api.repository.*;
 import com.samarama.bicycle.api.service.ServiceOrderService;
+import com.samarama.bicycle.api.service.ServiceSlotService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.time.LocalDateTime;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -22,18 +22,21 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
     private final CityValidator cityValidator;
     private final ServicePackageRepository servicePackageRepository;
     private final IncompleteBikeRepository incompleteBikeRepository;
+    private final ServiceSlotService serviceSlotService;
 
     public ServiceOrderServiceImpl(
             ServiceOrderRepository serviceOrderRepository,
             UserRepository userRepository,
             CityValidator cityValidator,
             ServicePackageRepository servicePackageRepository,
-            IncompleteBikeRepository incompleteBikeRepository) {
+            IncompleteBikeRepository incompleteBikeRepository,
+            ServiceSlotService serviceSlotService) {
         this.serviceOrderRepository = serviceOrderRepository;
         this.userRepository = userRepository;
         this.cityValidator = cityValidator;
         this.servicePackageRepository = servicePackageRepository;
         this.incompleteBikeRepository = incompleteBikeRepository;
+        this.serviceSlotService = serviceSlotService;
     }
 
     @Override
@@ -98,34 +101,121 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
     @Override
     @Transactional
     public ResponseEntity<?> createServiceOrder(ServiceOrderDto serviceOrderDto, String userEmail) {
-        // Implementacja pozostaje bez zmian...
-        // Validate service date is not in the past or too far in the future
+        // Walidacja daty - nie może być w przeszłości ani zbyt daleko w przyszłości
         LocalDate today = LocalDate.now();
         if (serviceOrderDto.pickupDate().isBefore(today)) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Pickup date cannot be in the past"));
+            return ResponseEntity.badRequest().body(Map.of("message", "Data odbioru nie może być w przeszłości"));
         }
 
         LocalDate maxDate = today.plusMonths(1);
         if (serviceOrderDto.pickupDate().isAfter(maxDate)) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Pickup date cannot be more than a month in the future"));
+            return ResponseEntity.badRequest().body(Map.of("message", "Data odbioru nie może być odleglejsza niż miesiąc"));
         }
 
-        // Validate city from the address
+        // Walidacja miasta z adresu
         String city = cityValidator.extractCityFromAddress(serviceOrderDto.pickupAddress());
         if (city == null || !cityValidator.isValidCity(city)) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Invalid city. Please select a city from the provided list."));
+            return ResponseEntity.badRequest().body(Map.of("message", "Nieprawidłowe miasto. Proszę wybrać miasto z listy."));
         }
 
-        // Reszta implementacji bez zmian...
-        // Ten fragment kodu został pominięty dla czytelności
+        // Walidacja dostępnych slotów serwisowych
+        int bikesCount = serviceOrderDto.bicycleIds().size();
 
-        return ResponseEntity.ok(Map.of("message", "Service order created successfully"));
+        // Sprawdź, czy liczba rowerów nie przekracza limitu na jedno zamówienie
+        if (!serviceSlotService.isWithinMaxBikesPerOrder(serviceOrderDto.pickupDate(), bikesCount)) {
+            int maxPerOrder = serviceSlotService.getMaxBikesPerOrder(serviceOrderDto.pickupDate());
+            return ResponseEntity.badRequest().body(Map.of(
+                    "message", "Przekroczono maksymalną liczbę rowerów na jedno zamówienie (" + maxPerOrder + "). Proszę rozłożyć zamówienie na kilka dni.",
+                    "maxBikesPerOrder", maxPerOrder
+            ));
+        }
+
+        // Sprawdź, czy są dostępne sloty serwisowe na wybrany dzień
+        if (!serviceSlotService.areSlotsAvailable(serviceOrderDto.pickupDate(), bikesCount)) {
+            int maxPerDay = serviceSlotService.getMaxBikesPerDay(serviceOrderDto.pickupDate());
+            int booked = serviceOrderRepository.countBikesScheduledForDate(serviceOrderDto.pickupDate());
+            int available = Math.max(0, maxPerDay - booked);
+
+            return ResponseEntity.badRequest().body(Map.of(
+                    "message", "Brak wystarczającej liczby wolnych miejsc na wybrany dzień. Dostępne miejsca: " + available + ". Proszę wybrać inny termin lub zmniejszyć liczbę rowerów.",
+                    "availableBikes", available,
+                    "maxBikesPerDay", maxPerDay
+            ));
+        }
+
+        // Pobierz użytkownika
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new RuntimeException("User not found with email: " + userEmail));
+
+        // Pobierz pakiet serwisowy
+        ServicePackage servicePackage = null;
+        String packageCode = null;
+
+        if (serviceOrderDto.servicePackageId() != null) {
+            servicePackage = servicePackageRepository.findById(serviceOrderDto.servicePackageId())
+                    .orElseThrow(() -> new RuntimeException("Service package not found"));
+            packageCode = servicePackage.getCode();
+        } else if (serviceOrderDto.servicePackageCode() != null) {
+            // Dla kompatybilności wstecznej
+            servicePackage = servicePackageRepository.findByCode(serviceOrderDto.servicePackageCode())
+                    .orElseThrow(() -> new RuntimeException("Service package not found with code: " + serviceOrderDto.servicePackageCode()));
+            packageCode = serviceOrderDto.servicePackageCode();
+        } else {
+            return ResponseEntity.badRequest().body(Map.of("message", "Pakiet serwisowy jest wymagany"));
+        }
+
+        // Walidacja rowerów
+        List<Long> bicycleIds = serviceOrderDto.bicycleIds();
+        if (bicycleIds == null || bicycleIds.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Lista rowerów jest wymagana"));
+        }
+
+        // Dla każdego roweru utwórz osobne zamówienie
+        List<ServiceOrder> orders = new ArrayList<>();
+        for (Long bicycleId : bicycleIds) {
+            Optional<IncompleteBike> bikeOpt = incompleteBikeRepository.findById(bicycleId);
+            if (bikeOpt.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Rower o ID " + bicycleId + " nie został znaleziony"));
+            }
+
+            IncompleteBike bike = bikeOpt.get();
+
+            // Sprawdź, czy rower należy do użytkownika
+            if (bike.getOwner() == null || !bike.getOwner().getId().equals(user.getId())) {
+                return ResponseEntity.status(403).body(Map.of("message", "Brak uprawnień do wybranego roweru"));
+            }
+
+            // Utwórz zamówienie
+            ServiceOrder order = new ServiceOrder();
+            order.setBicycle(bike);
+            order.setClient(user);
+            order.setServicePackage(servicePackage);
+            order.setServicePackageCode(packageCode);
+            order.setPickupDate(serviceOrderDto.pickupDate());
+            order.setPickupAddress(serviceOrderDto.pickupAddress());
+            order.setPickupLatitude(serviceOrderDto.pickupLatitude());
+            order.setPickupLongitude(serviceOrderDto.pickupLongitude());
+            order.setPrice(servicePackage.getPrice());
+            order.setAdditionalNotes(serviceOrderDto.additionalNotes());
+            order.setStatus(ServiceOrder.OrderStatus.PENDING);
+            order.setOrderDate(LocalDateTime.now());
+
+            orders.add(order);
+        }
+
+        // Zapisz wszystkie zamówienia
+        serviceOrderRepository.saveAll(orders);
+
+        return ResponseEntity.ok(Map.of(
+                "message", "Zamówienie serwisowe zostało utworzone pomyślnie",
+                "orderCount", orders.size(),
+                "orderIds", orders.stream().map(ServiceOrder::getId).collect(Collectors.toList())
+        ));
     }
 
     @Override
     @Transactional
     public ResponseEntity<?> cancelServiceOrder(Long orderId, String userEmail) {
-        // Implementacja pozostaje bez zmian...
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new RuntimeException("User not found with email: " + userEmail));
 
@@ -138,28 +228,27 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
 
         // Sprawdź czy zamówienie należy do użytkownika
         if (!order.getClient().getId().equals(user.getId())) {
-            return ResponseEntity.status(403).body(Map.of("message", "You do not have permission to cancel this order"));
+            return ResponseEntity.status(403).body(Map.of("message", "Nie masz uprawnień do anulowania tego zamówienia"));
         }
 
         // Sprawdź czy zamówienie można anulować (tylko w stanie PENDING lub CONFIRMED)
         if (order.getStatus() != ServiceOrder.OrderStatus.PENDING &&
                 order.getStatus() != ServiceOrder.OrderStatus.CONFIRMED) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Service order cannot be cancelled in current state: " + order.getStatus()));
+            return ResponseEntity.badRequest().body(Map.of("message", "Zamówienia nie można anulować w obecnym stanie: " + order.getStatus()));
         }
 
         // Anuluj zamówienie
         order.setStatus(ServiceOrder.OrderStatus.CANCELLED);
         serviceOrderRepository.save(order);
 
-        return ResponseEntity.ok(Map.of("message", "Service order cancelled successfully"));
+        return ResponseEntity.ok(Map.of("message", "Zamówienie zostało pomyślnie anulowane"));
     }
 
     @Override
     public ResponseEntity<?> getServicePackagePrice(String servicePackageCode) {
-        // Implementacja pozostaje bez zmian...
         Optional<ServicePackage> packageEntity = servicePackageRepository.findByCode(servicePackageCode);
         if (packageEntity.isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Invalid service package"));
+            return ResponseEntity.badRequest().body(Map.of("message", "Nieprawidłowy pakiet serwisowy"));
         }
 
         return ResponseEntity.ok(Map.of(
