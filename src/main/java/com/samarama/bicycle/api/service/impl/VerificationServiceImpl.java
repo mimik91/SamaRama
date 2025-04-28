@@ -45,9 +45,9 @@ public class VerificationServiceImpl implements VerificationService {
 
         VerificationToken verificationToken;
         if (existingTokenOpt.isPresent()) {
-            // Jeśli token już istnieje, zaktualizuj go
+            // Jeśli token już istnieje, nie generuj nowego tokena,
+            // tylko zaktualizuj datę wygaśnięcia i zresetuj flagę used
             verificationToken = existingTokenOpt.get();
-            verificationToken.setToken(java.util.UUID.randomUUID().toString());
             verificationToken.setExpiryDate(LocalDateTime.now().plusMinutes(tokenExpirationMs / 60000));
             verificationToken.setUsed(false);
         } else {
@@ -75,14 +75,22 @@ public class VerificationServiceImpl implements VerificationService {
 
         VerificationToken verificationToken = verificationTokenOpt.get();
 
+        // Jeśli token został już wykorzystany, sprawdź czy konto jest już zweryfikowane
         if (verificationToken.isUsed()) {
-            logger.warning("Token already used: " + token);
-            return ResponseEntity.badRequest().body(Map.of("message", "Token został już wykorzystany"));
+            User user = verificationToken.getUser();
+            if (user.isVerified()) {
+                // Jeśli konto jest już zweryfikowane, zwróć komunikat o tym
+                return ResponseEntity.ok(Map.of("message", "Konto zostało już wcześniej zweryfikowane. Możesz się zalogować."));
+            } else {
+                // Jeśli token jest już użyty, ale konto nie jest zweryfikowane (teoretycznie niemożliwe, ale dla pewności),
+                // oznaczamy token jako niewykorzystany i kontynuujemy weryfikację
+                verificationToken.setUsed(false);
+            }
         }
 
         if (verificationToken.isExpired()) {
             logger.warning("Token expired: " + token);
-            return ResponseEntity.badRequest().body(Map.of("message", "Token weryfikacyjny wygasł"));
+            return ResponseEntity.badRequest().body(Map.of("message", "Token weryfikacyjny wygasł. Możesz poprosić o wysłanie nowego."));
         }
 
         User user = verificationToken.getUser();
