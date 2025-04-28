@@ -40,7 +40,8 @@ public class WebSecurityConfig {
                 .exceptionHandling(exception -> exception.authenticationEntryPoint(unauthorizedHandler))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth ->
-                        auth.requestMatchers("/api/auth/**").permitAll()
+                        auth.requestMatchers("/api/auth/signin/**").permitAll()
+                                .requestMatchers("/api/auth/signup/**").permitAll()
                                 .requestMatchers("/api/test/**").permitAll()
                                 // Dodajemy dostęp do endpointów weryfikacji
                                 .requestMatchers("/api/verification/**").permitAll()

@@ -19,6 +19,9 @@ public class VerificationController {
         this.verificationService = verificationService;
     }
 
+
+
+
     /**
      * Endpoint do weryfikacji konta na podstawie tokenu
      * @param token token weryfikacyjny
