@@ -34,17 +34,17 @@ public class EmailServiceImpl implements EmailService {
     @Override
     public void sendVerificationEmail(User user, String token) {
         try {
-            // Zmień tę linię, aby odpowiadała ścieżce Twojego API:
-            //String verificationUrl = frontendUrl + "verify-account?token=" + token;
-
-            // lub alternatywnie, jeśli Twój frontend ma specjalną stronę:
-             String verificationUrl = frontendUrl + "/#/verify?token=" + token;
+            String verificationUrl = frontendUrl + "/verify-account?token=" + token;
 
             String subject = "Potwierdź swoje konto w aplikacji Samarama Bicycle";
             String content = "<div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>"
-                    // Reszta zawartości maila
+                    + "<h2 style='color: #3498db;'>Witaj " + user.getFirstName() + "!</h2>"
+                    + "<p>Dziękujemy za rejestrację w aplikacji Samarama Bicycle.</p>"
+                    + "<p>Aby aktywować swoje konto, kliknij poniższy przycisk:</p>"
                     + "<p><a href='" + verificationUrl + "' style='display: inline-block; padding: 10px 20px; background-color: #3498db; color: #ffffff; text-decoration: none; border-radius: 5px;'>Potwierdź konto</a></p>"
-                    // Reszta zawartości maila
+                    + "<p>Jeśli przycisk nie działa, skopiuj i wklej poniższy link do przeglądarki:</p>"
+                    + "<p><a href='" + verificationUrl + "'>" + verificationUrl + "</a></p>"
+                    + "<p>Pozdrawiamy,<br>Zespół Samarama Bicycle</p>"
                     + "</div>";
 
             sendHtmlEmail(user.getEmail(), subject, content);
