@@ -45,6 +45,8 @@ public class WebSecurityConfig {
                                 .requestMatchers("/api/test/**").permitAll()
                                 // Dodajemy dostęp do endpointów weryfikacji
                                 .requestMatchers("/api/verification/**").permitAll()
+                                .requestMatchers("/api/password/reset-request").permitAll()
+                                .requestMatchers("/api/password/reset").permitAll()
                                 // Allow access to guest orders endpoint
                                 .requestMatchers("/api/guest-orders/**").permitAll()
                                 // Add this line to permit access to the service packages endpoint

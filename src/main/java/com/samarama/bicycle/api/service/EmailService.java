@@ -15,4 +15,6 @@ public interface EmailService {
      * @param user użytkownik którego konto zostało aktywowane
      */
     void sendAccountActivatedEmail(User user);
+
+    void sendPasswordResetEmail(User user, String token);
 }

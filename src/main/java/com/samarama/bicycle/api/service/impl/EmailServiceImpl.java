@@ -89,6 +89,40 @@ public class EmailServiceImpl implements EmailService {
         }
     }
 
+    @Async
+    @Override
+    public void sendPasswordResetEmail(User user, String token) {
+        try {
+            String resetUrl = frontendUrl + "/reset-password?token=" + token;
+
+            String subject = "Resetowanie hasła w aplikacji Samarama Bicycle";
+
+            String content =
+                    "<div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;'>" +
+                            "<div style='text-align: center; margin-bottom: 20px;'>" +
+                            "<h1 style='color: #3498db; margin-bottom: 5px;'>Samarama Bicycle</h1>" +
+                            "<p style='color: #7f8c8d; font-size: 16px;'>Twoja aplikacja do zarządzania rowerami</p>" +
+                            "</div>" +
+                            "<p style='font-size: 16px; color: #333; margin-bottom: 20px;'>Cześć " + user.getFirstName() + ",</p>" +
+                            "<p style='font-size: 16px; color: #333; margin-bottom: 20px;'>Otrzymaliśmy prośbę o zresetowanie hasła do Twojego konta. Aby ustawić nowe hasło, kliknij w poniższy przycisk:</p>" +
+                            "<div style='text-align: center; margin: 30px 0;'>" +
+                            "<a href='" + resetUrl + "' style='display: inline-block; padding: 12px 24px; background-color: #3498db; color: #ffffff; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px;'>Resetuj hasło</a>" +
+                            "</div>" +
+                            "<p style='font-size: 14px; color: #7f8c8d; margin-bottom: 10px;'>Link jest ważny przez 2 godziny. Jeśli przycisk nie działa, możesz skopiować i wkleić poniższy link do przeglądarki:</p>" +
+                            "<p style='font-size: 14px; color: #3498db; word-break: break-all; margin-bottom: 30px;'>" + resetUrl + "</p>" +
+                            "<p style='font-size: 14px; color: #7f8c8d; margin-bottom: 10px;'>Jeżeli nie prosiłeś o zresetowanie hasła, zignoruj tę wiadomość lub skontaktuj się z nami.</p>" +
+                            "<hr style='border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;'>" +
+                            "<p style='font-size: 12px; color: #7f8c8d; text-align: center;'>© " + java.time.Year.now().getValue() + " Samarama Bicycle. Wszelkie prawa zastrzeżone.</p>" +
+                            "</div>";
+
+            sendHtmlEmail(user.getEmail(), subject, content);
+            logger.info("Password reset email sent to: " + user.getEmail());
+        } catch (Exception e) {
+            logger.log(Level.SEVERE, "Error sending password reset email to " + user.getEmail(), e);
+            throw new RuntimeException("Error sending password reset email", e);
+        }
+    }
+
     private void sendHtmlEmail(String to, String subject, String htmlContent) throws MessagingException, UnsupportedEncodingException {
         MimeMessage message = mailSender.createMimeMessage();
         MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
@@ -108,4 +142,6 @@ public class EmailServiceImpl implements EmailService {
 
         mailSender.send(message);
     }
+
+
 }
