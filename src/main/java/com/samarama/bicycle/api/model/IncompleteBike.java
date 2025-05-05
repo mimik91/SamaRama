@@ -22,15 +22,20 @@ public class IncompleteBike {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "id") // Nazwa kolumny
     private Long id;
 
     @NotBlank
+    @Column(name = "brand") // Nazwa kolumny
     private String brand;
 
+    @Column(name = "model") // Nazwa kolumny
     private String model;
 
+    @Column(name = "type") // Nazwa kolumny
     private String type;
 
+    @Column(name = "frame_material") // Nazwa kolumny
     private String frameMaterial;
 
     @OneToOne(mappedBy = "bike", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
@@ -38,13 +43,15 @@ public class IncompleteBike {
     private BicyclePhoto photo;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "owner_id")
+    @JoinColumn(name = "owner_id") // Nazwa kolumny
     @JsonIgnore
     @ToString.Exclude
     private IncompleteUser owner;
 
+    @Column(name = "created_at") // Nazwa kolumny
     private LocalDateTime createdAt = LocalDateTime.now();
 
+    @Column(name = "production_date") // Nazwa kolumny
     private LocalDate productionDate;
 
     public boolean hasPhoto() {

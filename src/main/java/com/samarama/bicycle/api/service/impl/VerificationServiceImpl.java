@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.logging.Logger;
 
 @Service
@@ -37,7 +38,6 @@ public class VerificationServiceImpl implements VerificationService {
         this.emailService = emailService;
     }
 
-    @Override
     @Transactional
     public VerificationToken createVerificationToken(User user) {
         // Najpierw sprawdź, czy istnieje już token dla tego użytkownika
@@ -45,14 +45,20 @@ public class VerificationServiceImpl implements VerificationService {
 
         VerificationToken verificationToken;
         if (existingTokenOpt.isPresent()) {
-            // Jeśli token już istnieje, nie generuj nowego tokena,
-            // tylko zaktualizuj datę wygaśnięcia i zresetuj flagę used
+            // Jeśli token już istnieje, aktualizuj go
             verificationToken = existingTokenOpt.get();
-            verificationToken.setExpiryDate(LocalDateTime.now().plusMinutes(tokenExpirationMs / 60000));
+            verificationToken.setToken(UUID.randomUUID().toString());
+            // Ustawienie daty wygaśnięcia (WAŻNE!)
+            verificationToken.setExpiryDate(LocalDateTime.now().plusHours(24));
             verificationToken.setUsed(false);
         } else {
-            // Jeśli nie, utwórz nowy token
-            verificationToken = new VerificationToken(user, (int) (tokenExpirationMs / 60000));
+            // Tworzenie nowego tokenu
+            verificationToken = new VerificationToken();
+            verificationToken.setUser(user);
+            verificationToken.setToken(UUID.randomUUID().toString());
+            // Ustawienie daty wygaśnięcia (WAŻNE!)
+            verificationToken.setExpiryDate(LocalDateTime.now().plusHours(24));
+            verificationToken.setUsed(false);
         }
 
         return tokenRepository.save(verificationToken);

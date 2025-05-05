@@ -20,14 +20,18 @@ public class User extends IncompleteUser {
     }
 
     @Size(max = 50)
+    @Column(name = "first_name") // Nazwa kolumny
     private String firstName;
 
     @Size(max = 50)
+    @Column(name = "last_name") // Nazwa kolumny
     private String lastName;
 
     @NotBlank
     @Size(max = 120)
+    @Column(name = "password") // Nazwa kolumny
     private String password;
 
+    @Column(name = "verified") // Nazwa kolumny
     private boolean verified = false;
 }

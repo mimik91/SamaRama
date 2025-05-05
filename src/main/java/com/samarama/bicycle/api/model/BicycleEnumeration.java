@@ -17,9 +17,10 @@ public class BicycleEnumeration {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "id") // Nazwa kolumny w tabeli
     private Long id;
 
-    @Column(unique = true, nullable = false)
+    @Column(name = "type", unique = true, nullable = false) // Dodana nazwa kolumny
     private String type; // np. "BRAND", "BIKE_TYPE", "FRAME_MATERIAL"
 
     @ElementCollection
@@ -27,7 +28,7 @@ public class BicycleEnumeration {
             name = "bicycle_enumeration_values",
             joinColumns = @JoinColumn(name = "enumeration_id")
     )
-    @Column(name = "value")
+    @Column(name = "value") // Nazwa kolumny dla wartości w kolekcji
     private List<String> values = new ArrayList<>();
 
     // Konstruktor pomocniczy

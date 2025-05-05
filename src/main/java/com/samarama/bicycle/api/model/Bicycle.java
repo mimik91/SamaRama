@@ -16,7 +16,7 @@ import java.time.LocalDateTime;
 @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Bicycle extends IncompleteBike {
 
-    @Column(unique = true)
+    @Column(name = "frame_number", unique = true)
     private String frameNumber;
 
     public Bicycle(Long id, String brand, String model, String type, String frameMaterial,

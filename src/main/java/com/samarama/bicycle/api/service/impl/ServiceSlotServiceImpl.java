@@ -248,7 +248,32 @@ public class ServiceSlotServiceImpl implements ServiceSlotService {
         }
 
         LocalDate endDate = startDate.plusDays(days - 1);
-        return getSlotAvailability(startDate, endDate);
+        List<ServiceSlotAvailabilityDto> results = new ArrayList<>();
+
+        // Pobierz konfigurację slotów tylko raz
+        Optional<ServiceSlotConfig> slotConfigOpt = slotConfigRepository.findConfigForDate(startDate);
+        int maxBikesPerDay = slotConfigOpt.map(ServiceSlotConfig::getMaxBikesPerDay).orElse(DEFAULT_MAX_BIKES_PER_DAY);
+        int maxBikesPerOrder = slotConfigOpt.map(ServiceSlotConfig::getEffectiveMaxBikesPerOrder).orElse(DEFAULT_MAX_BIKES_PER_ORDER);
+
+        // Pobierz informacje o wszystkich zarezerwowanych slotach w danym zakresie dat
+        List<Object[]> bookings = serviceOrderRepository.countBikesScheduledForDateRange(startDate, endDate);
+        Map<LocalDate, Integer> bookingsMap = new HashMap<>();
+
+        for (Object[] row : bookings) {
+            LocalDate date = (LocalDate) row[0];
+            Number count = (Number) row[1];
+            bookingsMap.put(date, count.intValue());
+        }
+
+        // Przygotowanie wyników
+        LocalDate currentDate = startDate;
+        while (!currentDate.isAfter(endDate)) {
+            int bookedBikes = bookingsMap.getOrDefault(currentDate, 0);
+            results.add(ServiceSlotAvailabilityDto.of(currentDate, maxBikesPerDay, bookedBikes, maxBikesPerOrder));
+            currentDate = currentDate.plusDays(1);
+        }
+
+        return results;
     }
 
     @Override

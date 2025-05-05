@@ -27,12 +27,13 @@ public class ServiceSlotConfig {
      * Data, od której obowiązuje konfiguracja
      */
     @NotNull
-    @Column(nullable = false)
+    @Column(name = "start_date", nullable = false)
     private LocalDate startDate;
 
     /**
      * Data, do której obowiązuje konfiguracja (null oznacza bezterminowo)
      */
+    @Column(name = "end_date")
     private LocalDate endDate;
 
     /**
@@ -40,7 +41,7 @@ public class ServiceSlotConfig {
      */
     @NotNull
     @Positive
-    @Column(nullable = false)
+    @Column(name = "max_bikes_per_day", nullable = false)
     private Integer maxBikesPerDay;
 
     /**
@@ -48,9 +49,10 @@ public class ServiceSlotConfig {
      * (jeśli null, to domyślnie równa maxBikesPerDay)
      */
     @Positive
+    @Column(name = "max_bikes_per_order")
     private Integer maxBikesPerOrder;
 
-    @Column(nullable = false)
+    @Column(name = "created_at")
     private LocalDate createdAt = LocalDate.now();
 
     /**

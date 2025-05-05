@@ -24,46 +24,51 @@ public class ServiceOrder {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "id") // Nazwa kolumny
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "bicycle_id")
+    @JoinColumn(name = "bicycle_id") // Nazwa kolumny
     private IncompleteBike bicycle;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id")
+    @JoinColumn(name = "user_id") // Nazwa kolumny
     private IncompleteUser client;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "service_package_id")
+    @JoinColumn(name = "service_package_id") // Nazwa kolumny
     private ServicePackage servicePackage;
 
     // Zachowanie kompatybilności wstecznej - kolumna przechowująca kod pakietu
-    @Column(name = "service_package_code")
+    @Column(name = "service_package_code") // Nazwa kolumny
     private String servicePackageCode;
 
-    @Column(nullable = false)
+    @Column(name = "pickup_date", nullable = false) // Nazwa kolumny
     private LocalDate pickupDate;
 
+    @Column(name = "pickup_address") // Nazwa kolumny
     private String pickupAddress;
 
+    @Column(name = "pickup_latitude") // Nazwa kolumny
     private Double pickupLatitude;
 
+    @Column(name = "pickup_longitude") // Nazwa kolumny
     private Double pickupLongitude;
 
-    @Column(nullable = false)
+    @Column(name = "price", nullable = false) // Nazwa kolumny
     private BigDecimal price;
 
-    @Column(nullable = false)
+    @Column(name = "order_date", nullable = false) // Nazwa kolumny
     private LocalDateTime orderDate = LocalDateTime.now();
 
-    @Column(length = 500)
+    @Column(name = "additional_notes", length = 500) // Nazwa kolumny
     private String additionalNotes;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(name = "status", nullable = false) // Nazwa kolumny
     private OrderStatus status = OrderStatus.PENDING;
 
     // Opcjonalne uwagi od serwisu
+    @Column(name = "service_notes") // Nazwa kolumny
     private String serviceNotes;
 }

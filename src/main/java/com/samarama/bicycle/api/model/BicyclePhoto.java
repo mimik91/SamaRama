@@ -20,6 +20,7 @@ public class BicyclePhoto {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "id")
     private Long id;
 
     @OneToOne(fetch = FetchType.LAZY)
@@ -33,8 +34,13 @@ public class BicyclePhoto {
     @ToString.Exclude
     private byte[] photoData;
 
+    @Column(name = "content_type")
     private String contentType;
+
+    @Column(name = "file_size")
     private Long fileSize;
+
+    @Column(name = "uploaded_at")
     private LocalDateTime uploadedAt = LocalDateTime.now();
 
     public void setPhotoFromFile(byte[] data, String contentType, Long fileSize) {

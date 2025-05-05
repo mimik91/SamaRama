@@ -24,43 +24,49 @@ public class ServicePackage {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "id")
     private Long id;
 
     /**
      * Unikalny kod pakietu (np. "BASIC", "EXTENDED", "FULL")
      * Używany do referencji w innych częściach aplikacji
      */
-    @Column(unique = true, nullable = false)
+    @Column(name = "code", unique = true, nullable = false)
     private String code;
 
     /**
      * Nazwa pakietu widoczna dla użytkownika
      */
     @NotBlank
+    @Column(name = "name")
     private String name;
 
     /**
      * Opis pakietu
      */
-    @Column(length = 1000)
+    @Column(name = "description", length = 1000)
     private String description;
 
     /**
      * Cena pakietu
      */
     @NotNull
+    @Column(name = "price")
     private BigDecimal price;
 
+    @Column(name = "service_id")
     private Long serviceId;
 
     /**
      * Czy pakiet jest aktywny (dostępny do wyboru)
      */
+    @Column(name = "active")
     private boolean active = true;
 
     /**
      * Kolejność wyświetlania pakietu na liście (niższe wartości = wyżej na liście)
      */
+    @Column(name = "display_order")
     private Integer displayOrder;
 
     /**
