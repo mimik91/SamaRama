@@ -58,7 +58,7 @@ public class ServiceOrder {
     @Column(name = "price", nullable = false) // Nazwa kolumny
     private BigDecimal price;
 
-    @Column(name = "order_date", nullable = false) // Nazwa kolumny
+    @Column(name = "orderdate", nullable = false) // Nazwa kolumny
     private LocalDateTime orderDate = LocalDateTime.now();
 
     @Column(name = "additional_notes", length = 500) // Nazwa kolumny
