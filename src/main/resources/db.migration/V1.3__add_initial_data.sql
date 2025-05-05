@@ -1,18 +1,5 @@
 -- Create admin user
-INSERT INTO incomplete_users (email, created_at) 
-VALUES ('dominiklach@poczta.fm', CURRENT_TIMESTAMP);
 
-INSERT INTO users (id, first_name, last_name, password, verified)
-VALUES (
-    (SELECT id FROM incomplete_users WHERE email = 'dominiklach@poczta.fm'),
-    'Admin',
-    'User',
-    '$2a$10$JQOfPxoQlKw2YGjYkN6we.p2y2Nt3s5QFUKlL6Yi9P2livRuAyLqK', -- hashed 'misiek'
-    true
-);
-
-INSERT INTO user_roles (user_id, role)
-VALUES ((SELECT id FROM incomplete_users WHERE email = 'dominiklach@poczta.fm'), 'ROLE_ADMIN');
 
 -- Initialize default bicycle enumerations
 -- Brands

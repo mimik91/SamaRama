@@ -65,7 +65,5 @@ public class AdminInitializerService {
                 System.out.println("Updated roles for admin user: " + adminEmail);
             }
         }
-
-        // Moderator initialization code has been removed
     }
 }
