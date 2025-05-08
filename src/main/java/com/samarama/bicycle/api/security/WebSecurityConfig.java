@@ -1,5 +1,6 @@
 package com.samarama.bicycle.api.security;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.PropertySource;
@@ -25,6 +26,9 @@ public class WebSecurityConfig {
 
     private final JwtAuthEntryPoint unauthorizedHandler;
     private final JwtTokenFilter jwtTokenFilter;
+
+    @Value("${app.frontend.url}")
+    private String frontendUrl;
 
     public WebSecurityConfig(JwtAuthEntryPoint unauthorizedHandler,
                              JwtTokenFilter jwtTokenFilter) {
@@ -78,7 +82,7 @@ public class WebSecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList("https://samarama-front-7d7f603b041c.herokuapp.com/"));
+        configuration.setAllowedOrigins(Arrays.asList(frontendUrl));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("authorization", "content-type", "x-auth-token"));
         configuration.setExposedHeaders(Arrays.asList("x-auth-token"));

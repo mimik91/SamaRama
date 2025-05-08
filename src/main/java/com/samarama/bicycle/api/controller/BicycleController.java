@@ -28,6 +28,12 @@ public class BicycleController {
         this.bicycleService = bicycleService;
     }
 
+    @GetMapping("bike")
+    public String test(){
+        return "TEST";
+    }
+
+
     @GetMapping
     @PreAuthorize("hasRole('CLIENT')")
     public ResponseEntity<List<IncompleteBikeResponseDto>> getUserBikes() {
