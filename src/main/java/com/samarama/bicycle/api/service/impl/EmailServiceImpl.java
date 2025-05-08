@@ -93,7 +93,7 @@ public class EmailServiceImpl implements EmailService {
     @Override
     public void sendPasswordResetEmail(User user, String token) {
         try {
-            String resetUrl = frontendUrl + "/reset-password?token=" + token;
+            String resetUrl = frontendUrl + "/password-reset?token=" + token;
 
             String subject = "Resetowanie hasła w aplikacji Samarama Bicycle";
 
