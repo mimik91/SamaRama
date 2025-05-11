@@ -64,7 +64,7 @@ public class WebSecurityConfig {
                                 .requestMatchers("/api/service-slots/availability/**").permitAll()
                                 .requestMatchers("/api/service-slots/check-availability").permitAll()
                                 .requestMatchers("/api/account/**").permitAll()
-                                .requestMatchers("/test").permitAll()
+                                .requestMatchers("/bicycles/bike").permitAll()
                                 .requestMatchers("/api/account/public/**").permitAll()
                                 .requestMatchers("/api/account/**").authenticated()
                                 // Admin routes require ADMIN or MODERATOR role
