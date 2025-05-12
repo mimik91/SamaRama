@@ -39,17 +39,17 @@ public class EmailServiceImpl implements EmailService {
             String verificationUrl = frontendUrl + "/verify-account?token=" + token;
 
             // Lepszy tytuł maila - bez słów kluczowych spamowych
-            String subject = "Dokończ rejestrację w aplikacji Samarama Bicycle";
+            String subject = "Dokończ rejestrację w aplikacji cyclopick.pl";
 
             // Ulepszona treść maila
             String content =
                     "<div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;'>" +
                             "<div style='text-align: center; margin-bottom: 20px;'>" +
-                            "<h1 style='color: #3498db; margin-bottom: 5px;'>Samarama Bicycle</h1>" +
+                            "<h1 style='color: #3498db; margin-bottom: 5px;'>cyclopick.pl</h1>" +
                             "<p style='color: #7f8c8d; font-size: 16px;'>Twoja aplikacja do zarządzania rowerami</p>" +
                             "</div>" +
                             "<p style='font-size: 16px; color: #333; margin-bottom: 20px;'>Cześć " + user.getFirstName() + ",</p>" +
-                            "<p style='font-size: 16px; color: #333; margin-bottom: 20px;'>Dziękujemy za rejestrację w aplikacji Samarama Bicycle. Aby dokończyć proces rejestracji, prosimy o potwierdzenie swojego adresu email.</p>" +
+                            "<p style='font-size: 16px; color: #333; margin-bottom: 20px;'>Dziękujemy za rejestrację w aplikacji cyclopick.pl. Aby dokończyć proces rejestracji, prosimy o potwierdzenie swojego adresu email.</p>" +
                             "<div style='text-align: center; margin: 30px 0;'>" +
                             "<a href='" + verificationUrl + "' style='display: inline-block; padding: 12px 24px; background-color: #3498db; color: #ffffff; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px;'>Potwierdź swój email</a>" +
                             "</div>" +
@@ -57,7 +57,7 @@ public class EmailServiceImpl implements EmailService {
                             "<p style='font-size: 14px; color: #3498db; word-break: break-all; margin-bottom: 30px;'>" + verificationUrl + "</p>" +
                             "<p style='font-size: 14px; color: #7f8c8d; margin-bottom: 10px;'>Jeżeli nie rejestrowałeś się w naszej aplikacji, zignoruj tę wiadomość.</p>" +
                             "<hr style='border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;'>" +
-                            "<p style='font-size: 12px; color: #7f8c8d; text-align: center;'>© " + java.time.Year.now().getValue() + " Samarama Bicycle. Wszelkie prawa zastrzeżone.</p>" +
+                            "<p style='font-size: 12px; color: #7f8c8d; text-align: center;'>© " + java.time.Year.now().getValue() + " cyclopick.pl. Wszelkie prawa zastrzeżone.</p>" +
                             "</div>";
 
             sendHtmlEmail(user.getEmail(), subject, content);
@@ -73,13 +73,13 @@ public class EmailServiceImpl implements EmailService {
         try {
             String loginUrl = frontendUrl + "/login";
 
-            String subject = "Twoje konto w aplikacji Samarama Bicycle zostało aktywowane";
+            String subject = "Twoje konto w aplikacji cyclopick.pl zostało aktywowane";
             String content = "<div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>"
                     + "<h2 style='color: #3498db;'>Witaj " + user.getFirstName() + "!</h2>"
-                    + "<p>Twoje konto w aplikacji Samarama Bicycle zostało pomyślnie aktywowane.</p>"
+                    + "<p>Twoje konto w aplikacji cyclopick.pl zostało pomyślnie aktywowane.</p>"
                     + "<p>Możesz teraz w pełni korzystać z naszej aplikacji.</p>"
                     + "<p><a href='" + loginUrl + "' style='display: inline-block; padding: 10px 20px; background-color: #3498db; color: #ffffff; text-decoration: none; border-radius: 5px;'>Zaloguj się</a></p>"
-                    + "<p>Pozdrawiamy,<br>Zespół Samarama Bicycle</p>"
+                    + "<p>Pozdrawiamy,<br>Zespół cyclopick.pl</p>"
                     + "</div>";
 
             sendHtmlEmail(user.getEmail(), subject, content);
@@ -95,12 +95,12 @@ public class EmailServiceImpl implements EmailService {
         try {
             String resetUrl = frontendUrl + "/password-reset?token=" + token;
 
-            String subject = "Resetowanie hasła w aplikacji Samarama Bicycle";
+            String subject = "Resetowanie hasła w aplikacji cyclopick.pl";
 
             String content =
                     "<div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;'>" +
                             "<div style='text-align: center; margin-bottom: 20px;'>" +
-                            "<h1 style='color: #3498db; margin-bottom: 5px;'>Samarama Bicycle</h1>" +
+                            "<h1 style='color: #3498db; margin-bottom: 5px;'>cyclopick.pl</h1>" +
                             "<p style='color: #7f8c8d; font-size: 16px;'>Twoja aplikacja do zarządzania rowerami</p>" +
                             "</div>" +
                             "<p style='font-size: 16px; color: #333; margin-bottom: 20px;'>Cześć " + user.getFirstName() + ",</p>" +
@@ -112,7 +112,7 @@ public class EmailServiceImpl implements EmailService {
                             "<p style='font-size: 14px; color: #3498db; word-break: break-all; margin-bottom: 30px;'>" + resetUrl + "</p>" +
                             "<p style='font-size: 14px; color: #7f8c8d; margin-bottom: 10px;'>Jeżeli nie prosiłeś o zresetowanie hasła, zignoruj tę wiadomość lub skontaktuj się z nami.</p>" +
                             "<hr style='border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;'>" +
-                            "<p style='font-size: 12px; color: #7f8c8d; text-align: center;'>© " + java.time.Year.now().getValue() + " Samarama Bicycle. Wszelkie prawa zastrzeżone.</p>" +
+                            "<p style='font-size: 12px; color: #7f8c8d; text-align: center;'>© " + java.time.Year.now().getValue() + " cyclopick.pl. Wszelkie prawa zastrzeżone.</p>" +
                             "</div>";
 
             sendHtmlEmail(user.getEmail(), subject, content);
@@ -128,7 +128,7 @@ public class EmailServiceImpl implements EmailService {
         MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
         // Ustawienie nagłówków pomagających uniknąć oznaczenia jako spam
-        helper.setFrom(new InternetAddress(fromEmail, "Samarama Bicycle"));
+        helper.setFrom(new InternetAddress(fromEmail, "cyclopick.pl"));
         helper.setTo(to);
         helper.setSubject(subject);
         helper.setText(htmlContent, true);
@@ -137,11 +137,9 @@ public class EmailServiceImpl implements EmailService {
         message.addHeader("X-Priority", "1");
         message.addHeader("X-MSMail-Priority", "High");
         message.addHeader("Importance", "High");
-        message.addHeader("X-Mailer", "Samarama Bicycle Application");
+        message.addHeader("X-Mailer", "cyclopick.pl Application");
         message.addHeader("List-Unsubscribe", "<mailto:" + fromEmail + "?subject=Unsubscribe>");
 
         mailSender.send(message);
     }
-
-
 }
