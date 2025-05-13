@@ -9,15 +9,19 @@ import com.samarama.bicycle.api.repository.BicycleRepository;
 import com.samarama.bicycle.api.repository.IncompleteBikeRepository;
 import com.samarama.bicycle.api.service.ServiceOrderService;
 import jakarta.validation.Valid;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @CrossOrigin(origins = "*", maxAge = 3600)
 @RestController
@@ -29,7 +33,7 @@ public class ServiceOrderController {
     private final IncompleteBikeRepository incompleteBikeRepository;
 
     public ServiceOrderController(
-            ServiceOrderService serviceOrderService,
+            @Lazy ServiceOrderService serviceOrderService,
             BicycleRepository bicycleRepository,
             IncompleteBikeRepository incompleteBikeRepository
     ) {
@@ -38,18 +42,12 @@ public class ServiceOrderController {
         this.incompleteBikeRepository = incompleteBikeRepository;
     }
 
+    // --- REGULAR USER ENDPOINTS ---
+
     @PostMapping
     public ResponseEntity<?> createServiceOrder(@Valid @RequestBody ServiceOrderDto serviceOrderDto) {
         String email = getCurrentUserEmail();
         return serviceOrderService.createServiceOrder(serviceOrderDto, email);
-    }
-
-    private String getCurrentUserEmail() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null) {
-            throw new RuntimeException("Authentication is null - user not authenticated");
-        }
-        return authentication.getName();
     }
 
     @GetMapping("/bicycle/{bicycleId}")
@@ -86,17 +84,31 @@ public class ServiceOrderController {
     }
 
     @GetMapping("/{orderId}")
-    @PreAuthorize("hasRole('CLIENT')")
     public ResponseEntity<ServiceOrderResponseDto> getServiceOrderById(@PathVariable Long orderId) {
         String email = getCurrentUserEmail();
-        return serviceOrderService.getServiceOrderById(orderId, email);
+
+        // Sprawdzamy, czy użytkownik ma rolę ADMIN lub MODERATOR
+        if (hasAdminOrModeratorRole()) {
+            // Dla admina używamy specjalnej metody bez sprawdzania właściciela
+            return serviceOrderService.getServiceOrderByIdForAdmin(orderId);
+        } else {
+            // Dla zwykłego użytkownika sprawdzamy, czy jest właścicielem
+            return serviceOrderService.getServiceOrderById(orderId, email);
+        }
     }
 
     @DeleteMapping("/{orderId}")
-    @PreAuthorize("hasRole('CLIENT')")
     public ResponseEntity<?> cancelServiceOrder(@PathVariable Long orderId) {
         String email = getCurrentUserEmail();
-        return serviceOrderService.cancelServiceOrder(orderId, email);
+
+        // Sprawdzamy, czy użytkownik ma rolę ADMIN lub MODERATOR
+        if (hasAdminOrModeratorRole()) {
+            // Dla admina używamy specjalnej metody
+            return serviceOrderService.cancelServiceOrderByAdmin(orderId, email);
+        } else {
+            // Dla zwykłego użytkownika
+            return serviceOrderService.cancelServiceOrder(orderId, email);
+        }
     }
 
     @GetMapping("/package-price/{packageCode}")
@@ -104,18 +116,29 @@ public class ServiceOrderController {
         return serviceOrderService.getServicePackagePrice(packageCode);
     }
 
-    // Dodaj do src/main/java/com/samarama/bicycle/api/controller/ServiceOrderController.java
-    /**
-     * Aktualizuje istniejące zamówienie serwisowe
-     */
+    // --- ADMIN ENDPOINTS ---
+
+    @GetMapping("/admin/all")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
+    public ResponseEntity<List<ServiceOrderResponseDto>> getAllOrders() {
+        return ResponseEntity.ok(serviceOrderService.getAllServiceOrders());
+    }
+
     @PutMapping("/{orderId}")
-    @PreAuthorize("hasAnyRole('CLIENT', 'ADMIN', 'MODERATOR')")
     public ResponseEntity<?> updateServiceOrder(
             @PathVariable Long orderId,
             @Valid @RequestBody ServiceOrderDto serviceOrderDto) {
 
         String email = getCurrentUserEmail();
-        return serviceOrderService.updateServiceOrder(orderId, serviceOrderDto, email);
+
+        // Sprawdzamy, czy użytkownik ma rolę ADMIN lub MODERATOR
+        if (hasAdminOrModeratorRole()) {
+            // Dla admina używamy specjalnej metody
+            return serviceOrderService.updateServiceOrderByAdmin(orderId, serviceOrderDto, email);
+        } else {
+            // Dla zwykłego użytkownika
+            return serviceOrderService.updateServiceOrder(orderId, serviceOrderDto, email);
+        }
     }
 
     @PatchMapping("/{orderId}/status")
@@ -131,9 +154,31 @@ public class ServiceOrderController {
         try {
             ServiceOrder.OrderStatus newStatus = ServiceOrder.OrderStatus.valueOf(statusStr);
             String email = getCurrentUserEmail();
-            return serviceOrderService.updateOrderStatus(orderId, newStatus, email);
+
+            // Sprawdzamy, czy użytkownik ma rolę ADMIN lub MODERATOR
+            if (hasAdminOrModeratorRole()) {
+                // Dla admina używamy specjalnej metody
+                return serviceOrderService.updateOrderStatusByAdmin(orderId, newStatus, email);
+            } else {
+                // Dla zwykłego użytkownika
+                return serviceOrderService.updateOrderStatus(orderId, newStatus, email);
+            }
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("message", "Nieprawidłowy status: " + statusStr));
         }
+    }
+
+    // --- HELPER METHODS ---
+
+    private String getCurrentUserEmail() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        return authentication.getName();
+    }
+
+    private boolean hasAdminOrModeratorRole() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        return authentication.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .anyMatch(role -> role.equals("ROLE_ADMIN") || role.equals("ROLE_MODERATOR"));
     }
 }

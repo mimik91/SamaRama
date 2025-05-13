@@ -21,7 +21,7 @@ public class AccountController {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
-
+    // Use @Lazy on the PasswordEncoder to prevent circular dependencies
     public AccountController(UserRepository userRepository,
                              @Lazy PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
