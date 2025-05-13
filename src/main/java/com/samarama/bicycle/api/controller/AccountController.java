@@ -1,21 +1,19 @@
 package com.samarama.bicycle.api.controller;
 
 import com.samarama.bicycle.api.dto.PasswordChangeDto;
-import com.samarama.bicycle.api.dto.ServiceProfileUpdateDto;
 import com.samarama.bicycle.api.dto.UserProfileUpdateDto;
 import com.samarama.bicycle.api.model.User;
 import com.samarama.bicycle.api.repository.UserRepository;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
-@CrossOrigin(origins = "*", maxAge = 3600)
 @RestController
 @RequestMapping("/api/account")
 public class AccountController {
@@ -23,8 +21,9 @@ public class AccountController {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
+
     public AccountController(UserRepository userRepository,
-                             PasswordEncoder passwordEncoder) {
+                             @Lazy PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
     }

@@ -3,7 +3,6 @@ package com.samarama.bicycle.api.security;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -14,16 +13,16 @@ import java.util.Collections;
 @Configuration
 public class AuthenticationConfig {
 
-    private final PasswordEncoder passwordEncoder;
     private final UserDetailsService userDetailsService;
+    private final PasswordEncoder passwordEncoder;
 
-    public AuthenticationConfig(PasswordEncoder passwordEncoder, UserDetailsService userDetailsService){
-        this.passwordEncoder = passwordEncoder;
+    public AuthenticationConfig(UserDetailsService userDetailsService, PasswordEncoder passwordEncoder) {
         this.userDetailsService = userDetailsService;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @Bean
-    public AuthenticationProvider userAuthenticationProvider() {
+    public DaoAuthenticationProvider authenticationProvider() {
         DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
         provider.setUserDetailsService(userDetailsService);
         provider.setPasswordEncoder(passwordEncoder);
@@ -32,6 +31,6 @@ public class AuthenticationConfig {
 
     @Bean
     public AuthenticationManager authenticationManager() {
-        return new ProviderManager(Collections.singletonList(userAuthenticationProvider()));
+        return new ProviderManager(Collections.singletonList(authenticationProvider()));
     }
 }

@@ -1,12 +1,13 @@
 package com.samarama.bicycle.api.security;
 
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.PropertySource;
+import org.springframework.context.annotation.*;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -17,6 +18,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.Arrays;
+import java.util.List;
 
 @Configuration
 @EnableWebSecurity
@@ -26,59 +28,59 @@ public class WebSecurityConfig {
 
     private final JwtAuthEntryPoint unauthorizedHandler;
     private final JwtTokenFilter jwtTokenFilter;
+    private final AuthenticationManager authenticationManager;
 
-    @Value("${app.frontend.url}")
+    @Value("${app.frontend.url:http://localhost:3000}")
     private String frontendUrl;
 
     public WebSecurityConfig(JwtAuthEntryPoint unauthorizedHandler,
-                             JwtTokenFilter jwtTokenFilter) {
+                             JwtTokenFilter jwtTokenFilter,
+                             @Lazy AuthenticationManager authenticationManager) {
         this.unauthorizedHandler = unauthorizedHandler;
         this.jwtTokenFilter = jwtTokenFilter;
+        this.authenticationManager = authenticationManager;
     }
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        // In WebSecurityConfig.java
-        http.cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                .csrf(csrf -> csrf.disable())
+    @Primary
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        return http
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .csrf(AbstractHttpConfigurer::disable)
                 .exceptionHandling(exception -> exception.authenticationEntryPoint(unauthorizedHandler))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(auth ->
-                        auth.requestMatchers("/api/auth/signin/**").permitAll()
-                                .requestMatchers("/api/auth/signup/**").permitAll()
-                                .requestMatchers("/api/test/**").permitAll()
-                                // Dodajemy dostęp do endpointów weryfikacji
-                                .requestMatchers("/api/verification/**").permitAll()
-                                .requestMatchers("/api/password/reset-request").permitAll()
-                                .requestMatchers("/api/password/reset").permitAll()
-                                .requestMatchers("/api/password/**").permitAll()
-                                // Allow access to guest orders endpoint
-                                .requestMatchers("/api/guest-orders/**").permitAll()
-                                // Add this line to permit access to the service packages endpoint
-                                .requestMatchers("/api/service-packages/active").permitAll()
-                                // For standard access to bikes (GET)
-                                .requestMatchers("/api/bicycles").permitAll()
-                                .requestMatchers("/api/bicycles/*/photo").permitAll()
-                                .requestMatchers("/api/enumerations/**").permitAll()
-                                .requestMatchers("/api/service-orders/package-price/**").permitAll()
-                                .requestMatchers("/api/service-slots/availability/**").permitAll()
-                                .requestMatchers("/api/service-slots/config").permitAll()
-                                .requestMatchers("/api/service-slots/check-availability").permitAll()
-                                .requestMatchers("/api/account/**").permitAll()
-                                .requestMatchers("/bicycles/bike").permitAll()
-                                .requestMatchers("/api/account/public/**").permitAll()
-                                .requestMatchers("/api/account/**").authenticated()
-                                // Admin routes require ADMIN or MODERATOR role
-                                .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "MODERATOR")
-                                // Only authorized users for modifying bikes
-                                .requestMatchers("/api/bicycles/*/photo").authenticated()
-                                .requestMatchers("/api/admin/orders/**").hasAnyRole("ADMIN", "MODERATOR")
-                                // Remaining API should be protected
-                                .anyRequest().authenticated()
-                );
-
-        http.addFilterBefore(jwtTokenFilter, UsernamePasswordAuthenticationFilter.class);
-        return http.build();
+                .authorizeHttpRequests(auth -> auth
+                        // Public endpoints
+                        .requestMatchers(
+                                "/api/auth/signin/**",
+                                "/api/auth/signup/**",
+                                "/api/test/**",
+                                "/api/verification/**",
+                                "/api/password/reset-request",
+                                "/api/password/reset",
+                                "/api/password/**",
+                                "/api/guest-orders/**",
+                                "/api/service-packages/active",
+                                "/api/enumerations/**",
+                                "/api/service-orders/package-price/**",
+                                "/api/service-slots/availability/**",
+                                "/api/service-slots/config",
+                                "/api/service-slots/check-availability",
+                                "/api/account/public/**",
+                                "/bicycles/bike"
+                        ).permitAll()
+                        // Endpoints for bike photos
+                        .requestMatchers("/api/bicycles/*/photo").permitAll()
+                        // Admin endpoints
+                        .requestMatchers("/api/admin/**", "/api/admin/orders/**").hasAnyRole("ADMIN", "MODERATOR")
+                        // Authenticated endpoints
+                        .requestMatchers("/api/account/**").authenticated()
+                        // Default policy
+                        .anyRequest().authenticated()
+                )
+                .authenticationManager(authenticationManager)
+                .addFilterBefore(jwtTokenFilter, UsernamePasswordAuthenticationFilter.class)
+                .build();
     }
 
     @Bean
@@ -86,16 +88,11 @@ public class WebSecurityConfig {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(Arrays.asList(frontendUrl));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("authorization", "content-type", "x-auth-token"));
-        configuration.setExposedHeaders(Arrays.asList("x-auth-token"));
+        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Auth-Token"));
+        configuration.setExposedHeaders(Arrays.asList("X-Auth-Token"));
         configuration.setAllowCredentials(true);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;
-    }
-
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
     }
 }
