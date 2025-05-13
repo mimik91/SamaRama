@@ -68,7 +68,12 @@ public class ServiceOrder {
     @Column(name = "status", nullable = false) // Nazwa kolumny
     private OrderStatus status = OrderStatus.PENDING;
 
-    // Opcjonalne uwagi od serwisu
-    @Column(name = "service_notes") // Nazwa kolumny
+    @Column(name = "service_notes")
     private String serviceNotes;
+
+    @Column(name = "last_modified_by")
+    private String lastModifiedBy;
+
+    @Column(name = "last_modified_date")
+    private LocalDateTime lastModifiedDate;
 }

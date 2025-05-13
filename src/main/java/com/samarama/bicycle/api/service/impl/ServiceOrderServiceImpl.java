@@ -413,4 +413,173 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
                 "order", ServiceOrderResponseDto.fromEntity(order)
         ));
     }
+
+    @Override
+    public ResponseEntity<ServiceOrderResponseDto> getServiceOrderByIdForAdmin(Long orderId) {
+        Optional<ServiceOrder> orderOpt = serviceOrderRepository.findById(orderId);
+
+        if (orderOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        ServiceOrder order = orderOpt.get();
+        return ResponseEntity.ok(ServiceOrderResponseDto.fromEntity(order));
+    }
+
+
+    @Override
+    @Transactional
+    public ResponseEntity<?> updateServiceOrderByAdmin(Long orderId, ServiceOrderDto dto, String adminEmail) {
+        Optional<ServiceOrder> orderOpt = serviceOrderRepository.findById(orderId);
+
+        if (orderOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        ServiceOrder order = orderOpt.get();
+
+        // Aktualizacja pól z DTO - zwróć uwagę na użycie metod dostępowych rekordu
+        if (dto.pickupDate() != null) {
+            order.setPickupDate(dto.pickupDate());
+        }
+
+        if (dto.pickupAddress() != null) {
+            order.setPickupAddress(dto.pickupAddress());
+        }
+
+        // Aktualizacja pakietu serwisowego, jeśli podano
+        if (dto.servicePackageId() != null) {
+            Optional<ServicePackage> packageOpt = servicePackageRepository.findById(dto.servicePackageId());
+
+            if (packageOpt.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Pakiet serwisowy o podanym ID nie istnieje"));
+            }
+
+            ServicePackage servicePackage = packageOpt.get();
+            order.setServicePackage(servicePackage);
+            order.setServicePackageCode(servicePackage.getCode());
+            order.setPrice(servicePackage.getPrice());
+        }
+
+        // Aktualizacja notatek dodatkowych
+        if (dto.additionalNotes() != null) {
+            order.setAdditionalNotes(dto.additionalNotes());
+        }
+
+        // Zapisanie informacji o modyfikacji
+        order.setLastModifiedBy(adminEmail);
+        order.setLastModifiedDate(LocalDateTime.now());
+
+        serviceOrderRepository.save(order);
+
+        return ResponseEntity.ok(Map.of("message", "Zamówienie zostało zaktualizowane"));
+    }
+
+    /**
+     * Anuluj zamówienie serwisowe (dla administratora)
+     * @param orderId ID zamówienia
+     * @param adminEmail email administratora
+     * @return wynik operacji
+     */
+    @Override
+    @Transactional
+    public ResponseEntity<?> cancelServiceOrderByAdmin(Long orderId, String adminEmail) {
+        Optional<ServiceOrder> orderOpt = serviceOrderRepository.findById(orderId);
+
+        if (orderOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        ServiceOrder order = orderOpt.get();
+
+        // Sprawdzenie, czy zamówienie można anulować
+        if (order.getStatus() == ServiceOrder.OrderStatus.DELIVERED ||
+                order.getStatus() == ServiceOrder.OrderStatus.COMPLETED ||
+                order.getStatus() == ServiceOrder.OrderStatus.CANCELLED) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "message", "Nie można anulować zamówienia w statusie " + order.getStatus()));
+        }
+
+        // Aktualizacja statusu na anulowany
+        order.setStatus(ServiceOrder.OrderStatus.CANCELLED);
+
+        // Zapisanie informacji o modyfikacji
+        order.setLastModifiedBy(adminEmail);
+        order.setLastModifiedDate(LocalDateTime.now());
+
+        serviceOrderRepository.save(order);
+
+        return ResponseEntity.ok(Map.of("message", "Zamówienie zostało anulowane"));
+    }
+
+    /**
+     * Aktualizuj status zamówienia (dla administratora)
+     * @param orderId ID zamówienia
+     * @param newStatus nowy status zamówienia
+     * @param adminEmail email administratora
+     * @return wynik operacji
+     */
+    @Override
+    @Transactional
+    public ResponseEntity<?> updateOrderStatusByAdmin(Long orderId, ServiceOrder.OrderStatus newStatus, String adminEmail) {
+        Optional<ServiceOrder> orderOpt = serviceOrderRepository.findById(orderId);
+
+        if (orderOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        ServiceOrder order = orderOpt.get();
+
+        // Walidacja zmiany statusu
+        if (!isValidStatusChange(order.getStatus(), newStatus)) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "message", "Nieprawidłowa zmiana statusu z " + order.getStatus() + " na " + newStatus));
+        }
+
+        // Aktualizacja statusu
+        order.setStatus(newStatus);
+
+        // Zapisanie informacji o modyfikacji
+        order.setLastModifiedBy(adminEmail);
+        order.setLastModifiedDate(LocalDateTime.now());
+
+        serviceOrderRepository.save(order);
+
+        return ResponseEntity.ok(Map.of("message", "Status zamówienia został zaktualizowany"));
+    }
+
+    /**
+     * Sprawdź, czy zmiana statusu jest prawidłowa
+     */
+    private boolean isValidStatusChange(ServiceOrder.OrderStatus currentStatus, ServiceOrder.OrderStatus newStatus) {
+        if (currentStatus == newStatus) {
+            return true; // Brak zmiany
+        }
+
+        if (currentStatus == ServiceOrder.OrderStatus.CANCELLED) {
+            return false; // Nie można zmienić z anulowanego
+        }
+
+        if (newStatus == ServiceOrder.OrderStatus.CANCELLED) {
+            return true; // Można anulować z dowolnego statusu
+        }
+
+        // Sprawdzenie prawidłowej progresji statusów
+        switch (currentStatus) {
+            case PENDING:
+                return newStatus == ServiceOrder.OrderStatus.CONFIRMED;
+            case CONFIRMED:
+                return newStatus == ServiceOrder.OrderStatus.PICKED_UP;
+            case PICKED_UP:
+                return newStatus == ServiceOrder.OrderStatus.IN_SERVICE;
+            case IN_SERVICE:
+                return newStatus == ServiceOrder.OrderStatus.COMPLETED;
+            case COMPLETED:
+                return newStatus == ServiceOrder.OrderStatus.DELIVERED;
+            case DELIVERED:
+                return false; // Koniec przepływu
+            default:
+                return false;
+        }
+    }
 }

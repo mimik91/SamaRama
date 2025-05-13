@@ -72,6 +72,7 @@ public class WebSecurityConfig {
                                 .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "MODERATOR")
                                 // Only authorized users for modifying bikes
                                 .requestMatchers("/api/bicycles/*/photo").authenticated()
+                                .requestMatchers("/api/admin/orders/**").hasAnyRole("ADMIN", "MODERATOR")
                                 // Remaining API should be protected
                                 .anyRequest().authenticated()
                 );

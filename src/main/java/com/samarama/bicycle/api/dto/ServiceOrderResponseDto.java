@@ -1,15 +1,10 @@
 package com.samarama.bicycle.api.dto;
 
 import com.samarama.bicycle.api.model.ServiceOrder;
-import com.samarama.bicycle.api.model.IncompleteBike;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
-/**
- * DTO for returning service order information to the client.
- * Contains only the necessary data and excludes sensitive or internal details.
- */
 public record ServiceOrderResponseDto(
         Long id,
         Long bicycleId,
@@ -23,7 +18,9 @@ public record ServiceOrderResponseDto(
         LocalDateTime orderDate,
         String additionalNotes,
         String status,
-        String serviceNotes
+        String serviceNotes,
+        String lastModifiedBy,
+        LocalDateTime lastModifiedDate
 ) {
     public static ServiceOrderResponseDto fromEntity(ServiceOrder entity) {
         return new ServiceOrderResponseDto(
@@ -39,7 +36,9 @@ public record ServiceOrderResponseDto(
                 entity.getOrderDate(),
                 entity.getAdditionalNotes(),
                 entity.getStatus() != null ? entity.getStatus().toString() : null,
-                entity.getServiceNotes()
+                entity.getServiceNotes(),
+                entity.getLastModifiedBy(),
+                entity.getLastModifiedDate()
         );
     }
 }
