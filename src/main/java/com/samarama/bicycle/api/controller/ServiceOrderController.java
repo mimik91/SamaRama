@@ -4,6 +4,7 @@ import com.samarama.bicycle.api.dto.ServiceOrderDto;
 import com.samarama.bicycle.api.dto.ServiceOrderResponseDto;
 import com.samarama.bicycle.api.model.Bicycle;
 import com.samarama.bicycle.api.model.IncompleteBike;
+import com.samarama.bicycle.api.model.ServiceOrder;
 import com.samarama.bicycle.api.repository.BicycleRepository;
 import com.samarama.bicycle.api.repository.IncompleteBikeRepository;
 import com.samarama.bicycle.api.service.ServiceOrderService;
@@ -15,6 +16,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @CrossOrigin(origins = "*", maxAge = 3600)
@@ -100,5 +102,38 @@ public class ServiceOrderController {
     @GetMapping("/package-price/{packageCode}")
     public ResponseEntity<?> getServicePackagePrice(@PathVariable String packageCode) {
         return serviceOrderService.getServicePackagePrice(packageCode);
+    }
+
+    // Dodaj do src/main/java/com/samarama/bicycle/api/controller/ServiceOrderController.java
+    /**
+     * Aktualizuje istniejące zamówienie serwisowe
+     */
+    @PutMapping("/{orderId}")
+    @PreAuthorize("hasAnyRole('CLIENT', 'ADMIN', 'MODERATOR')")
+    public ResponseEntity<?> updateServiceOrder(
+            @PathVariable Long orderId,
+            @Valid @RequestBody ServiceOrderDto serviceOrderDto) {
+
+        String email = getCurrentUserEmail();
+        return serviceOrderService.updateServiceOrder(orderId, serviceOrderDto, email);
+    }
+
+    @PatchMapping("/{orderId}/status")
+    public ResponseEntity<?> updateOrderStatus(
+            @PathVariable Long orderId,
+            @RequestBody Map<String, String> request) {
+
+        String statusStr = request.get("status");
+        if (statusStr == null) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Status jest wymagany"));
+        }
+
+        try {
+            ServiceOrder.OrderStatus newStatus = ServiceOrder.OrderStatus.valueOf(statusStr);
+            String email = getCurrentUserEmail();
+            return serviceOrderService.updateOrderStatus(orderId, newStatus, email);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Nieprawidłowy status: " + statusStr));
+        }
     }
 }

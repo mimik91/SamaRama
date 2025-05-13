@@ -57,4 +57,9 @@ public interface ServiceOrderService {
     long countServiceOrders();
 
     List<ServiceOrderResponseDto> getAllServiceOrders();
+
+    ResponseEntity<?> updateServiceOrder(Long orderId, ServiceOrderDto serviceOrderDto, String userEmail);
+
+    ResponseEntity<?> updateOrderStatus(Long orderId, ServiceOrder.OrderStatus newStatus, String userEmail);
+
 }

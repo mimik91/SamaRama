@@ -269,4 +269,148 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
                 .map(ServiceOrderResponseDto::fromEntity)
                 .collect(Collectors.toList());
     }
+
+    @Override
+    @Transactional
+    public ResponseEntity<?> updateServiceOrder(Long orderId, ServiceOrderDto serviceOrderDto, String userEmail) {
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new RuntimeException("User not found with email: " + userEmail));
+
+        Optional<ServiceOrder> orderOpt = serviceOrderRepository.findById(orderId);
+        if (orderOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        ServiceOrder order = orderOpt.get();
+
+        // Sprawdź czy zamówienie należy do użytkownika (lub jest adminem/moderatorem)
+        if (!order.getClient().getId().equals(user.getId()) &&
+                !user.hasRole("ROLE_ADMIN") && !user.hasRole("ROLE_MODERATOR")) {
+            return ResponseEntity.status(403).body(Map.of("message", "Nie masz uprawnień do aktualizacji tego zamówienia"));
+        }
+
+        // Walidacja daty - nie może być w przeszłości ani zbyt daleko w przyszłości
+        LocalDate today = LocalDate.now();
+        if (serviceOrderDto.pickupDate().isBefore(today)) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Data odbioru nie może być w przeszłości"));
+        }
+
+        LocalDate maxDate = today.plusMonths(3);
+        if (serviceOrderDto.pickupDate().isAfter(maxDate)) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Data odbioru nie może być odleglejsza niż 3 miesiące"));
+        }
+
+        // Walidacja miasta z adresu (jeśli adres jest aktualizowany)
+        if (!serviceOrderDto.pickupAddress().equals(order.getPickupAddress())) {
+            String city = cityValidator.extractCityFromAddress(serviceOrderDto.pickupAddress());
+            if (city == null || !cityValidator.isValidCity(city)) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Nieprawidłowe miasto. Proszę wybrać miasto z listy."));
+            }
+        }
+
+        // Sprawdzenie pakietu serwisowego (jeśli został zmieniony)
+        ServicePackage servicePackage = order.getServicePackage();
+        String packageCode = order.getServicePackageCode();
+
+        if (serviceOrderDto.servicePackageId() != null &&
+                (order.getServicePackage() == null || !order.getServicePackage().getId().equals(serviceOrderDto.servicePackageId()))) {
+
+            servicePackage = servicePackageRepository.findById(serviceOrderDto.servicePackageId())
+                    .orElseThrow(() -> new RuntimeException("Service package not found"));
+            packageCode = servicePackage.getCode();
+        } else if (serviceOrderDto.servicePackageCode() != null && !serviceOrderDto.servicePackageCode().equals(order.getServicePackageCode())) {
+            servicePackage = servicePackageRepository.findByCode(serviceOrderDto.servicePackageCode())
+                    .orElseThrow(() -> new RuntimeException("Service package not found with code: " + serviceOrderDto.servicePackageCode()));
+            packageCode = serviceOrderDto.servicePackageCode();
+        }
+
+        // Sprawdzanie dostępności slotów jeśli zmieniono datę
+        if (!serviceOrderDto.pickupDate().equals(order.getPickupDate())) {
+            // Sprawdź, czy są dostępne sloty serwisowe na wybrany dzień
+            if (!serviceSlotService.areSlotsAvailable(serviceOrderDto.pickupDate(), 1)) {
+                int maxPerDay = serviceSlotService.getMaxBikesPerDay(serviceOrderDto.pickupDate());
+                int booked = serviceOrderRepository.countBikesScheduledForDate(serviceOrderDto.pickupDate());
+                int available = Math.max(0, maxPerDay - booked);
+
+                return ResponseEntity.badRequest().body(Map.of(
+                        "message", "Brak wolnych miejsc na wybrany dzień. Dostępne miejsca: " + available,
+                        "availableBikes", available,
+                        "maxBikesPerDay", maxPerDay
+                ));
+            }
+        }
+
+        // Aktualizacja zamówienia
+        order.setPickupDate(serviceOrderDto.pickupDate());
+        order.setPickupAddress(serviceOrderDto.pickupAddress());
+        order.setPickupLatitude(serviceOrderDto.pickupLatitude());
+        order.setPickupLongitude(serviceOrderDto.pickupLongitude());
+        order.setServicePackage(servicePackage);
+        order.setServicePackageCode(packageCode);
+
+        if (serviceOrderDto.additionalNotes() != null) {
+            order.setAdditionalNotes(serviceOrderDto.additionalNotes());
+        }
+
+        // Aktualizacja ceny (jeśli pakiet się zmienił)
+        if (servicePackage != null && !servicePackage.getPrice().equals(order.getPrice())) {
+            order.setPrice(servicePackage.getPrice());
+        }
+
+        serviceOrderRepository.save(order);
+
+        return ResponseEntity.ok(Map.of(
+                "message", "Zamówienie zostało zaktualizowane pomyślnie",
+                "order", ServiceOrderResponseDto.fromEntity(order)
+        ));
+    }
+
+    @Override
+    @Transactional
+    public ResponseEntity<?> updateOrderStatus(Long orderId, ServiceOrder.OrderStatus newStatus, String userEmail) {
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new RuntimeException("User not found with email: " + userEmail));
+
+        Optional<ServiceOrder> orderOpt = serviceOrderRepository.findById(orderId);
+        if (orderOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        ServiceOrder order = orderOpt.get();
+
+        // Klient może tylko anulować swoje zamówienie
+        if (!user.hasRole("ROLE_ADMIN") && !user.hasRole("ROLE_MODERATOR")) {
+            // Sprawdź czy zamówienie należy do użytkownika
+            if (!order.getClient().getId().equals(user.getId())) {
+                return ResponseEntity.status(403).body(Map.of("message", "Nie masz uprawnień do aktualizacji tego zamówienia"));
+            }
+
+            // Klient może tylko anulować zamówienie
+            if (newStatus != ServiceOrder.OrderStatus.CANCELLED) {
+                return ResponseEntity.status(403).body(Map.of("message", "Klient może tylko anulować zamówienie"));
+            }
+
+            // Sprawdź czy zamówienie można anulować (tylko w stanie PENDING lub CONFIRMED)
+            if (order.getStatus() != ServiceOrder.OrderStatus.PENDING &&
+                    order.getStatus() != ServiceOrder.OrderStatus.CONFIRMED) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Zamówienia nie można anulować w obecnym stanie: " + order.getStatus()));
+            }
+        }
+
+        // Jeśli zamówienie było anulowane, tylko admin może je reaktywować
+        if (order.getStatus() == ServiceOrder.OrderStatus.CANCELLED &&
+                newStatus != ServiceOrder.OrderStatus.CANCELLED &&
+                !user.hasRole("ROLE_ADMIN")) {
+            return ResponseEntity.status(403).body(Map.of("message", "Tylko administrator może reaktywować anulowane zamówienie"));
+        }
+
+        // Aktualizacja statusu
+        order.setStatus(newStatus);
+        serviceOrderRepository.save(order);
+
+        return ResponseEntity.ok(Map.of(
+                "message", "Status zamówienia został zaktualizowany pomyślnie",
+                "order", ServiceOrderResponseDto.fromEntity(order)
+        ));
+    }
 }
