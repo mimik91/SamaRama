@@ -265,6 +265,7 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
     @Override
     public List<ServiceOrderResponseDto> getAllServiceOrders() {
         return serviceOrderRepository.findAllActiveOrders().stream()
+                .sorted(Comparator.comparing(ServiceOrder::getPickupDate))
                 .map(ServiceOrderResponseDto::fromEntity)
                 .collect(Collectors.toList());
     }
