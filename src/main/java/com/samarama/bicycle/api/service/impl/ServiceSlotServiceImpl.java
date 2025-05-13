@@ -92,16 +92,47 @@ public class ServiceSlotServiceImpl implements ServiceSlotService {
             ));
         }
 
-        // Sprawdzenie nakładających się aktywnych konfiguracji
+        // Sprawdź, czy data startu jest późniejsza niż wczoraj
+        LocalDate yesterday = LocalDate.now().minusDays(1);
+        if (configDto.startDate().isBefore(yesterday)) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "message", "Data startu nie może być wcześniejsza niż wczoraj"
+            ));
+        }
+
+        // Znajdź konfiguracje, które zaczynają się po nowej konfiguracji
+        List<ServiceSlotConfig> laterConfigs = slotConfigRepository.findConfigsWithStartDateAfter(configDto.startDate());
+
+        // Znajdź nakładające się konfiguracje
         List<ServiceSlotConfig> overlappingConfigs = slotConfigRepository.findOverlappingConfigs(
                 configDto.startDate(),
                 configDto.endDate()
         );
 
-        if (!overlappingConfigs.isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of(
-                    "message", "Istnieją już konfiguracje dla podanego zakresu dat"
-            ));
+        // Konfiguracje do usunięcia - konflikty ze starszymi konfiguracjami
+        List<ServiceSlotConfig> configsToDelete = new ArrayList<>();
+
+        // Jeśli data końca nowej konfiguracji jest po dacie startu którejkolwiek starszej konfiguracji,
+        // usuwamy starszą konfigurację
+        if (configDto.endDate() != null && !laterConfigs.isEmpty()) {
+            for (ServiceSlotConfig laterConfig : laterConfigs) {
+                if (configDto.endDate().isAfter(laterConfig.getStartDate()) || configDto.endDate().isEqual(laterConfig.getStartDate())) {
+                    configsToDelete.add(laterConfig);
+                }
+            }
+        }
+
+        // Jeśli nowa konfiguracja jest bezterminowa (endDate == null), usuń wszystkie późniejsze konfiguracje
+        if (configDto.endDate() == null && !laterConfigs.isEmpty()) {
+            configsToDelete.addAll(laterConfigs);
+        }
+
+        // Usuń konfiguracje, które kolidują z nową
+        if (!configsToDelete.isEmpty()) {
+            for (ServiceSlotConfig configToDelete : configsToDelete) {
+                slotConfigRepository.deleteById(configToDelete.getId());
+                logger.info("Usunięto kolidującą konfigurację o ID: " + configToDelete.getId());
+            }
         }
 
         // Tworzenie nowej konfiguracji
@@ -113,10 +144,19 @@ public class ServiceSlotServiceImpl implements ServiceSlotService {
         newConfig.setCreatedAt(LocalDate.now());
 
         ServiceSlotConfig savedConfig = slotConfigRepository.save(newConfig);
-        return ResponseEntity.ok(Map.of(
-                "message", "Konfiguracja slotów została utworzona pomyślnie",
-                "id", savedConfig.getId()
-        ));
+
+        if (configsToDelete.isEmpty()) {
+            return ResponseEntity.ok(Map.of(
+                    "message", "Konfiguracja slotów została utworzona pomyślnie",
+                    "id", savedConfig.getId()
+            ));
+        } else {
+            return ResponseEntity.ok(Map.of(
+                    "message", "Konfiguracja slotów została utworzona pomyślnie. Usunięto " + configsToDelete.size() + " kolidujących konfiguracji.",
+                    "id", savedConfig.getId(),
+                    "removedConfigIds", configsToDelete.stream().map(ServiceSlotConfig::getId).collect(Collectors.toList())
+            ));
+        }
     }
 
     @Override
@@ -154,6 +194,20 @@ public class ServiceSlotServiceImpl implements ServiceSlotService {
             ));
         }
 
+        // Sprawdź, czy data startu jest późniejsza niż wczoraj
+        LocalDate yesterday = LocalDate.now().minusDays(1);
+        if (configDto.startDate().isBefore(yesterday)) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "message", "Data startu nie może być wcześniejsza niż wczoraj"
+            ));
+        }
+
+        // Znajdź konfiguracje, które zaczynają się po aktualizowanej konfiguracji
+        List<ServiceSlotConfig> laterConfigs = slotConfigRepository.findConfigsWithStartDateAfter(configDto.startDate())
+                .stream()
+                .filter(c -> !c.getId().equals(id)) // Wykluczenie aktualnej konfiguracji
+                .collect(Collectors.toList());
+
         // Sprawdzenie nakładających się aktywnych konfiguracji (z wyjątkiem aktualnej)
         List<ServiceSlotConfig> overlappingConfigs = slotConfigRepository.findOverlappingConfigs(
                         configDto.startDate(),
@@ -162,10 +216,30 @@ public class ServiceSlotServiceImpl implements ServiceSlotService {
                 .filter(c -> !c.getId().equals(id)) // Wykluczenie aktualnej konfiguracji
                 .collect(Collectors.toList());
 
-        if (!overlappingConfigs.isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of(
-                    "message", "Istnieją już inne konfiguracje dla podanego zakresu dat"
-            ));
+        // Konfiguracje do usunięcia - konflikty ze starszymi konfiguracjami
+        List<ServiceSlotConfig> configsToDelete = new ArrayList<>();
+
+        // Jeśli data końca aktualizowanej konfiguracji jest po dacie startu którejkolwiek starszej konfiguracji,
+        // usuwamy starszą konfigurację
+        if (configDto.endDate() != null && !laterConfigs.isEmpty()) {
+            for (ServiceSlotConfig laterConfig : laterConfigs) {
+                if (configDto.endDate().isAfter(laterConfig.getStartDate()) || configDto.endDate().isEqual(laterConfig.getStartDate())) {
+                    configsToDelete.add(laterConfig);
+                }
+            }
+        }
+
+        // Jeśli aktualizowana konfiguracja jest bezterminowa (endDate == null), usuń wszystkie późniejsze konfiguracje
+        if (configDto.endDate() == null && !laterConfigs.isEmpty()) {
+            configsToDelete.addAll(laterConfigs);
+        }
+
+        // Usuń konfiguracje, które kolidują z aktualizowaną
+        if (!configsToDelete.isEmpty()) {
+            for (ServiceSlotConfig configToDelete : configsToDelete) {
+                slotConfigRepository.deleteById(configToDelete.getId());
+                logger.info("Usunięto kolidującą konfigurację o ID: " + configToDelete.getId());
+            }
         }
 
         // Aktualizacja konfiguracji
@@ -175,7 +249,15 @@ public class ServiceSlotServiceImpl implements ServiceSlotService {
         config.setMaxBikesPerOrder(configDto.maxBikesPerOrder());
 
         slotConfigRepository.save(config);
-        return ResponseEntity.ok(Map.of("message", "Konfiguracja slotów została zaktualizowana pomyślnie"));
+
+        if (configsToDelete.isEmpty()) {
+            return ResponseEntity.ok(Map.of("message", "Konfiguracja slotów została zaktualizowana pomyślnie"));
+        } else {
+            return ResponseEntity.ok(Map.of(
+                    "message", "Konfiguracja slotów została zaktualizowana pomyślnie. Usunięto " + configsToDelete.size() + " kolidujących konfiguracji.",
+                    "removedConfigIds", configsToDelete.stream().map(ServiceSlotConfig::getId).collect(Collectors.toList())
+            ));
+        }
     }
 
     @Override

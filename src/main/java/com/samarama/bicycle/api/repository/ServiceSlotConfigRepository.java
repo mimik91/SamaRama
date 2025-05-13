@@ -20,7 +20,7 @@ public interface ServiceSlotConfigRepository extends JpaRepository<ServiceSlotCo
      */
     @Query("SELECT c FROM ServiceSlotConfig c WHERE " +
             "c.startDate <= :date AND (c.endDate IS NULL OR c.endDate >= :date) " +
-            "ORDER BY c.startDate DESC")
+            "ORDER BY c.startDate DESC LIMIT 1")
     Optional<ServiceSlotConfig> findConfigForDate(@Param("date") LocalDate date);
 
     /**
@@ -51,4 +51,12 @@ public interface ServiceSlotConfigRepository extends JpaRepository<ServiceSlotCo
     List<ServiceSlotConfig> findOverlappingConfigs(
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate);
+
+    /**
+     * Znajduje konfiguracje z datą startu po podanej dacie
+     * @param date data graniczna
+     * @return lista konfiguracji z datą startu po podanej dacie
+     */
+    @Query("SELECT c FROM ServiceSlotConfig c WHERE c.startDate > :date ORDER BY c.startDate")
+    List<ServiceSlotConfig> findConfigsWithStartDateAfter(@Param("date") LocalDate date);
 }
