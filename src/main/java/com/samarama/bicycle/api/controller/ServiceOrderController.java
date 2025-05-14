@@ -121,7 +121,8 @@ public class ServiceOrderController {
     @GetMapping("/admin/all")
     @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
     public ResponseEntity<List<ServiceOrderResponseDto>> getAllOrders() {
-        return ResponseEntity.ok(serviceOrderService.getAllServiceOrders());
+        List<ServiceOrderResponseDto> orders = serviceOrderService.getAllServiceOrders();
+        return ResponseEntity.ok(orders);
     }
 
     @PutMapping("/{orderId}")
