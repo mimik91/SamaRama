@@ -58,7 +58,8 @@ public class WebSecurityConfig {
                                 "/api/service-slots/config",
                                 "/api/service-slots/check-availability",
                                 "/api/account/public/**",
-                                "/bicycles/bike"
+                                "/bicycles/bike",
+                                "/api/bicycles/**"
                         ).permitAll()
                         // Endpoints for bike photos
                         .requestMatchers("/api/bicycles/*/photo").permitAll()

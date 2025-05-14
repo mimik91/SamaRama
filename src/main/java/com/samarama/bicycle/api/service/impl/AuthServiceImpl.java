@@ -3,8 +3,10 @@ package com.samarama.bicycle.api.service.impl;
 import com.samarama.bicycle.api.dto.BikeServiceDto;
 import com.samarama.bicycle.api.dto.LoginDto;
 import com.samarama.bicycle.api.dto.UserRegistrationDto;
-import com.samarama.bicycle.api.model.User;
-import com.samarama.bicycle.api.model.VerificationToken;
+import com.samarama.bicycle.api.model.*;
+import com.samarama.bicycle.api.repository.IncompleteBikeRepository;
+import com.samarama.bicycle.api.repository.IncompleteUserRepository;
+import com.samarama.bicycle.api.repository.ServiceOrderRepository;
 import com.samarama.bicycle.api.repository.UserRepository;
 import com.samarama.bicycle.api.security.JwtUtils;
 import com.samarama.bicycle.api.service.AuthService;
@@ -22,9 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.logging.Logger;
 
 @Service
@@ -37,19 +37,21 @@ public class AuthServiceImpl implements AuthService {
     private final JwtUtils jwtUtils;
     private final VerificationService verificationService;
     private final EmailService emailService;
+    private final UserDataMigrationService userDataMigrationService;
 
     public AuthServiceImpl(AuthenticationManager authenticationManager,
                            UserRepository userRepository,
                            PasswordEncoder encoder,
                            JwtUtils jwtUtils,
                            VerificationService verificationService,
-                           EmailService emailService) {
+                           EmailService emailService, IncompleteUserRepository incompleteUserRepository, IncompleteBikeRepository incompleteBikeRepository, ServiceOrderRepository serviceOrderRepository, UserDataMigrationService userDataMigrationService) {
         this.authenticationManager = authenticationManager;
         this.userRepository = userRepository;
         this.encoder = encoder;
         this.jwtUtils = jwtUtils;
         this.verificationService = verificationService;
         this.emailService = emailService;
+        this.userDataMigrationService = userDataMigrationService;
     }
 
     @Override
@@ -103,49 +105,26 @@ public class AuthServiceImpl implements AuthService {
         }
     }
 
-    @Override
     @Transactional
     public ResponseEntity<Map<String, String>> registerClient(UserRegistrationDto registrationDto) {
-        // Sprawdź czy użytkownik o podanym emailu już istnieje
-        if (userRepository.existsByEmail(registrationDto.email())) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Email jest już zajęty"));
+        String email = registrationDto.email();
+
+        // Sprawdź, czy istnieje już użytkownik z tym adresem email
+        if (userRepository.existsByEmail(email)) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Email jest już zajęty przez zarejestrowanego użytkownika"));
         }
 
-        User user = new User();
-        user.setEmail(registrationDto.email());
-        user.setFirstName(registrationDto.firstName());
-        user.setLastName(registrationDto.lastName());
-        user.setPhoneNumber(registrationDto.phoneNumber());
-        user.setPassword(encoder.encode(registrationDto.password()));
-        user.addRole("ROLE_CLIENT"); // Ensure role is set
-        user.setVerified(false); // Domyślnie konto jest niezweryfikowane
-        user.setCreatedAt(LocalDateTime.now());
+        // Użyj nowej usługi do utworzenia użytkownika i migracji danych
+        User savedUser = userDataMigrationService.registerAndMigrateData(registrationDto);
 
-        User savedUser = userRepository.save(user);
+        // Wyślij email weryfikacyjny
+        VerificationToken verificationToken = verificationService.createVerificationToken(savedUser);
+        emailService.sendVerificationEmail(savedUser, verificationToken.getToken());
 
-        try {
-            // Tworzenie tokenu weryfikacyjnego
-            VerificationToken verificationToken = verificationService.createVerificationToken(savedUser);
-
-            // Wysyłanie maila z linkiem aktywacyjnym
-            emailService.sendVerificationEmail(savedUser, verificationToken.getToken());
-
-            logger.info("Verification email sent to: " + savedUser.getEmail());
-
-            return ResponseEntity.ok(Map.of(
-                    "message", "Zarejestrowano pomyślnie! Sprawdź swoją skrzynkę email, aby aktywować konto.",
-                    "email", savedUser.getEmail()
-            ));
-        } catch (Exception e) {
-            logger.severe("Error during registration process: " + e.getMessage());
-            e.printStackTrace();
-
-            // Pomimo błędu z emailem, użytkownik został zarejestrowany
-            return ResponseEntity.ok(Map.of(
-                    "message", "Zarejestrowano pomyślnie, ale wystąpił problem z wysyłaniem emaila aktywacyjnego. Skontaktuj się z administracją.",
-                    "email", savedUser.getEmail()
-            ));
-        }
+        return ResponseEntity.ok(Map.of(
+                "message", "Zarejestrowano pomyślnie! Sprawdź swoją skrzynkę email, aby aktywować konto.",
+                "email", savedUser.getEmail()
+        ));
     }
 
     @Override

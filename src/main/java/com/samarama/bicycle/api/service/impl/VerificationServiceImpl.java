@@ -2,6 +2,7 @@ package com.samarama.bicycle.api.service.impl;
 
 import com.samarama.bicycle.api.model.User;
 import com.samarama.bicycle.api.model.VerificationToken;
+import com.samarama.bicycle.api.repository.IncompleteUserRepository;
 import com.samarama.bicycle.api.repository.UserRepository;
 import com.samarama.bicycle.api.repository.VerificationTokenRepository;
 import com.samarama.bicycle.api.service.EmailService;
@@ -25,6 +26,7 @@ public class VerificationServiceImpl implements VerificationService {
     private final VerificationTokenRepository tokenRepository;
     private final UserRepository userRepository;
     private final EmailService emailService;
+    private final IncompleteUserRepository incompleteUserRepository;
 
     @Value("${app.verification.token.expiration:86400000}")
     private long tokenExpirationMs;
@@ -32,10 +34,11 @@ public class VerificationServiceImpl implements VerificationService {
     public VerificationServiceImpl(
             VerificationTokenRepository tokenRepository,
             UserRepository userRepository,
-            EmailService emailService) {
+            EmailService emailService, IncompleteUserRepository incompleteUserRepository) {
         this.tokenRepository = tokenRepository;
         this.userRepository = userRepository;
         this.emailService = emailService;
+        this.incompleteUserRepository = incompleteUserRepository;
     }
 
     @Transactional
@@ -116,22 +119,35 @@ public class VerificationServiceImpl implements VerificationService {
     @Override
     @Transactional
     public ResponseEntity<?> resendVerificationToken(String email) {
+        // Only registered users (User) can have verification tokens
         Optional<User> userOpt = userRepository.findByEmail(email);
 
         if (userOpt.isEmpty()) {
-            // Dla bezpieczeństwa nie ujawniamy, że użytkownik nie istnieje
-            logger.warning("Attempt to resend verification token for non-existent user: " + email);
-            return ResponseEntity.ok(Map.of("message", "Jeśli konto istnieje, nowy link aktywacyjny został wysłany"));
+            // Check if this email belongs to an IncompleteUser
+            boolean incompleteUserExists = incompleteUserRepository.existsByEmail(email);
+
+            if (incompleteUserExists) {
+                // This is a guest who ordered without registration
+                return ResponseEntity.ok(Map.of(
+                        "message", "Ten adres email jest powiązany z zamówieniem jako gość. Aby uzyskać pełny dostęp, zarejestruj się.",
+                        "isGuestUser", true
+                ));
+            } else {
+                // Standard "not found" response
+                logger.warning("Attempt to resend verification token for non-existent user: " + email);
+                return ResponseEntity.ok(Map.of("message", "Jeśli konto istnieje, nowy link aktywacyjny został wysłany"));
+            }
         }
 
         User user = userOpt.get();
 
+        // Check if already verified
         if (user.isVerified()) {
             logger.info("Attempted to resend verification for already verified user: " + email);
             return ResponseEntity.badRequest().body(Map.of("message", "Konto jest już zweryfikowane"));
         }
 
-        // Tworzenie nowego tokenu i wysyłanie maila
+        // Send verification email
         VerificationToken token = createVerificationToken(user);
         emailService.sendVerificationEmail(user, token.getToken());
 
