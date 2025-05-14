@@ -114,7 +114,7 @@ public class AuthServiceImpl implements AuthService {
             return ResponseEntity.badRequest().body(Map.of("message", "Email jest już zajęty przez zarejestrowanego użytkownika"));
         }
 
-        // Użyj nowej usługi do utworzenia użytkownika i migracji danych
+        // Użyj nowej usługi do utworzenia użytkownika lub konwersji IncompleteUser
         User savedUser = userDataMigrationService.registerAndMigrateData(registrationDto);
 
         // Wyślij email weryfikacyjny
