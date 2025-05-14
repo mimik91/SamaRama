@@ -7,9 +7,11 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 
 import jakarta.annotation.PostConstruct;
+import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 @SpringBootApplication(scanBasePackages = "com.samarama.bicycle")
 @EnableJpaRepositories(basePackages = "com.samarama.bicycle.api.repository")
+@EnableTransactionManagement
 public class BicycleApplication {
 
 	@Autowired
