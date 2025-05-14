@@ -24,7 +24,7 @@ public class WebSecurityConfig {
     private final JwtAuthEntryPoint unauthorizedHandler;
     private final JwtTokenFilter jwtTokenFilter;
 
-    @Value("${app.frontend.url:http://localhost:3000}")
+    @Value("${app.frontend.url:https://cyclopick.pl}")
     private String frontendUrl;
 
     public WebSecurityConfig(JwtAuthEntryPoint unauthorizedHandler,
