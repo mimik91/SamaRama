@@ -52,9 +52,9 @@ public class WebSecurityConfig {
                                 "/api/password/**",
                                 "/api/guest-orders/**",
                                 "/api/service-packages/active",
-                                "/api/enumerations/**",
+                                "/api/enumerations/**", // Added this line
                                 "/api/service-orders/package-price/**",
-                                "/api/service-slots/availability/**",
+                                "/api/service-slots/availability/**", // Added this line
                                 "/api/service-slots/config",
                                 "/api/service-slots/check-availability",
                                 "/api/account/public/**",
@@ -63,6 +63,8 @@ public class WebSecurityConfig {
                         ).permitAll()
                         // Endpoints for bike photos
                         .requestMatchers("/api/bicycles/*/photo").permitAll()
+                        // OPTIONS requests (for CORS preflight)
+                        .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
                         // Admin endpoints
                         .requestMatchers("/api/admin/**", "/api/admin/orders/**").hasAnyRole("ADMIN", "MODERATOR")
                         // Authenticated endpoints
@@ -77,11 +79,28 @@ public class WebSecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList(frontendUrl));
+        configuration.setAllowedOrigins(Arrays.asList(
+                frontendUrl,
+                "https://cyclopick.pl",
+                "http://cyclopick.pl",
+                "https://www.cyclopick.pl",
+                "http://www.cyclopick.pl",
+                "http://localhost:3000",
+                "http://localhost:4200",
+                "*"  // Temporarily allow all origins for debugging
+        ));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Auth-Token"));
+        configuration.setAllowedHeaders(Arrays.asList(
+                "Authorization",
+                "Content-Type",
+                "X-Auth-Token",
+                "Origin",
+                "Accept"
+        ));
         configuration.setExposedHeaders(Arrays.asList("X-Auth-Token"));
         configuration.setAllowCredentials(true);
+        configuration.setMaxAge(3600L);
+
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;
