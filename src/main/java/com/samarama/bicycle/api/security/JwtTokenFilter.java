@@ -12,6 +12,7 @@ import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
+import org.springframework.util.AntPathMatcher;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -19,27 +20,60 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
 import java.util.logging.Logger;
 
 @Component
 public class JwtTokenFilter extends OncePerRequestFilter {
     private static final Logger logger = Logger.getLogger(JwtTokenFilter.class.getName());
 
+    // Lista publicznych endpointów, które mają być pominięte przez filtr
+    private static final List<String> PUBLIC_URLS = Arrays.asList(
+            "/api/auth/signin/**",
+            "/api/auth/signup/**",
+            "/api/test/**",
+            "/api/verification/**",
+            "/api/password/reset-request",
+            "/api/password/reset",
+            "/api/guest-orders/**",
+            "/api/service-packages/active",
+            "/api/enumerations/**",  // Dodajemy tu
+            "/api/service-orders/package-price/**",
+            "/api/service-slots/availability/**",  // Dodajemy tu
+            "/api/service-slots/config",
+            "/api/service-slots/check-availability"
+    );
+
     private final JwtUtils jwtUtils;
+    private final AntPathMatcher pathMatcher = new AntPathMatcher();
 
     public JwtTokenFilter(JwtUtils jwtUtils) {
         this.jwtUtils = jwtUtils;
     }
 
     @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {
+        String path = request.getRequestURI();
+
+        // Pomijamy filtr dla żądań OPTIONS (preflightowych CORS)
+        if (request.getMethod().equals("OPTIONS")) {
+            return true;
+        }
+
+        // Pomijamy filtr dla publicznych endpointów
+        return PUBLIC_URLS.stream().anyMatch(pattern -> pathMatcher.match(pattern, path));
+    }
+
+    @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
+
         try {
             String jwt = parseJwt(request);
             logger.info("Processing request to: " + request.getRequestURI() + " with method: " + request.getMethod());
 
             if (jwt != null) {
-                logger.info("JWT token found: " + jwt.substring(0, Math.min(10, jwt.length())) + "...");
+                logger.info("JWT token found");
                 try {
                     if (jwtUtils.validateJwtToken(jwt)) {
                         String email = jwtUtils.getUserNameFromJwtToken(jwt);
