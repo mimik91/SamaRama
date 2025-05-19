@@ -84,10 +84,7 @@ public class WebSecurityConfig {
                 "https://cyclopick.pl",
                 "http://cyclopick.pl",
                 "https://www.cyclopick.pl",
-                "http://www.cyclopick.pl",
-                "http://localhost:3000",
-                "http://localhost:4200",
-                "*"  // Temporarily allow all origins for debugging
+                "http://www.cyclopick.pl"
         ));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList(
