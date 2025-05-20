@@ -1,5 +1,6 @@
 package com.samarama.bicycle.api.service;
 
+import com.samarama.bicycle.api.dto.ServiceRegisterDto;
 import com.samarama.bicycle.api.model.User;
 
 public interface EmailService {
@@ -17,4 +18,6 @@ public interface EmailService {
     void sendAccountActivatedEmail(User user);
 
     void sendPasswordResetEmail(User user, String token);
+    void sendServiceRegistrationNotification(ServiceRegisterDto serviceRegisterDto);
+
 }

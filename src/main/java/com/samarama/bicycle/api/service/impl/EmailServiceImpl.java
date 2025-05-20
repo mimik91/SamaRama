@@ -1,5 +1,6 @@
 package com.samarama.bicycle.api.service.impl;
 
+import com.samarama.bicycle.api.dto.ServiceRegisterDto;
 import com.samarama.bicycle.api.model.User;
 import com.samarama.bicycle.api.service.EmailService;
 import jakarta.mail.MessagingException;
@@ -27,6 +28,9 @@ public class EmailServiceImpl implements EmailService {
 
     @Value("${app.frontend.url}")
     private String frontendUrl;
+
+    @Value("${admin.notification.email}")
+    private String adminEmail;
 
     public EmailServiceImpl(JavaMailSender mailSender) {
         this.mailSender = mailSender;
@@ -120,6 +124,45 @@ public class EmailServiceImpl implements EmailService {
         } catch (Exception e) {
             logger.log(Level.SEVERE, "Error sending password reset email to " + user.getEmail(), e);
             throw new RuntimeException("Error sending password reset email", e);
+        }
+    }
+
+    @Async
+    @Override
+    public void sendServiceRegistrationNotification(ServiceRegisterDto dto) {
+        try {
+            String subject = "Nowe zgłoszenie rejestracji serwisu: " + dto.getServiceName();
+
+            StringBuilder content = new StringBuilder();
+            content.append("<div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>");
+            content.append("<h2>Nowe zgłoszenie rejestracji serwisu</h2>");
+            content.append("<p><strong>Nazwa serwisu:</strong> ").append(dto.getServiceName()).append("</p>");
+            content.append("<p><strong>Osoba kontaktowa:</strong> ").append(dto.getName()).append("</p>");
+            content.append("<p><strong>Telefon:</strong> ").append(dto.getPhoneNumber()).append("</p>");
+            content.append("<p><strong>Email:</strong> ").append(dto.getEmail()).append("</p>");
+            content.append("<hr style='border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;'>");
+            content.append("<p style='font-size: 12px; color: #7f8c8d; text-align: center;'>© ").append(java.time.Year.now().getValue()).append(" cyclopick.pl</p>");
+            content.append("</div>");
+
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setFrom(new InternetAddress(fromEmail, "cyclopick.pl - Administracja"));
+            helper.setTo(adminEmail);
+            helper.setSubject(subject);
+            helper.setText(content.toString(), true);
+
+            // Dodanie nagłówków
+            message.addHeader("X-Priority", "1");
+            message.addHeader("X-MSMail-Priority", "High");
+            message.addHeader("Importance", "High");
+            message.addHeader("X-Mailer", "cyclopick.pl Administration");
+
+            mailSender.send(message);
+            logger.info("Service registration notification sent to admin email: " + adminEmail);
+        } catch (Exception e) {
+            logger.log(Level.SEVERE, "Error sending service registration notification: " + e.getMessage(), e);
+            throw new RuntimeException("Error sending service registration notification", e);
         }
     }
 

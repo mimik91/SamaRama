@@ -1,10 +1,12 @@
 package com.samarama.bicycle.api.controller;
 
 import com.samarama.bicycle.api.dto.ServiceOrderResponseDto;
+import com.samarama.bicycle.api.dto.ServiceRegisterDto;
 import com.samarama.bicycle.api.model.User;
 import com.samarama.bicycle.api.repository.IncompleteBikeRepository;
 import com.samarama.bicycle.api.repository.UserRepository;
 import com.samarama.bicycle.api.service.BicycleEnumerationService;
+import com.samarama.bicycle.api.service.EmailService;
 import com.samarama.bicycle.api.service.ServiceOrderService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -13,10 +15,8 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 @CrossOrigin(origins = "*", maxAge = 3600)
@@ -29,15 +29,20 @@ public class AdminController {
     private final IncompleteBikeRepository incompleteBikeRepository;
     private final ServiceOrderService serviceOrderService;
     private final BicycleEnumerationService enumerationService;
+    private final EmailService emailService;
+    private static final Logger logger = Logger.getLogger(AdminController.class.getName());
+
+
 
     public AdminController(UserRepository userRepository,
                            IncompleteBikeRepository incompleteBikeRepository,
                            ServiceOrderService serviceOrderService,
-                           BicycleEnumerationService enumerationService) {
+                           BicycleEnumerationService enumerationService, EmailService emailService) {
         this.userRepository = userRepository;
         this.incompleteBikeRepository = incompleteBikeRepository;
         this.serviceOrderService = serviceOrderService;
         this.enumerationService = enumerationService;
+        this.emailService = emailService;
     }
 
     @GetMapping("/dashboard")
@@ -105,5 +110,55 @@ public class AdminController {
                 "user", auth.getName(),
                 "roles", roles
         ));
+    }
+
+    @PostMapping("/service-registration")
+    public ResponseEntity<?> serviceRegistration(@RequestBody List<String> serviceData) {
+        logger.info("Received service registration: " + serviceData);
+
+        if (serviceData == null || serviceData.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Brak danych rejestracyjnych"));
+        }
+
+        // Pobierz pierwszy element z listy - dokładnie tak jak widać na zrzucie ekranu
+        String data = serviceData.get(0);
+
+        // Parsowanie danych w formacie K:[contactPerson]|T:[phoneNumber]|E:[email]|S:[serviceName]
+        ServiceRegisterDto dto = parseServiceData(data);
+
+        // Wysłanie emaila z danymi rejestracyjnymi
+        try {
+            emailService.sendServiceRegistrationNotification(dto);
+
+
+            return ResponseEntity.ok(Map.of("message", "Zgłoszenie zostało przyjęte pomyślnie"));
+        } catch (Exception e) {
+            logger.severe("Error processing service registration: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(Map.of("message", "Wystąpił błąd podczas przetwarzania zgłoszenia"));
+        }
+    }
+
+    /**
+     * Parsuje dane serwisu z formatowanego stringa
+     */
+    private ServiceRegisterDto parseServiceData(String data) {
+        ServiceRegisterDto dto = new ServiceRegisterDto();
+
+        // Format: K:[contactPerson]|T:[phoneNumber]|E:[email]|S:[serviceName]
+        String[] parts = data.split("\\|");
+
+        for (String part : parts) {
+            if (part.startsWith("K:")) {
+                dto.setName(part.substring(2));
+            } else if (part.startsWith("T:")) {
+                dto.setPhoneNumber(part.substring(2));
+            } else if (part.startsWith("E:")) {
+                dto.setEmail(part.substring(2));
+            } else if (part.startsWith("S:")) {
+                dto.setServiceName(part.substring(2));
+            }
+        }
+
+        return dto;
     }
 }
