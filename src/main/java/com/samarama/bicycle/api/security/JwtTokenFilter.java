@@ -41,7 +41,8 @@ public class JwtTokenFilter extends OncePerRequestFilter {
             "/api/service-orders/package-price/**",
             "/api/service-slots/availability/**",  // Dodajemy tu
             "/api/service-slots/config",
-            "/api/service-slots/check-availability"
+            "/api/service-slots/check-availability",
+            "/api/admin/service-registration"
     );
 
     private final JwtUtils jwtUtils;

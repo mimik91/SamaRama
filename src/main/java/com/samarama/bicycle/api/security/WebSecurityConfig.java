@@ -59,8 +59,10 @@ public class WebSecurityConfig {
                                 "/api/service-slots/check-availability",
                                 "/api/account/public/**",
                                 "/bicycles/bike",
-                                "/api/bicycles/**"
+                                "/api/bicycles/**",
+                                "/api/admin/service-registration"
                         ).permitAll()
+
                         // Endpoints for bike photos
                         .requestMatchers("/api/bicycles/*/photo").permitAll()
                         // OPTIONS requests (for CORS preflight)
