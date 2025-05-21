@@ -42,7 +42,7 @@ public class JwtTokenFilter extends OncePerRequestFilter {
             "/api/service-slots/availability/**",  // Dodajemy tu
             "/api/service-slots/config",
             "/api/service-slots/check-availability",
-            "/api/admin/service-registration"
+            "/api/guest-orders/service-registration"
     );
 
     private final JwtUtils jwtUtils;

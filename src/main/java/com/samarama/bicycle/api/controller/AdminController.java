@@ -29,9 +29,6 @@ public class AdminController {
     private final IncompleteBikeRepository incompleteBikeRepository;
     private final ServiceOrderService serviceOrderService;
     private final BicycleEnumerationService enumerationService;
-    private final EmailService emailService;
-    private static final Logger logger = Logger.getLogger(AdminController.class.getName());
-
 
 
     public AdminController(UserRepository userRepository,
@@ -42,7 +39,6 @@ public class AdminController {
         this.incompleteBikeRepository = incompleteBikeRepository;
         this.serviceOrderService = serviceOrderService;
         this.enumerationService = enumerationService;
-        this.emailService = emailService;
     }
 
     @GetMapping("/dashboard")
@@ -110,55 +106,5 @@ public class AdminController {
                 "user", auth.getName(),
                 "roles", roles
         ));
-    }
-
-    @PostMapping("/service-registration")
-    public ResponseEntity<?> serviceRegistration(@RequestBody List<String> serviceData) {
-        logger.info("Received service registration: " + serviceData);
-
-        if (serviceData == null || serviceData.isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Brak danych rejestracyjnych"));
-        }
-
-        // Pobierz pierwszy element z listy - dokładnie tak jak widać na zrzucie ekranu
-        String data = serviceData.get(0);
-
-        // Parsowanie danych w formacie K:[contactPerson]|T:[phoneNumber]|E:[email]|S:[serviceName]
-        ServiceRegisterDto dto = parseServiceData(data);
-
-        // Wysłanie emaila z danymi rejestracyjnymi
-        try {
-            emailService.sendServiceRegistrationNotification(dto);
-
-
-            return ResponseEntity.ok(Map.of("message", "Zgłoszenie zostało przyjęte pomyślnie"));
-        } catch (Exception e) {
-            logger.severe("Error processing service registration: " + e.getMessage());
-            return ResponseEntity.internalServerError().body(Map.of("message", "Wystąpił błąd podczas przetwarzania zgłoszenia"));
-        }
-    }
-
-    /**
-     * Parsuje dane serwisu z formatowanego stringa
-     */
-    private ServiceRegisterDto parseServiceData(String data) {
-        ServiceRegisterDto dto = new ServiceRegisterDto();
-
-        // Format: K:[contactPerson]|T:[phoneNumber]|E:[email]|S:[serviceName]
-        String[] parts = data.split("\\|");
-
-        for (String part : parts) {
-            if (part.startsWith("K:")) {
-                dto.setName(part.substring(2));
-            } else if (part.startsWith("T:")) {
-                dto.setPhoneNumber(part.substring(2));
-            } else if (part.startsWith("E:")) {
-                dto.setEmail(part.substring(2));
-            } else if (part.startsWith("S:")) {
-                dto.setServiceName(part.substring(2));
-            }
-        }
-
-        return dto;
     }
 }
