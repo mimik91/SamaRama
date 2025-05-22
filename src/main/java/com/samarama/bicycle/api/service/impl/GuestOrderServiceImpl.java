@@ -4,6 +4,7 @@ import com.samarama.bicycle.api.dto.GuestBicycleDto;
 import com.samarama.bicycle.api.dto.GuestServiceOrderDto;
 import com.samarama.bicycle.api.model.*;
 import com.samarama.bicycle.api.repository.*;
+import com.samarama.bicycle.api.service.EmailService;
 import com.samarama.bicycle.api.service.GuestOrderService;
 import com.samarama.bicycle.api.service.ServiceSlotService;
 import org.springframework.http.ResponseEntity;
@@ -24,6 +25,7 @@ public class GuestOrderServiceImpl implements GuestOrderService {
     private final ServiceOrderRepository serviceOrderRepository;
     private final CityValidator cityValidator;
     private final ServiceSlotService serviceSlotService;
+    private final EmailService emailService;
 
     public GuestOrderServiceImpl(
             IncompleteUserRepository incompleteUserRepository,
@@ -31,13 +33,14 @@ public class GuestOrderServiceImpl implements GuestOrderService {
             ServicePackageRepository servicePackageRepository,
             ServiceOrderRepository serviceOrderRepository,
             CityValidator cityValidator,
-            ServiceSlotService serviceSlotService) {
+            ServiceSlotService serviceSlotService, EmailService emailService) {
         this.incompleteUserRepository = incompleteUserRepository;
         this.incompleteBikeRepository = incompleteBikeRepository;
         this.servicePackageRepository = servicePackageRepository;
         this.serviceOrderRepository = serviceOrderRepository;
         this.cityValidator = cityValidator;
         this.serviceSlotService = serviceSlotService;
+        this.emailService = emailService;
     }
 
     @Override
@@ -102,6 +105,15 @@ public class GuestOrderServiceImpl implements GuestOrderService {
 
         // 4. Zapisywanie zamówień
         List<ServiceOrder> savedOrders = serviceOrderRepository.saveAll(orders);
+
+        for (ServiceOrder savedOrder : savedOrders) {
+            try {
+                emailService.sendOrderNotificationEmail(savedOrder);
+            } catch (Exception e) {
+                // Log błędu ale nie przerywaj procesu
+                System.err.println("Failed to send email notification for guest order ID: " + savedOrder.getId() + ", error: " + e.getMessage());
+            }
+        }
 
         // Pobranie ID zamówień
         List<Long> orderIds = savedOrders.stream()

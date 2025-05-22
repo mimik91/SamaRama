@@ -4,8 +4,10 @@ import com.samarama.bicycle.api.dto.ServiceOrderDto;
 import com.samarama.bicycle.api.dto.ServiceOrderResponseDto;
 import com.samarama.bicycle.api.model.*;
 import com.samarama.bicycle.api.repository.*;
+import com.samarama.bicycle.api.service.EmailService;
 import com.samarama.bicycle.api.service.ServiceOrderService;
 import com.samarama.bicycle.api.service.ServiceSlotService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,16 +15,21 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 @Service
 public class ServiceOrderServiceImpl implements ServiceOrderService {
+
+    private static final Logger logger = Logger.getLogger(ServiceOrderServiceImpl.class.getName());
+
     private final ServiceOrderRepository serviceOrderRepository;
     private final UserRepository userRepository;
     private final CityValidator cityValidator;
     private final ServicePackageRepository servicePackageRepository;
     private final IncompleteBikeRepository incompleteBikeRepository;
     private final ServiceSlotService serviceSlotService;
+    private final EmailService emailService;
 
     public ServiceOrderServiceImpl(
             ServiceOrderRepository serviceOrderRepository,
@@ -30,13 +37,14 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
             CityValidator cityValidator,
             ServicePackageRepository servicePackageRepository,
             IncompleteBikeRepository incompleteBikeRepository,
-            ServiceSlotService serviceSlotService) {
+            ServiceSlotService serviceSlotService, EmailService emailService) {
         this.serviceOrderRepository = serviceOrderRepository;
         this.userRepository = userRepository;
         this.cityValidator = cityValidator;
         this.servicePackageRepository = servicePackageRepository;
         this.incompleteBikeRepository = incompleteBikeRepository;
         this.serviceSlotService = serviceSlotService;
+        this.emailService = emailService;
     }
 
     @Override
@@ -205,6 +213,15 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
 
         // Zapisz wszystkie zamówienia
         serviceOrderRepository.saveAll(orders);
+
+        for (ServiceOrder savedOrder : orders) {
+            try {
+                emailService.sendOrderNotificationEmail(savedOrder);
+            } catch (Exception e) {
+                logger.warning("Failed to send email notification for order ID: " + savedOrder.getId() + ", error: " + e.getMessage());
+
+            }
+        }
 
         return ResponseEntity.ok(Map.of(
                 "message", "Zamówienie serwisowe zostało utworzone pomyślnie",

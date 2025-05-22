@@ -1,6 +1,7 @@
 package com.samarama.bicycle.api.service.impl;
 
 import com.samarama.bicycle.api.dto.ServiceRegisterDto;
+import com.samarama.bicycle.api.model.ServiceOrder;
 import com.samarama.bicycle.api.model.User;
 import com.samarama.bicycle.api.service.EmailService;
 import jakarta.mail.MessagingException;
@@ -163,6 +164,110 @@ public class EmailServiceImpl implements EmailService {
         } catch (Exception e) {
             logger.log(Level.SEVERE, "Error sending service registration notification: " + e.getMessage(), e);
             throw new RuntimeException("Error sending service registration notification", e);
+        }
+    }
+
+    @Async
+    @Override
+    public void sendOrderNotificationEmail(ServiceOrder serviceOrder) {
+        try {
+            String subject = "Nowe zamówienie serwisowe - " + serviceOrder.getBicycle().getBrand() + " " + serviceOrder.getBicycle().getModel();
+
+            StringBuilder content = new StringBuilder();
+            content.append("<div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;'>");
+            content.append("<div style='text-align: center; margin-bottom: 20px;'>");
+            content.append("<h1 style='color: #3498db; margin-bottom: 5px;'>cyclopick.pl</h1>");
+            content.append("<p style='color: #7f8c8d; font-size: 16px;'>Nowe zamówienie serwisowe</p>");
+            content.append("</div>");
+
+            content.append("<h2 style='color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px;'>Szczegóły zamówienia</h2>");
+
+            // Informacje o zamówieniu
+            content.append("<div style='background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 20px;'>");
+            content.append("<p><strong>ID zamówienia:</strong> ").append(serviceOrder.getId()).append("</p>");
+            content.append("<p><strong>Data zamówienia:</strong> ").append(serviceOrder.getOrderDate().format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"))).append("</p>");
+            content.append("<p><strong>Status:</strong> ").append(serviceOrder.getStatus()).append("</p>");
+            content.append("</div>");
+
+            // Informacje o rowerze
+            content.append("<h3 style='color: #2c3e50; margin-top: 20px;'>Rower</h3>");
+            content.append("<div style='background-color: #e8f4fd; padding: 15px; border-radius: 5px; margin-bottom: 20px;'>");
+            content.append("<p><strong>Marka:</strong> ").append(serviceOrder.getBicycle().getBrand() != null ? serviceOrder.getBicycle().getBrand() : "Nie podano").append("</p>");
+            content.append("<p><strong>Model:</strong> ").append(serviceOrder.getBicycle().getModel() != null ? serviceOrder.getBicycle().getModel() : "Nie podano").append("</p>");
+            content.append("<p><strong>Typ:</strong> ").append(serviceOrder.getBicycle().getType() != null ? serviceOrder.getBicycle().getType() : "Nie podano").append("</p>");
+            content.append("<p><strong>Materiał ramy:</strong> ").append(serviceOrder.getBicycle().getFrameMaterial() != null ? serviceOrder.getBicycle().getFrameMaterial() : "Nie podano").append("</p>");
+            if (serviceOrder.getBicycle().getProductionDate() != null) {
+                content.append("<p><strong>Data produkcji:</strong> ").append(serviceOrder.getBicycle().getProductionDate().format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy"))).append("</p>");
+            }
+            content.append("</div>");
+
+            // Informacje o odbiorze
+            content.append("<h3 style='color: #2c3e50; margin-top: 20px;'>Odbiór</h3>");
+            content.append("<div style='background-color: #f0f8f0; padding: 15px; border-radius: 5px; margin-bottom: 20px;'>");
+            content.append("<p><strong>Data odbioru:</strong> ").append(serviceOrder.getPickupDate().format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy"))).append("</p>");
+            content.append("<p><strong>Adres odbioru:</strong> ").append(serviceOrder.getPickupAddress()).append("</p>");
+            content.append("</div>");
+
+            // Informacje o kliencie
+            content.append("<h3 style='color: #2c3e50; margin-top: 20px;'>Klient</h3>");
+            content.append("<div style='background-color: #fff5f5; padding: 15px; border-radius: 5px; margin-bottom: 20px;'>");
+            content.append("<p><strong>Email:</strong> ").append(serviceOrder.getClient().getEmail()).append("</p>");
+            if (serviceOrder.getClient().getPhoneNumber() != null) {
+                content.append("<p><strong>Telefon:</strong> ").append(serviceOrder.getClient().getPhoneNumber()).append("</p>");
+            }
+            // Jeśli klient to User (zarejestrowany), pokaż imię i nazwisko
+            if (serviceOrder.getClient() instanceof com.samarama.bicycle.api.model.User) {
+                com.samarama.bicycle.api.model.User user = (com.samarama.bicycle.api.model.User) serviceOrder.getClient();
+                if (user.getFirstName() != null || user.getLastName() != null) {
+                    content.append("<p><strong>Imię i nazwisko:</strong> ")
+                            .append(user.getFirstName() != null ? user.getFirstName() : "")
+                            .append(" ")
+                            .append(user.getLastName() != null ? user.getLastName() : "")
+                            .append("</p>");
+                }
+            }
+            content.append("</div>");
+
+            // Informacje o pakiecie serwisowym
+            content.append("<h3 style='color: #2c3e50; margin-top: 20px;'>Pakiet serwisowy</h3>");
+            content.append("<div style='background-color: #f5f0ff; padding: 15px; border-radius: 5px; margin-bottom: 20px;'>");
+            content.append("<p><strong>Nazwa pakietu:</strong> ").append(serviceOrder.getServicePackage() != null ? serviceOrder.getServicePackage().getName() : serviceOrder.getServicePackageCode()).append("</p>");
+            content.append("<p><strong>Kod pakietu:</strong> ").append(serviceOrder.getServicePackageCode()).append("</p>");
+            content.append("<p><strong>Cena:</strong> ").append(serviceOrder.getPrice()).append(" zł</p>");
+            content.append("</div>");
+
+            // Dodatkowe informacje
+            if (serviceOrder.getAdditionalNotes() != null && !serviceOrder.getAdditionalNotes().trim().isEmpty()) {
+                content.append("<h3 style='color: #2c3e50; margin-top: 20px;'>Dodatkowe informacje</h3>");
+                content.append("<div style='background-color: #fffbf0; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #f39c12;'>");
+                content.append("<p>").append(serviceOrder.getAdditionalNotes()).append("</p>");
+                content.append("</div>");
+            }
+
+            content.append("<hr style='border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;'>");
+            content.append("<p style='font-size: 12px; color: #7f8c8d; text-align: center;'>© ").append(java.time.Year.now().getValue()).append(" cyclopick.pl. Powiadomienie o nowym zamówieniu serwisowym.</p>");
+            content.append("</div>");
+
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setFrom(new InternetAddress(fromEmail, "cyclopick.pl - Zamówienia"));
+            helper.setTo(adminEmail);
+            helper.setSubject(subject);
+            helper.setText(content.toString(), true);
+
+            // Dodanie nagłówków
+            message.addHeader("X-Priority", "1");
+            message.addHeader("X-MSMail-Priority", "High");
+            message.addHeader("Importance", "High");
+            message.addHeader("X-Mailer", "cyclopick.pl Order Notification");
+
+            mailSender.send(message);
+            logger.info("Order notification email sent to admin email: " + adminEmail + " for order ID: " + serviceOrder.getId());
+
+        } catch (Exception e) {
+            logger.log(Level.SEVERE, "Error sending order notification email for order ID: " + (serviceOrder != null ? serviceOrder.getId() : "unknown") + ": " + e.getMessage(), e);
+            // Nie rzucamy wyjątku, żeby nie przerwać procesu tworzenia zamówienia
         }
     }
 
