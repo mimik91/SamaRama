@@ -99,13 +99,13 @@ public class BikeService {
     /**
      * Szerokość geograficzna
      */
-    @Column(name = "latitude", precision = 10, scale = 8)
+    @Column(name = "latitude")
     private Double latitude;
 
     /**
      * Długość geograficzna
      */
-    @Column(name = "longitude", precision = 11, scale = 8)
+    @Column(name = "longitude")
     private Double longitude;
 
     // === KONTAKT ===
