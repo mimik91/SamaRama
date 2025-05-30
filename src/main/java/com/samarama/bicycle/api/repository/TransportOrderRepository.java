@@ -2,6 +2,7 @@ package com.samarama.bicycle.api.repository;
 
 import com.samarama.bicycle.api.model.*;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -10,7 +11,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 @Repository
-public interface TransportOrderRepository extends JpaRepository<TransportOrder, Long> {
+public interface TransportOrderRepository extends JpaRepository<TransportOrder, Long>, JpaSpecificationExecutor<TransportOrder> {
 
     // === PODSTAWOWE ZAPYTANIA ===
 
@@ -106,10 +107,26 @@ public interface TransportOrderRepository extends JpaRepository<TransportOrder, 
 
     /**
      * Znajdź zamówienia transportowe które powinny być dostarczone dzisiaj
+     * Bezpieczna wersja używająca porównania LocalDateTime
      */
-    @Query("SELECT t FROM TransportOrder t WHERE DATE(t.estimatedDeliveryTime) = CURRENT_DATE " +
+    @Query("SELECT t FROM TransportOrder t WHERE " +
+            "t.estimatedDeliveryTime >= :startOfDay " +
+            "AND t.estimatedDeliveryTime < :endOfDay " +
             "AND t.transportStatus IN ('PICKED_UP', 'IN_TRANSIT')")
-    List<TransportOrder> findDueForDeliveryToday();
+    List<TransportOrder> findDueForDeliveryToday(
+            @Param("startOfDay") java.time.LocalDateTime startOfDay,
+            @Param("endOfDay") java.time.LocalDateTime endOfDay);
+
+    /**
+     * Znajdź zamówienia transportowe które powinny być dostarczone dzisiaj
+     * Wrapper metoda bez parametrów (helper w serwisie)
+     */
+    default List<TransportOrder> findDueForDeliveryToday() {
+        java.time.LocalDate today = java.time.LocalDate.now();
+        java.time.LocalDateTime startOfDay = today.atStartOfDay();
+        java.time.LocalDateTime endOfDay = today.plusDays(1).atStartOfDay();
+        return findDueForDeliveryToday(startOfDay, endOfDay);
+    }
 
     // === ZAPYTANIA COMBINED (ServiceOrder + TransportOrder) ===
 
@@ -130,4 +147,54 @@ public interface TransportOrderRepository extends JpaRepository<TransportOrder, 
             @Param("date") LocalDate date,
             @Param("limit") int limit
     );
+
+    // === DODATKOWE METODY DLA ZARZĄDZANIA SLOTAMI ===
+
+    /**
+     * Zlicz liczbę rowerów transportowych zaplanowanych na określony dzień
+     */
+    @Query("SELECT COUNT(t) FROM TransportOrder t WHERE t.pickupDate = :date AND t.status != 'CANCELLED'")
+    int countBikesScheduledForDate(@Param("date") LocalDate date);
+
+    /**
+     * Znajdź wszystkie aktywne zamówienia transportowe
+     */
+    @Query("SELECT t FROM TransportOrder t WHERE t.status != 'CANCELLED' ORDER BY t.pickupDate, t.orderDate")
+    List<TransportOrder> findAllActiveOrders();
+
+    /**
+     * Zlicz wszystkie aktywne zamówienia transportowe
+     */
+    @Query("SELECT COUNT(t) FROM TransportOrder t WHERE t.status != 'CANCELLED'")
+    long countAllActive();
+
+    // === WYSZUKIWANIE WEDŁUG INFORMACJI O KLIENCIE ===
+
+    /**
+     * Wyszukuje zamówienia transportowe według informacji o kliencie (email lub telefon)
+     *
+     * @param searchTerm termin wyszukiwania (email lub telefon)
+     * @return lista zamówień pasujących do wyszukiwania
+     */
+    @Query("SELECT t FROM TransportOrder t WHERE " +
+            "LOWER(t.client.email) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
+            "LOWER(t.client.phoneNumber) LIKE LOWER(CONCAT('%', :searchTerm, '%'))")
+    List<TransportOrder> searchByClientInfo(@Param("searchTerm") String searchTerm);
+
+    // === ZLICZANIE W ZAKRESIE DAT ===
+
+    /**
+     * Zlicza liczbę rowerów transportowych zaplanowanych w zakresie dat
+     * Zwraca pary [data, liczba_rowerów] dla każdej daty w zakresie która ma zamówienia
+     *
+     * @param startDate data początkowa
+     * @param endDate data końcowa
+     * @return lista par [LocalDate, Long] reprezentujących datę i liczbę rowerów
+     */
+    @Query("SELECT t.pickupDate, COUNT(t) FROM TransportOrder t " +
+            "WHERE t.pickupDate BETWEEN :startDate AND :endDate " +
+            "AND t.status != 'CANCELLED' " +
+            "GROUP BY t.pickupDate " +
+            "ORDER BY t.pickupDate")
+    List<Object[]> countBikesScheduledForDateRange(@Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
 }

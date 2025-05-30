@@ -29,18 +29,21 @@ public class OrderManagementServiceImpl implements OrderManagementService {
     private final UserRepository userRepository;
     private final ServicePackageRepository servicePackageRepository;
     private final BikeServiceRepository bikeServiceRepository;
+    private final IncompleteBikeRepository incompleteBikeRepository;
 
     public OrderManagementServiceImpl(
             ServiceOrderRepository serviceOrderRepository,
             TransportOrderRepository transportOrderRepository,
             UserRepository userRepository,
             ServicePackageRepository servicePackageRepository,
-            BikeServiceRepository bikeServiceRepository) {
+            BikeServiceRepository bikeServiceRepository,
+            IncompleteBikeRepository incompleteBikeRepository) {
         this.serviceOrderRepository = serviceOrderRepository;
         this.transportOrderRepository = transportOrderRepository;
         this.userRepository = userRepository;
         this.servicePackageRepository = servicePackageRepository;
         this.bikeServiceRepository = bikeServiceRepository;
+        this.incompleteBikeRepository = incompleteBikeRepository;
     }
 
     // === ADMIN - ZAMÓWIENIA SERWISOWE ===
@@ -200,7 +203,7 @@ public class OrderManagementServiceImpl implements OrderManagementService {
         }
 
         try {
-            // Sprawdź czy to status zamówienia czy transportu
+            // Sprawdź czy to status transportu czy zamówienia
             if (isTransportStatus(newStatus)) {
                 TransportOrder.TransportStatus transportStatus = TransportOrder.TransportStatus.valueOf(newStatus);
                 TransportOrder order = orderOpt.get();
@@ -527,11 +530,11 @@ public class OrderManagementServiceImpl implements OrderManagementService {
                 predicates.add(cb.or(emailPredicate, phonePredicate));
             }
 
-            if (filter.servicePackageCode != null) {
+            if (filter.servicePackageCode() != null) {
                 predicates.add(cb.equal(root.get("servicePackageCode"), filter.servicePackageCode()));
             }
 
-            if (filter.servicePackageId != null) {
+            if (filter.servicePackageId() != null) {
                 predicates.add(cb.equal(root.get("servicePackage").get("id"), filter.servicePackageId()));
             }
 
@@ -563,12 +566,12 @@ public class OrderManagementServiceImpl implements OrderManagementService {
                 predicates.add(cb.or(emailPredicate, phonePredicate));
             }
 
-            if (filter.transportStatus != null) {
+            if (filter.transportStatus() != null) {
                 predicates.add(cb.equal(root.get("transportStatus"),
                         TransportOrder.TransportStatus.valueOf(filter.transportStatus())));
             }
 
-            if (filter.transportType != null) {
+            if (filter.transportType() != null) {
                 predicates.add(cb.equal(root.get("transportType"),
                         TransportOrder.TransportType.valueOf(filter.transportType())));
             }
@@ -578,21 +581,11 @@ public class OrderManagementServiceImpl implements OrderManagementService {
     }
 
     private List<ServiceOrder> searchServiceOrdersByClientInfo(String searchTerm) {
-        String pattern = "%" + searchTerm.toLowerCase() + "%";
-        return serviceOrderRepository.findAll((root, query, cb) -> {
-            Predicate emailPredicate = cb.like(cb.lower(root.get("client").get("email")), pattern);
-            Predicate phonePredicate = cb.like(cb.lower(root.get("client").get("phoneNumber")), pattern);
-            return cb.or(emailPredicate, phonePredicate);
-        });
+        return serviceOrderRepository.searchByClientInfo(searchTerm);
     }
 
     private List<TransportOrder> searchTransportOrdersByClientInfo(String searchTerm) {
-        String pattern = "%" + searchTerm.toLowerCase() + "%";
-        return transportOrderRepository.findAll((root, query, cb) -> {
-            Predicate emailPredicate = cb.like(cb.lower(root.get("client").get("email")), pattern);
-            Predicate phonePredicate = cb.like(cb.lower(root.get("client").get("phoneNumber")), pattern);
-            return cb.or(emailPredicate, phonePredicate);
-        });
+        return transportOrderRepository.searchByClientInfo(searchTerm);
     }
 
     private List<ServiceAndTransportOrdersDto> applyFilters(List<ServiceAndTransportOrdersDto> orders, OrderFilterDto filter) {
@@ -643,7 +636,7 @@ public class OrderManagementServiceImpl implements OrderManagementService {
             case "pickupDate" -> Comparator.comparing(ServiceAndTransportOrdersDto::pickupDate);
             case "status" -> Comparator.comparing(ServiceAndTransportOrdersDto::status);
             case "client" -> Comparator.comparing(ServiceAndTransportOrdersDto::clientEmail);
-            case "price" -> Comparator.comparing(ServiceAndTransportOrdersDto::totalPrice);
+            case "price" -> Comparator.comparing(ServiceAndTransportOrdersDto::price);
             default -> Comparator.comparing(ServiceAndTransportOrdersDto::orderDate);
         };
 
@@ -661,13 +654,41 @@ public class OrderManagementServiceImpl implements OrderManagementService {
         if (dto.pickupAddress() != null) {
             order.setPickupAddress(dto.pickupAddress());
         }
+
+        // Aktualizuj współrzędne odbioru
+        if (dto.pickupLatitude() != null) {
+            order.setPickupLatitude(dto.pickupLatitude());
+        }
+        if (dto.pickupLongitude() != null) {
+            order.setPickupLongitude(dto.pickupLongitude());
+        }
+
+        // Aktualizuj rower - sprawdź czy należy do klienta
+        if (dto.bicycleIds() != null && !dto.bicycleIds().isEmpty()) {
+            Long bicycleId = dto.bicycleIds().get(0); // Weź pierwszy rower
+            Optional<IncompleteBike> bikeOpt = incompleteBikeRepository.findById(bicycleId);
+            if (bikeOpt.isPresent()) {
+                IncompleteBike bike = bikeOpt.get();
+                if (bike.getOwner().getId().equals(order.getClient().getId())) {
+                    order.setBicycle(bike);
+                }
+            }
+        }
+
         if (dto.servicePackageId() != null) {
             ServicePackage servicePackage = servicePackageRepository.findById(dto.servicePackageId())
                     .orElseThrow(() -> new RuntimeException("Service package not found"));
             order.setServicePackage(servicePackage);
             order.setServicePackageCode(servicePackage.getCode());
             order.setPrice(servicePackage.getPrice());
+        } else if (dto.servicePackageCode() != null) {
+            ServicePackage servicePackage = servicePackageRepository.findByCode(dto.servicePackageCode())
+                    .orElseThrow(() -> new RuntimeException("Service package not found"));
+            order.setServicePackage(servicePackage);
+            order.setServicePackageCode(servicePackage.getCode());
+            order.setPrice(servicePackage.getPrice());
         }
+
         if (dto.additionalNotes() != null) {
             order.setAdditionalNotes(dto.additionalNotes());
         }
@@ -680,34 +701,36 @@ public class OrderManagementServiceImpl implements OrderManagementService {
         if (dto.pickupAddress() != null) {
             order.setPickupAddress(dto.pickupAddress());
         }
-        if (dto.targetServiceId() != null) {
-            BikeService targetService = bikeServiceRepository.findById(dto.targetServiceId())
-                    .orElseThrow(() -> new RuntimeException("Target service not found"));
-            order.setTargetService(targetService);
+        if (dto.pickupLatitude() != null) {
+            order.setPickupLatitude(dto.pickupLatitude());
         }
-        if (dto.price() != null) {
-            order.setPrice(dto.price());
+        if (dto.pickupLongitude() != null) {
+            order.setPickupLongitude(dto.pickupLongitude());
         }
-        if (dto.pickupTimeFrom() != null) {
-            order.setPickupTimeFrom(dto.pickupTimeFrom());
+        if (dto.deliveryAddress() != null) {
+            order.setDeliveryAddress(dto.deliveryAddress());
         }
-        if (dto.pickupTimeTo() != null) {
-            order.setPickupTimeTo(dto.pickupTimeTo());
+        if (dto.deliveryLatitude() != null) {
+            order.setDeliveryLatitude(dto.deliveryLatitude());
         }
-        if (dto.notes() != null) {
-            order.setTransportNotes(dto.notes());
-        }
-        if (dto.additionalNotes() != null) {
-            order.setAdditionalNotes(dto.additionalNotes());
+        if (dto.deliveryLongitude() != null) {
+            order.setDeliveryLongitude(dto.deliveryLongitude());
         }
 
-        // Aktualizuj serwis jeśli to zamówienie kombinowane
-        if (order.includesService() && dto.servicePackageId() != null) {
-            ServicePackage servicePackage = servicePackageRepository.findById(dto.servicePackageId())
-                    .orElseThrow(() -> new RuntimeException("Service package not found"));
-            order.setServicePackage(servicePackage);
-            order.setServicePackageCode(servicePackage.getCode());
-            order.setServicePrice(servicePackage.getPrice());
+        // Aktualizuj rower
+        if (dto.bicycleIds() != null && !dto.bicycleIds().isEmpty()) {
+            Long bicycleId = dto.bicycleIds().get(0); // Weź pierwszy rower
+            Optional<IncompleteBike> bikeOpt = incompleteBikeRepository.findById(bicycleId);
+            if (bikeOpt.isPresent()) {
+                IncompleteBike bike = bikeOpt.get();
+                if (bike.getOwner().getId().equals(order.getClient().getId())) {
+                    order.setBicycle(bike);
+                }
+            }
+        }
+
+        if (dto.additionalNotes() != null) {
+            order.setAdditionalNotes(dto.additionalNotes());
         }
     }
 

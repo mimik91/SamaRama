@@ -12,7 +12,7 @@ import java.time.LocalTime;
 
 /**
  * TransportOrder - zamówienie transportu roweru do serwisu
- * Rozszerza ServiceOrder o funkcjonalność transportową
+ * Rozszerza Order o funkcjonalność transportową
  */
 @EqualsAndHashCode(callSuper = true)
 @Data
@@ -21,15 +21,15 @@ import java.time.LocalTime;
 @Table(name = "transport_orders")
 @PrimaryKeyJoinColumn(name = "id")
 @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
-public class TransportOrder extends ServiceOrder {
+public class TransportOrder extends Order {
 
     public enum TransportStatus {
         PENDING,               // Oczekuje na odbiór
         PICKED_UP,            // Odebrano od klienta
         IN_TRANSIT,           // W transporcie
-        DELIVERED_TO_SERVICE,
-        PICKED_UP_FROM_SERVICE,
-        COMPLETED
+        DELIVERED_TO_SERVICE, // Dostarczono do serwisu
+        PICKED_UP_FROM_SERVICE, // Odebrano z serwisu
+        COMPLETED             // Zakończono
     }
 
     public enum TransportType {
@@ -47,7 +47,14 @@ public class TransportOrder extends ServiceOrder {
     @JoinColumn(name = "target_service_id", nullable = false)
     private BikeService targetService;
 
+    @Column(name = "delivery_address")
+    private String deliveryAddress;
 
+    @Column(name = "delivery_latitude")
+    private Double deliveryLatitude;
+
+    @Column(name = "delivery_longitude")
+    private Double deliveryLongitude;
 
     // === CZAS I STATUS TRANSPORTU ===
 
@@ -58,8 +65,8 @@ public class TransportOrder extends ServiceOrder {
     private LocalTime pickupTimeTo;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false)
-    private TransportStatus status = TransportStatus.PENDING;
+    @Column(name = "transport_status", nullable = false)
+    private TransportStatus transportStatus = TransportStatus.PENDING;
 
     @Column(name = "estimated_delivery_time")
     private LocalDateTime estimatedDeliveryTime;
@@ -69,14 +76,36 @@ public class TransportOrder extends ServiceOrder {
 
     // === INFORMACJE DODATKOWE ===
 
-    @Column(name = "notes", length = 500)
-    private String notes;
+    @Column(name = "transport_notes", length = 500)
+    private String transportNotes;
 
     @Column(name = "estimated_time")
     private Integer estimatedTime; // w minutach
 
-    @Column(name = "price", nullable = false)
-    private BigDecimal price;
+    @Column(name = "transport_price", nullable = false)
+    private BigDecimal transportPrice = BigDecimal.ZERO;
+
+    // === SERWIS (jeśli transport zawiera serwis) ===
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "service_package_id")
+    private ServicePackage servicePackage;
+
+    @Column(name = "service_package_code")
+    private String servicePackageCode;
+
+    @Column(name = "service_price")
+    private BigDecimal servicePrice = BigDecimal.ZERO;
+
+    @Column(name = "service_notes", length = 500)
+    private String serviceNotes;
+
+    // === IMPLEMENTACJA METOD ABSTRAKCYJNYCH ===
+
+    @Override
+    public String getOrderType() {
+        return "TRANSPORT";
+    }
 
     // === METODY POMOCNICZE ===
 
@@ -84,23 +113,26 @@ public class TransportOrder extends ServiceOrder {
      * Zwraca łączną cenę (serwis + transport)
      */
     public BigDecimal getTotalPrice() {
-        BigDecimal servicePrice = super.getPrice() != null ? super.getPrice() : BigDecimal.ZERO;
-        BigDecimal transportCost = price != null ? price : BigDecimal.ZERO;
-        return servicePrice.add(transportCost);
+        BigDecimal service = servicePrice != null ? servicePrice : BigDecimal.ZERO;
+        BigDecimal transport = transportPrice != null ? transportPrice : BigDecimal.ZERO;
+        return service.add(transport);
     }
 
     /**
      * Sprawdza czy transport jest zakończony
      */
-    public boolean isCompleted() {
-        return status == TransportStatus.COMPLETED ||
-                status == TransportStatus.DELIVERED_TO_SERVICE;
+    public boolean isTransportCompleted() {
+        return transportStatus == TransportStatus.COMPLETED ||
+                transportStatus == TransportStatus.DELIVERED_TO_SERVICE;
     }
 
     /**
-     * Zwraca adres dostawy (zawsze adres serwisu)
+     * Zwraca adres dostawy
      */
     public String getDeliveryAddress() {
+        if (deliveryAddress != null && !deliveryAddress.trim().isEmpty()) {
+            return deliveryAddress;
+        }
         return targetService != null ? targetService.getFullAddress() : null;
     }
 
@@ -118,29 +150,81 @@ public class TransportOrder extends ServiceOrder {
         return transportType == TransportType.TO_SERVICE_ONLY;
     }
 
+    /**
+     * Sprawdza czy zamówienie ma przypisany pakiet serwisowy
+     */
+    public boolean hasServicePackage() {
+        return servicePackage != null ||
+                (servicePackageCode != null && !servicePackageCode.trim().isEmpty());
+    }
+
+    /**
+     * Zwraca nazwę pakietu serwisowego
+     */
+    public String getServicePackageName() {
+        return servicePackage != null ? servicePackage.getName() : servicePackageCode;
+    }
+
+    /**
+     * Sprawdza czy serwis może zostać rozpoczęty
+     */
+    public boolean canStartService() {
+        return includesService() &&
+                (transportStatus == TransportStatus.DELIVERED_TO_SERVICE ||
+                        getStatus() == OrderStatus.PICKED_UP ||
+                        getStatus() == OrderStatus.CONFIRMED);
+    }
+
+    /**
+     * Sprawdza czy serwis jest w trakcie realizacji
+     */
+    public boolean isInService() {
+        return getStatus() == OrderStatus.IN_SERVICE;
+    }
+
     // === KONSTRUKTORY ===
 
-    public TransportOrder(ServiceOrder serviceOrder, BikeService targetService,
-                          BigDecimal transportPrice, TransportType transportType) {
-        // Kopiuj wszystkie pola z ServiceOrder
-        super.setId(serviceOrder.getId());
-        super.setBicycle(serviceOrder.getBicycle());
-        super.setClient(serviceOrder.getClient());
-        super.setServicePackage(serviceOrder.getServicePackage());
-        super.setServicePackageCode(serviceOrder.getServicePackageCode());
-        super.setPickupDate(serviceOrder.getPickupDate());
-        super.setPickupAddress(serviceOrder.getPickupAddress());
-        super.setPickupLatitude(serviceOrder.getPickupLatitude());
-        super.setPickupLongitude(serviceOrder.getPickupLongitude());
-        super.setPrice(serviceOrder.getPrice());
-        super.setAdditionalNotes(serviceOrder.getAdditionalNotes());
-        super.setStatus(serviceOrder.getStatus());
-        super.setOrderDate(serviceOrder.getOrderDate());
-
-        // Ustaw pola transportowe
+    public TransportOrder(IncompleteBike bicycle, IncompleteUser client,
+                          BikeService targetService, BigDecimal transportPrice,
+                          TransportType transportType) {
+        super();
+        setBicycle(bicycle);
+        setClient(client);
         this.targetService = targetService;
-        this.price = transportPrice;
+        this.transportPrice = transportPrice;
         this.transportType = transportType;
-        this.status = TransportStatus.PENDING;
+        this.transportStatus = TransportStatus.PENDING;
+
+        // Ustaw całkowitą cenę
+        setPrice(getTotalPrice());
+
+        // Ustaw adres dostawy
+        this.deliveryAddress = targetService.getFullAddress();
+        this.deliveryLatitude = targetService.getLatitude();
+        this.deliveryLongitude = targetService.getLongitude();
+    }
+
+    public TransportOrder(IncompleteBike bicycle, IncompleteUser client,
+                          BikeService targetService, ServicePackage servicePackage,
+                          BigDecimal transportPrice) {
+        this(bicycle, client, targetService, transportPrice, TransportType.SERVICE_WITH_TRANSPORT);
+
+        this.servicePackage = servicePackage;
+        this.servicePackageCode = servicePackage.getCode();
+        this.servicePrice = servicePackage.getPrice();
+
+        // Zaktualizuj całkowitą cenę
+        setPrice(getTotalPrice());
+    }
+
+    // === LIFECYCLE HOOKS ===
+
+    @PreUpdate
+    protected void onUpdate() {
+        super.onUpdate();
+        // Automatycznie aktualizuj całkowitą cenę
+        if (getPrice() == null || !getPrice().equals(getTotalPrice())) {
+            setPrice(getTotalPrice());
+        }
     }
 }
