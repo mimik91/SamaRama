@@ -36,6 +36,7 @@ public class JwtTokenFilter extends OncePerRequestFilter {
             "/api/password/reset-request",
             "/api/password/reset",
             "/api/guest-orders/**",
+            "/api/transport-orders/**",
             "/api/service-packages/active",
             "/api/enumerations/**",  // Dodajemy tu
             "/api/service-orders/package-price/**",

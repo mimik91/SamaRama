@@ -10,65 +10,71 @@ import java.time.LocalTime;
 import java.util.List;
 
 /**
- * DTO dla zamówienia transportu rowerów
+ * DTO dla zamówienia TYLKO TRANSPORTU do zewnętrznego serwisu
+ * (ServiceOrder obsługuje transport + serwis w twoim serwisie)
  */
 public record TransportOrderDto(
-        @NotNull List<Long> bicycleIds,
+        // === ROWERY ===
+        List<Long> bicycleIds, // dla zalogowanych użytkowników
+        List<GuestBicycleDto> bicycles, // dla gości
 
+        // === TRANSPORT ===
         @NotNull @Future LocalDate pickupDate,
-
         @NotBlank String pickupAddress,
-
         Double pickupLatitude,
-
         Double pickupLongitude,
 
-        @NotBlank String deliveryAddress,
-
+        String deliveryAddress, // gdzie dostarczyć (opcjonalne - może być z targetService)
         Double deliveryLatitude,
-
         Double deliveryLongitude,
 
-        String additionalNotes,
-
-        // === DODATKOWE POLA TRANSPORTOWE ===
-
-        LocalTime pickupTimeFrom,
-
-        LocalTime pickupTimeTo,
-
-        String transportType, // TO_SERVICE_ONLY, SERVICE_WITH_TRANSPORT
-
+        @NotNull Long targetServiceId, // ID zewnętrznego serwisu
         BigDecimal transportPrice,
 
-        String transportNotes,
-
+        // === SZCZEGÓŁY TRANSPORTU ===
+        LocalTime pickupTimeFrom,
+        LocalTime pickupTimeTo,
         Integer estimatedTime, // w minutach
+        String transportNotes,
+        String additionalNotes,
 
-        Long targetServiceId,
-
-        // === POLA SERWISOWE (dla zamówień kombinowanych) ===
-
-        Long servicePackageId,
-
-        String servicePackageCode,
-
-        BigDecimal servicePrice,
-
-        String serviceNotes
+        // === DANE GOŚCI (gdy brak bicycleIds) ===
+        String clientEmail,
+        String clientPhone,
+        String clientName,
+        String city
 ) {
     /**
-     * Sprawdza, czy zamówienie ma wymagane dane
+     * Sprawdza czy to zamówienie gościa
      */
-    public boolean isValid() {
-        return bicycleIds != null && !bicycleIds.isEmpty() &&
-                pickupDate != null &&
-                pickupAddress != null && !pickupAddress.trim().isEmpty() &&
-                deliveryAddress != null && !deliveryAddress.trim().isEmpty();
+    public boolean isGuestOrder() {
+        return clientEmail != null && !clientEmail.trim().isEmpty();
     }
 
     /**
-     * Sprawdza, czy ma kompletne współrzędne geograficzne
+     * Walidacja dla zalogowanego użytkownika
+     */
+    public boolean isValidForLoggedUser() {
+        return bicycleIds != null && !bicycleIds.isEmpty() &&
+                pickupDate != null &&
+                pickupAddress != null && !pickupAddress.trim().isEmpty() &&
+                targetServiceId != null;
+    }
+
+    /**
+     * Walidacja dla gościa
+     */
+    public boolean isValidForGuest() {
+        return clientEmail != null && !clientEmail.trim().isEmpty() &&
+                clientPhone != null && !clientPhone.trim().isEmpty() &&
+                bicycles != null && !bicycles.isEmpty() &&
+                pickupDate != null &&
+                pickupAddress != null && !pickupAddress.trim().isEmpty() &&
+                targetServiceId != null;
+    }
+
+    /**
+     * Sprawdza czy ma współrzędne odbioru i dostawy
      */
     public boolean hasCompleteCoordinates() {
         return pickupLatitude != null && pickupLongitude != null &&
@@ -76,74 +82,9 @@ public record TransportOrderDto(
     }
 
     /**
-     * Sprawdza czy ma ustawiony czas odbioru
+     * Sprawdza czy ma okno czasowe odbioru
      */
     public boolean hasPickupTimeWindow() {
         return pickupTimeFrom != null && pickupTimeTo != null;
-    }
-
-    /**
-     * Sprawdza czy to zamówienie kombinowane (transport + serwis)
-     */
-    public boolean isCombinedOrder() {
-        return "SERVICE_WITH_TRANSPORT".equals(transportType) &&
-                (servicePackageId != null || servicePackageCode != null);
-    }
-
-    /**
-     * Sprawdza czy ma przypisany pakiet serwisowy
-     */
-    public boolean hasServicePackage() {
-        return servicePackageId != null ||
-                (servicePackageCode != null && !servicePackageCode.trim().isEmpty());
-    }
-
-    /**
-     * Zwraca całkowitą cenę (transport + serwis)
-     */
-    public BigDecimal getTotalPrice() {
-        BigDecimal transport = transportPrice != null ? transportPrice : BigDecimal.ZERO;
-        BigDecimal service = servicePrice != null ? servicePrice : BigDecimal.ZERO;
-        return transport.add(service);
-    }
-
-    /**
-     * Tworzy DTO dla prostego transportu (bez serwisu)
-     */
-    public static TransportOrderDto forTransportOnly(
-            List<Long> bicycleIds,
-            LocalDate pickupDate,
-            String pickupAddress,
-            String deliveryAddress,
-            Long targetServiceId,
-            BigDecimal transportPrice) {
-
-        return new TransportOrderDto(
-                bicycleIds, pickupDate, pickupAddress, null, null,
-                deliveryAddress, null, null, null,
-                null, null, "TO_SERVICE_ONLY", transportPrice, null, null,
-                targetServiceId, null, null, null, null
-        );
-    }
-
-    /**
-     * Tworzy DTO dla zamówienia kombinowanego (transport + serwis)
-     */
-    public static TransportOrderDto forCombinedOrder(
-            List<Long> bicycleIds,
-            LocalDate pickupDate,
-            String pickupAddress,
-            String deliveryAddress,
-            Long targetServiceId,
-            BigDecimal transportPrice,
-            Long servicePackageId,
-            BigDecimal servicePrice) {
-
-        return new TransportOrderDto(
-                bicycleIds, pickupDate, pickupAddress, null, null,
-                deliveryAddress, null, null, null,
-                null, null, "SERVICE_WITH_TRANSPORT", transportPrice, null, null,
-                targetServiceId, servicePackageId, null, servicePrice, null
-        );
     }
 }

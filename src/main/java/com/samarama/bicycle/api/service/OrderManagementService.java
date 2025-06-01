@@ -125,4 +125,37 @@ public interface OrderManagementService {
      * Sprawdza czy zamówienie można modyfikować
      */
     boolean canModifyOrder(Order order, boolean isAdmin);
+
+    // Dodaj te metody do interfejsu OrderManagementService.java
+
+// === TRANSPORT ORDER CREATION ===
+
+    /**
+     * Tworzy nowe zamówienie transportowe (dla zalogowanych użytkowników)
+     */
+    ResponseEntity<?> createTransportOrder(TransportOrderDto dto, String userEmail);
+
+    /**
+     * Tworzy zamówienie transportowe dla gości
+     */
+    ResponseEntity<?> createGuestTransportOrder(GuestTransportOrderDto dto);
+
+// === SERVICE ORDER CREATION ===
+
+    /**
+     * Tworzy nowe zamówienie serwisowe (dla zalogowanych użytkowników)
+     */
+    ResponseEntity<?> createServiceOrder(ServiceOrderDto dto, String userEmail);
+
+// === STATUS UPDATES ===
+
+    /**
+     * Aktualizuje status zamówienia serwisowego (klient)
+     */
+    ResponseEntity<?> updateServiceOrderStatus(Long orderId, String newStatus, String userEmail);
+
+    /**
+     * Aktualizuje status zamówienia transportowego (klient)
+     */
+    ResponseEntity<?> updateTransportOrderStatus(Long orderId, String newStatus, String userEmail);
 }
