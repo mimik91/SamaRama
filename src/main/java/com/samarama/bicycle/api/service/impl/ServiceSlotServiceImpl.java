@@ -3,11 +3,10 @@ package com.samarama.bicycle.api.service.impl;
 import com.samarama.bicycle.api.dto.ServiceSlotAvailabilityDto;
 import com.samarama.bicycle.api.dto.ServiceSlotConfigDto;
 import com.samarama.bicycle.api.model.ServiceSlotConfig;
-import com.samarama.bicycle.api.repository.ServiceOrderRepository;
 import com.samarama.bicycle.api.repository.ServiceSlotConfigRepository;
+import com.samarama.bicycle.api.repository.TransportOrderRepository;
 import com.samarama.bicycle.api.service.ServiceSlotService;
 import jakarta.annotation.PostConstruct;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,50 +15,54 @@ import java.time.LocalDate;
 import java.util.*;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 @Service
 public class ServiceSlotServiceImpl implements ServiceSlotService {
 
     private static final Logger logger = Logger.getLogger(ServiceSlotServiceImpl.class.getName());
 
-    private final ServiceSlotConfigRepository slotConfigRepository;
-    private final ServiceOrderRepository serviceOrderRepository;
+    private final ServiceSlotConfigRepository configRepository;
+    private final TransportOrderRepository transportOrderRepository;
 
-    // Domyślne wartości konfiguracji slotów
+    // Default configuration values
     private static final int DEFAULT_MAX_BIKES_PER_DAY = 5;
     private static final int DEFAULT_MAX_BIKES_PER_ORDER = 3;
 
-    @Autowired
     public ServiceSlotServiceImpl(
-            ServiceSlotConfigRepository slotConfigRepository,
-            ServiceOrderRepository serviceOrderRepository) {
-        this.slotConfigRepository = slotConfigRepository;
-        this.serviceOrderRepository = serviceOrderRepository;
+            ServiceSlotConfigRepository configRepository,
+            TransportOrderRepository transportOrderRepository) {
+        this.configRepository = configRepository;
+        this.transportOrderRepository = transportOrderRepository;
     }
 
     @PostConstruct
-    public void init() {
+    public void initializeDefaultConfig() {
         initializeDefaultSlotConfig();
     }
 
+    // === CONFIGURATION MANAGEMENT ===
+
     @Override
+    @Transactional(readOnly = true)
     public List<ServiceSlotConfigDto> getAllSlotConfigs() {
-        return slotConfigRepository.findAll().stream()
+        return configRepository.findAll().stream()
                 .map(ServiceSlotConfigDto::fromEntity)
+                .sorted(Comparator.comparing(ServiceSlotConfigDto::startDate))
                 .collect(Collectors.toList());
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<ServiceSlotConfigDto> getCurrentlyActiveSlotConfigs() {
-        return slotConfigRepository.findCurrentlyActiveConfigs().stream()
+        return configRepository.findCurrentlyActiveConfigs().stream()
                 .map(ServiceSlotConfigDto::fromEntity)
                 .collect(Collectors.toList());
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<ServiceSlotConfigDto> getFutureSlotConfigs() {
-        return slotConfigRepository.findFutureConfigs().stream()
+        return configRepository.findFutureConfigs().stream()
                 .map(ServiceSlotConfigDto::fromEntity)
                 .collect(Collectors.toList());
     }
@@ -67,372 +70,321 @@ public class ServiceSlotServiceImpl implements ServiceSlotService {
     @Override
     @Transactional
     public ResponseEntity<?> createSlotConfig(ServiceSlotConfigDto configDto) {
-        // Walidacja dat
-        if (configDto.startDate() == null) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Data początkowa jest wymagana"));
-        }
+        try {
+            // Validation
+            validateSlotConfig(configDto);
 
-        if (configDto.endDate() != null && configDto.endDate().isBefore(configDto.startDate())) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Data końcowa nie może być wcześniejsza niż data początkowa"));
-        }
+            // Check for overlapping configurations
+            List<ServiceSlotConfig> overlapping = configRepository.findOverlappingConfigs(
+                    configDto.startDate(), configDto.endDate());
 
-        // Walidacja liczby rowerów
-        if (configDto.maxBikesPerDay() == null || configDto.maxBikesPerDay() <= 0) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Maksymalna liczba rowerów dziennie musi być dodatnia"));
-        }
-
-        // Walidacja maksymalnej liczby rowerów na zamówienie
-        if (configDto.maxBikesPerOrder() != null && configDto.maxBikesPerOrder() <= 0) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Maksymalna liczba rowerów na zamówienie musi być dodatnia"));
-        }
-
-        if (configDto.maxBikesPerOrder() != null && configDto.maxBikesPerOrder() > configDto.maxBikesPerDay()) {
-            return ResponseEntity.badRequest().body(Map.of(
-                    "message", "Maksymalna liczba rowerów na zamówienie nie może być większa niż maksymalna liczba rowerów dziennie"
-            ));
-        }
-
-        // Sprawdź, czy data startu jest późniejsza niż wczoraj
-        LocalDate yesterday = LocalDate.now().minusDays(1);
-        if (configDto.startDate().isBefore(yesterday)) {
-            return ResponseEntity.badRequest().body(Map.of(
-                    "message", "Data startu nie może być wcześniejsza niż wczoraj"
-            ));
-        }
-
-        // Znajdź konfiguracje, które zaczynają się po nowej konfiguracji
-        List<ServiceSlotConfig> laterConfigs = slotConfigRepository.findConfigsWithStartDateAfter(configDto.startDate());
-
-        // Znajdź nakładające się konfiguracje
-        List<ServiceSlotConfig> overlappingConfigs = slotConfigRepository.findOverlappingConfigs(
-                configDto.startDate(),
-                configDto.endDate()
-        );
-
-        // Konfiguracje do usunięcia - konflikty ze starszymi konfiguracjami
-        List<ServiceSlotConfig> configsToDelete = new ArrayList<>();
-
-        // Jeśli data końca nowej konfiguracji jest po dacie startu którejkolwiek starszej konfiguracji,
-        // usuwamy starszą konfigurację
-        if (configDto.endDate() != null && !laterConfigs.isEmpty()) {
-            for (ServiceSlotConfig laterConfig : laterConfigs) {
-                if (configDto.endDate().isAfter(laterConfig.getStartDate()) || configDto.endDate().isEqual(laterConfig.getStartDate())) {
-                    configsToDelete.add(laterConfig);
-                }
+            if (!overlapping.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "message", "Konfiguracja nakłada się z istniejącymi konfiguracjami",
+                        "overlappingConfigs", overlapping.stream()
+                                .map(ServiceSlotConfigDto::fromEntity)
+                                .collect(Collectors.toList())
+                ));
             }
-        }
 
-        // Jeśli nowa konfiguracja jest bezterminowa (endDate == null), usuń wszystkie późniejsze konfiguracje
-        if (configDto.endDate() == null && !laterConfigs.isEmpty()) {
-            configsToDelete.addAll(laterConfigs);
-        }
+            // Create new configuration
+            ServiceSlotConfig config = new ServiceSlotConfig();
+            config.setStartDate(configDto.startDate());
+            config.setEndDate(configDto.endDate());
+            config.setMaxBikesPerDay(configDto.maxBikesPerDay());
+            config.setMaxBikesPerOrder(configDto.maxBikesPerOrder());
+            config.setCreatedAt(LocalDate.now());
 
-        // Usuń konfiguracje, które kolidują z nową
-        if (!configsToDelete.isEmpty()) {
-            for (ServiceSlotConfig configToDelete : configsToDelete) {
-                slotConfigRepository.deleteById(configToDelete.getId());
-                logger.info("Usunięto kolidującą konfigurację o ID: " + configToDelete.getId());
-            }
-        }
+            ServiceSlotConfig savedConfig = configRepository.save(config);
 
-        // Tworzenie nowej konfiguracji
-        ServiceSlotConfig newConfig = new ServiceSlotConfig();
-        newConfig.setStartDate(configDto.startDate());
-        newConfig.setEndDate(configDto.endDate());
-        newConfig.setMaxBikesPerDay(configDto.maxBikesPerDay());
-        newConfig.setMaxBikesPerOrder(configDto.maxBikesPerOrder());
-        newConfig.setCreatedAt(LocalDate.now());
+            logger.info("Created new slot configuration: " + savedConfig.getId());
 
-        ServiceSlotConfig savedConfig = slotConfigRepository.save(newConfig);
-
-        if (configsToDelete.isEmpty()) {
             return ResponseEntity.ok(Map.of(
                     "message", "Konfiguracja slotów została utworzona pomyślnie",
-                    "id", savedConfig.getId()
+                    "config", ServiceSlotConfigDto.fromEntity(savedConfig)
             ));
-        } else {
-            return ResponseEntity.ok(Map.of(
-                    "message", "Konfiguracja slotów została utworzona pomyślnie. Usunięto " + configsToDelete.size() + " kolidujących konfiguracji.",
-                    "id", savedConfig.getId(),
-                    "removedConfigIds", configsToDelete.stream().map(ServiceSlotConfig::getId).collect(Collectors.toList())
-            ));
+
+        } catch (Exception e) {
+            logger.severe("Error creating slot configuration: " + e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         }
     }
 
     @Override
     @Transactional
     public ResponseEntity<?> updateSlotConfig(Long id, ServiceSlotConfigDto configDto) {
-        Optional<ServiceSlotConfig> configOpt = slotConfigRepository.findById(id);
-        if (configOpt.isEmpty()) {
-            return ResponseEntity.notFound().build();
-        }
-
-        ServiceSlotConfig config = configOpt.get();
-
-        // Walidacja dat
-        if (configDto.startDate() == null) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Data początkowa jest wymagana"));
-        }
-
-        if (configDto.endDate() != null && configDto.endDate().isBefore(configDto.startDate())) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Data końcowa nie może być wcześniejsza niż data początkowa"));
-        }
-
-        // Walidacja liczby rowerów
-        if (configDto.maxBikesPerDay() == null || configDto.maxBikesPerDay() <= 0) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Maksymalna liczba rowerów dziennie musi być dodatnia"));
-        }
-
-        // Walidacja maksymalnej liczby rowerów na zamówienie
-        if (configDto.maxBikesPerOrder() != null && configDto.maxBikesPerOrder() <= 0) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Maksymalna liczba rowerów na zamówienie musi być dodatnia"));
-        }
-
-        if (configDto.maxBikesPerOrder() != null && configDto.maxBikesPerOrder() > configDto.maxBikesPerDay()) {
-            return ResponseEntity.badRequest().body(Map.of(
-                    "message", "Maksymalna liczba rowerów na zamówienie nie może być większa niż maksymalna liczba rowerów dziennie"
-            ));
-        }
-
-        // Sprawdź, czy data startu jest późniejsza niż wczoraj
-        LocalDate yesterday = LocalDate.now().minusDays(1);
-        if (configDto.startDate().isBefore(yesterday)) {
-            return ResponseEntity.badRequest().body(Map.of(
-                    "message", "Data startu nie może być wcześniejsza niż wczoraj"
-            ));
-        }
-
-        // Znajdź konfiguracje, które zaczynają się po aktualizowanej konfiguracji
-        List<ServiceSlotConfig> laterConfigs = slotConfigRepository.findConfigsWithStartDateAfter(configDto.startDate())
-                .stream()
-                .filter(c -> !c.getId().equals(id)) // Wykluczenie aktualnej konfiguracji
-                .collect(Collectors.toList());
-
-        // Sprawdzenie nakładających się aktywnych konfiguracji (z wyjątkiem aktualnej)
-        List<ServiceSlotConfig> overlappingConfigs = slotConfigRepository.findOverlappingConfigs(
-                        configDto.startDate(),
-                        configDto.endDate()
-                ).stream()
-                .filter(c -> !c.getId().equals(id)) // Wykluczenie aktualnej konfiguracji
-                .collect(Collectors.toList());
-
-        // Konfiguracje do usunięcia - konflikty ze starszymi konfiguracjami
-        List<ServiceSlotConfig> configsToDelete = new ArrayList<>();
-
-        // Jeśli data końca aktualizowanej konfiguracji jest po dacie startu którejkolwiek starszej konfiguracji,
-        // usuwamy starszą konfigurację
-        if (configDto.endDate() != null && !laterConfigs.isEmpty()) {
-            for (ServiceSlotConfig laterConfig : laterConfigs) {
-                if (configDto.endDate().isAfter(laterConfig.getStartDate()) || configDto.endDate().isEqual(laterConfig.getStartDate())) {
-                    configsToDelete.add(laterConfig);
-                }
+        try {
+            Optional<ServiceSlotConfig> configOpt = configRepository.findById(id);
+            if (configOpt.isEmpty()) {
+                return ResponseEntity.notFound().build();
             }
-        }
 
-        // Jeśli aktualizowana konfiguracja jest bezterminowa (endDate == null), usuń wszystkie późniejsze konfiguracje
-        if (configDto.endDate() == null && !laterConfigs.isEmpty()) {
-            configsToDelete.addAll(laterConfigs);
-        }
+            ServiceSlotConfig config = configOpt.get();
 
-        // Usuń konfiguracje, które kolidują z aktualizowaną
-        if (!configsToDelete.isEmpty()) {
-            for (ServiceSlotConfig configToDelete : configsToDelete) {
-                slotConfigRepository.deleteById(configToDelete.getId());
-                logger.info("Usunięto kolidującą konfigurację o ID: " + configToDelete.getId());
+            // Validation
+            validateSlotConfig(configDto);
+
+            // Check for overlapping configurations (excluding current one)
+            List<ServiceSlotConfig> overlapping = configRepository.findOverlappingConfigs(
+                            configDto.startDate(), configDto.endDate())
+                    .stream()
+                    .filter(c -> !c.getId().equals(id))
+                    .collect(Collectors.toList());
+
+            if (!overlapping.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "message", "Konfiguracja nakłada się z istniejącymi konfiguracjami"
+                ));
             }
-        }
 
-        // Aktualizacja konfiguracji
-        config.setStartDate(configDto.startDate());
-        config.setEndDate(configDto.endDate());
-        config.setMaxBikesPerDay(configDto.maxBikesPerDay());
-        config.setMaxBikesPerOrder(configDto.maxBikesPerOrder());
+            // Update configuration
+            config.setStartDate(configDto.startDate());
+            config.setEndDate(configDto.endDate());
+            config.setMaxBikesPerDay(configDto.maxBikesPerDay());
+            config.setMaxBikesPerOrder(configDto.maxBikesPerOrder());
 
-        slotConfigRepository.save(config);
+            ServiceSlotConfig savedConfig = configRepository.save(config);
 
-        if (configsToDelete.isEmpty()) {
-            return ResponseEntity.ok(Map.of("message", "Konfiguracja slotów została zaktualizowana pomyślnie"));
-        } else {
+            logger.info("Updated slot configuration: " + id);
+
             return ResponseEntity.ok(Map.of(
-                    "message", "Konfiguracja slotów została zaktualizowana pomyślnie. Usunięto " + configsToDelete.size() + " kolidujących konfiguracji.",
-                    "removedConfigIds", configsToDelete.stream().map(ServiceSlotConfig::getId).collect(Collectors.toList())
+                    "message", "Konfiguracja slotów została zaktualizowana",
+                    "config", ServiceSlotConfigDto.fromEntity(savedConfig)
             ));
+
+        } catch (Exception e) {
+            logger.severe("Error updating slot configuration " + id + ": " + e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         }
     }
 
     @Override
     @Transactional
     public ResponseEntity<?> deleteSlotConfig(Long id) {
-        if (!slotConfigRepository.existsById(id)) {
-            return ResponseEntity.notFound().build();
-        }
+        try {
+            if (!configRepository.existsById(id)) {
+                return ResponseEntity.notFound().build();
+            }
 
-        slotConfigRepository.deleteById(id);
-        return ResponseEntity.ok(Map.of("message", "Konfiguracja slotów została usunięta pomyślnie"));
+            configRepository.deleteById(id);
+            logger.info("Deleted slot configuration: " + id);
+
+            return ResponseEntity.ok(Map.of("message", "Konfiguracja slotów została usunięta"));
+
+        } catch (Exception e) {
+            logger.severe("Error deleting slot configuration " + id + ": " + e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
     }
 
+    // === AVAILABILITY CHECKING ===
+
     @Override
+    @Transactional(readOnly = true)
     public ServiceSlotAvailabilityDto getSlotAvailability(LocalDate date) {
-        if (date == null) {
-            date = LocalDate.now();
-        }
+        ServiceSlotConfig config = getConfigForDate(date);
+        int bookedBikes = countBookedBikesForDate(date);
 
-        int maxBikesPerDay = getMaxBikesPerDay(date);
-        int maxBikesPerOrder = getMaxBikesPerOrder(date);
-        int bookedBikes = serviceOrderRepository.countBikesScheduledForDate(date);
-
-        return ServiceSlotAvailabilityDto.of(date, maxBikesPerDay, bookedBikes, maxBikesPerOrder);
+        return ServiceSlotAvailabilityDto.of(
+                date,
+                config.getMaxBikesPerDay(),
+                bookedBikes,
+                config.getEffectiveMaxBikesPerOrder()
+        );
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<ServiceSlotAvailabilityDto> getSlotAvailability(LocalDate startDate, LocalDate endDate) {
-        if (startDate == null) {
-            startDate = LocalDate.now();
-        }
+        List<ServiceSlotAvailabilityDto> availability = new ArrayList<>();
 
-        if (endDate == null) {
-            endDate = startDate.plusMonths(1);
-        }
-
-        // Pobieramy informacje o zarezerwowanych rowerach w danym zakresie dat
-        List<Object[]> bookings = serviceOrderRepository.countBikesScheduledForDateRange(startDate, endDate);
-        Map<LocalDate, Integer> bookingsMap = new HashMap<>();
-
-        for (Object[] row : bookings) {
-            LocalDate date = (LocalDate) row[0];
-            Number count = (Number) row[1];
-            bookingsMap.put(date, count.intValue());
-        }
-
-        // Przygotowanie wyników
-        List<ServiceSlotAvailabilityDto> results = new ArrayList<>();
+        // Get all bookings for the date range in one query
+        Map<LocalDate, Integer> bookingsMap = getBookingsForDateRange(startDate, endDate);
 
         LocalDate currentDate = startDate;
         while (!currentDate.isAfter(endDate)) {
-            final LocalDate date = currentDate; // Dla lambda
-
-            int maxBikesPerDay = getMaxBikesPerDay(date);
-            int maxBikesPerOrder = getMaxBikesPerOrder(date);
-            int bookedBikes = bookingsMap.getOrDefault(date, 0);
-
-            results.add(ServiceSlotAvailabilityDto.of(date, maxBikesPerDay, bookedBikes, maxBikesPerOrder));
-
-            currentDate = currentDate.plusDays(1);
-        }
-
-        return results;
-    }
-
-    @Override
-    public List<ServiceSlotAvailabilityDto> getNextDaysAvailability(LocalDate startDate, int days) {
-        if (startDate == null) {
-            startDate = LocalDate.now();
-        }
-
-        LocalDate endDate = startDate.plusDays(days - 1);
-        List<ServiceSlotAvailabilityDto> results = new ArrayList<>();
-
-        // Pobierz konfigurację slotów tylko raz
-        Optional<ServiceSlotConfig> slotConfigOpt = slotConfigRepository.findConfigForDate(startDate);
-        int maxBikesPerDay = slotConfigOpt.map(ServiceSlotConfig::getMaxBikesPerDay).orElse(DEFAULT_MAX_BIKES_PER_DAY);
-        int maxBikesPerOrder = slotConfigOpt.map(ServiceSlotConfig::getEffectiveMaxBikesPerOrder).orElse(DEFAULT_MAX_BIKES_PER_ORDER);
-
-        // Pobierz informacje o wszystkich zarezerwowanych slotach w danym zakresie dat
-        List<Object[]> bookings = serviceOrderRepository.countBikesScheduledForDateRange(startDate, endDate);
-        Map<LocalDate, Integer> bookingsMap = new HashMap<>();
-
-        for (Object[] row : bookings) {
-            LocalDate date = (LocalDate) row[0];
-            Number count = (Number) row[1];
-            bookingsMap.put(date, count.intValue());
-        }
-
-        // Przygotowanie wyników
-        LocalDate currentDate = startDate;
-        while (!currentDate.isAfter(endDate)) {
+            ServiceSlotConfig config = getConfigForDate(currentDate);
             int bookedBikes = bookingsMap.getOrDefault(currentDate, 0);
-            results.add(ServiceSlotAvailabilityDto.of(currentDate, maxBikesPerDay, bookedBikes, maxBikesPerOrder));
+
+            availability.add(ServiceSlotAvailabilityDto.of(
+                    currentDate,
+                    config.getMaxBikesPerDay(),
+                    bookedBikes,
+                    config.getEffectiveMaxBikesPerOrder()
+            ));
+
             currentDate = currentDate.plusDays(1);
         }
 
-        return results;
+        return availability;
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public List<ServiceSlotAvailabilityDto> getNextDaysAvailability(LocalDate startDate, int days) {
+        LocalDate endDate = startDate.plusDays(days - 1);
+        return getSlotAvailability(startDate, endDate);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public boolean areSlotsAvailable(LocalDate date, int bikesCount) {
-        if (date == null) {
-            return false;
-        }
+        ServiceSlotConfig config = getConfigForDate(date);
+        int bookedBikes = countBookedBikesForDate(date);
+        int availableBikes = config.getMaxBikesPerDay() - bookedBikes;
 
-        int maxBikesPerDay = getMaxBikesPerDay(date);
-        int bookedBikes = serviceOrderRepository.countBikesScheduledForDate(date);
-
-        return (bookedBikes + bikesCount) <= maxBikesPerDay;
+        return availableBikes >= bikesCount;
     }
 
     @Override
+    @Transactional(readOnly = true)
     public boolean isWithinMaxBikesPerOrder(LocalDate date, int bikesCount) {
-        if (date == null) {
-            return false;
-        }
-
-        int maxBikesPerOrder = getMaxBikesPerOrder(date);
-        return bikesCount <= maxBikesPerOrder;
+        ServiceSlotConfig config = getConfigForDate(date);
+        return bikesCount <= config.getEffectiveMaxBikesPerOrder();
     }
 
     @Override
+    @Transactional(readOnly = true)
     public int getMaxBikesPerOrder(LocalDate date) {
-        if (date == null) {
-            date = LocalDate.now();
-        }
-
-        Optional<ServiceSlotConfig> configOpt = slotConfigRepository.findConfigForDate(date);
-        if (configOpt.isPresent()) {
-            ServiceSlotConfig config = configOpt.get();
-            return config.getEffectiveMaxBikesPerOrder();
-        }
-
-        return DEFAULT_MAX_BIKES_PER_ORDER;
+        ServiceSlotConfig config = getConfigForDate(date);
+        return config.getEffectiveMaxBikesPerOrder();
     }
 
     @Override
+    @Transactional(readOnly = true)
     public int getMaxBikesPerDay(LocalDate date) {
-        if (date == null) {
-            date = LocalDate.now();
-        }
-
-        Optional<ServiceSlotConfig> configOpt = slotConfigRepository.findConfigForDate(date);
-        if (configOpt.isPresent()) {
-            ServiceSlotConfig config = configOpt.get();
-            return config.getMaxBikesPerDay();
-        }
-
-        return DEFAULT_MAX_BIKES_PER_DAY;
+        ServiceSlotConfig config = getConfigForDate(date);
+        return config.getMaxBikesPerDay();
     }
+
+    // === INITIALIZATION ===
 
     @Override
     @Transactional
     public void initializeDefaultSlotConfig() {
-        // Sprawdź, czy istnieje już jakakolwiek konfiguracja
-        if (slotConfigRepository.count() > 0) {
-            logger.info("Konfiguracje slotów już istnieją, pomijanie inicjalizacji domyślnej konfiguracji");
-            return;
+        // Check if any configuration exists
+        if (configRepository.count() == 0) {
+            ServiceSlotConfig defaultConfig = new ServiceSlotConfig();
+            defaultConfig.setStartDate(LocalDate.now());
+            defaultConfig.setEndDate(null); // No end date - valid indefinitely
+            defaultConfig.setMaxBikesPerDay(DEFAULT_MAX_BIKES_PER_DAY);
+            defaultConfig.setMaxBikesPerOrder(DEFAULT_MAX_BIKES_PER_ORDER);
+            defaultConfig.setCreatedAt(LocalDate.now());
+
+            configRepository.save(defaultConfig);
+            logger.info("Initialized default slot configuration");
+        }
+    }
+
+    // === PRIVATE HELPER METHODS ===
+
+    /**
+     * Gets the active configuration for a specific date
+     */
+    private ServiceSlotConfig getConfigForDate(LocalDate date) {
+        return configRepository.findConfigForDate(date)
+                .orElseGet(() -> {
+                    // If no configuration found, return default values
+                    ServiceSlotConfig defaultConfig = new ServiceSlotConfig();
+                    defaultConfig.setMaxBikesPerDay(DEFAULT_MAX_BIKES_PER_DAY);
+                    defaultConfig.setMaxBikesPerOrder(DEFAULT_MAX_BIKES_PER_ORDER);
+                    return defaultConfig;
+                });
+    }
+
+    /**
+     * Counts booked bikes for a specific date
+     * Uses TransportOrderRepository which includes both transport and service orders
+     */
+    private int countBookedBikesForDate(LocalDate date) {
+        return transportOrderRepository.countBikesScheduledForDate(date);
+    }
+
+    /**
+     * Gets bookings for a date range as a map
+     */
+    private Map<LocalDate, Integer> getBookingsForDateRange(LocalDate startDate, LocalDate endDate) {
+        // Use the existing method from TransportOrderRepository
+        List<Object[]> bookings = transportOrderRepository.countOrdersForDateRange(startDate, endDate);
+
+        Map<LocalDate, Integer> bookingsMap = new HashMap<>();
+        for (Object[] booking : bookings) {
+            LocalDate date = (LocalDate) booking[0];
+            Long count = (Long) booking[1];
+            bookingsMap.put(date, count.intValue());
         }
 
-        logger.info("Inicjalizacja domyślnej konfiguracji slotów");
+        return bookingsMap;
+    }
 
-        LocalDate now = LocalDate.now();
+    /**
+     * Validates slot configuration data
+     */
+    private void validateSlotConfig(ServiceSlotConfigDto configDto) {
+        if (configDto.startDate() == null) {
+            throw new IllegalArgumentException("Data początkowa jest wymagana");
+        }
 
-        // Tworzenie domyślnej konfiguracji
-        ServiceSlotConfig defaultConfig = new ServiceSlotConfig();
-        defaultConfig.setStartDate(now);
-        defaultConfig.setEndDate(null); // Bezterminowo
-        defaultConfig.setMaxBikesPerDay(DEFAULT_MAX_BIKES_PER_DAY);
-        defaultConfig.setMaxBikesPerOrder(DEFAULT_MAX_BIKES_PER_ORDER);
-        defaultConfig.setCreatedAt(now);
+        if (configDto.maxBikesPerDay() == null || configDto.maxBikesPerDay() <= 0) {
+            throw new IllegalArgumentException("Maksymalna liczba rowerów na dzień musi być większa od 0");
+        }
 
-        slotConfigRepository.save(defaultConfig);
+        if (configDto.maxBikesPerOrder() != null && configDto.maxBikesPerOrder() <= 0) {
+            throw new IllegalArgumentException("Maksymalna liczba rowerów na zamówienie musi być większa od 0");
+        }
 
-        logger.info("Domyślna konfiguracja slotów została zainicjalizowana");
+        if (configDto.maxBikesPerOrder() != null &&
+                configDto.maxBikesPerOrder() > configDto.maxBikesPerDay()) {
+            throw new IllegalArgumentException("Maksymalna liczba rowerów na zamówienie nie może być większa niż na dzień");
+        }
+
+        if (configDto.endDate() != null && configDto.endDate().isBefore(configDto.startDate())) {
+            throw new IllegalArgumentException("Data końcowa nie może być wcześniejsza niż data początkowa");
+        }
+
+        // Business rule: start date cannot be in the past (except for current configs)
+        if (configDto.startDate().isBefore(LocalDate.now())) {
+            throw new IllegalArgumentException("Data początkowa nie może być w przeszłości");
+        }
+    }
+
+    /**
+     * Checks if a date range overlaps with existing configurations
+     */
+    private boolean hasOverlappingConfigs(LocalDate startDate, LocalDate endDate, Long excludeConfigId) {
+        List<ServiceSlotConfig> overlapping = configRepository.findOverlappingConfigs(startDate, endDate);
+
+        if (excludeConfigId != null) {
+            overlapping = overlapping.stream()
+                    .filter(config -> !config.getId().equals(excludeConfigId))
+                    .collect(Collectors.toList());
+        }
+
+        return !overlapping.isEmpty();
+    }
+
+    /**
+     * Gets statistics about slot utilization
+     */
+    public Map<String, Object> getSlotUtilizationStats(LocalDate startDate, LocalDate endDate) {
+        List<ServiceSlotAvailabilityDto> availability = getSlotAvailability(startDate, endDate);
+
+        int totalDays = availability.size();
+        int fullyBookedDays = (int) availability.stream()
+                .filter(a -> !a.isAvailable())
+                .count();
+
+        double averageUtilization = availability.stream()
+                .mapToDouble(a -> a.maxBikesPerDay() > 0 ?
+                        (double) a.bookedBikes() / a.maxBikesPerDay() * 100 : 0)
+                .average()
+                .orElse(0.0);
+
+        return Map.of(
+                "totalDays", totalDays,
+                "fullyBookedDays", fullyBookedDays,
+                "averageUtilization", String.format("%.1f%%", averageUtilization),
+                "availableDays", totalDays - fullyBookedDays
+        );
     }
 }

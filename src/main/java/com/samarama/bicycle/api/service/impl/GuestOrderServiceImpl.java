@@ -84,7 +84,7 @@ public class GuestOrderServiceImpl implements GuestOrderService {
         // Sprawdź, czy są dostępne sloty serwisowe na wybrany dzień
         if (!serviceSlotService.areSlotsAvailable(orderDto.pickupDate(), bikesCount)) {
             int maxPerDay = serviceSlotService.getMaxBikesPerDay(orderDto.pickupDate());
-            int booked = serviceOrderRepository.countBikesScheduledForDate(orderDto.pickupDate());
+            int booked = serviceOrderRepository.countByPickupDate(orderDto.pickupDate());
             int available = Math.max(0, maxPerDay - booked);
 
             return ResponseEntity.badRequest().body(Map.of(
@@ -183,7 +183,7 @@ public class GuestOrderServiceImpl implements GuestOrderService {
             order.setServicePackageCode(servicePackage.getCode());
             order.setPickupDate(orderDto.pickupDate());
             order.setPickupAddress(orderDto.address() + ", " + orderDto.city());
-            order.setPrice(servicePackage.getPrice());
+            order.setServicePrice(servicePackage.getPrice());
             order.setAdditionalNotes(orderDto.notes());
             order.setStatus(ServiceOrder.OrderStatus.PENDING);
             order.setOrderDate(LocalDateTime.now());

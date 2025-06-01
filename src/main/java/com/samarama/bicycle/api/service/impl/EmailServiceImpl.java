@@ -233,7 +233,7 @@ public class EmailServiceImpl implements EmailService {
             content.append("<div style='background-color: #f5f0ff; padding: 15px; border-radius: 5px; margin-bottom: 20px;'>");
             content.append("<p><strong>Nazwa pakietu:</strong> ").append(serviceOrder.getServicePackage() != null ? serviceOrder.getServicePackage().getName() : serviceOrder.getServicePackageCode()).append("</p>");
             content.append("<p><strong>Kod pakietu:</strong> ").append(serviceOrder.getServicePackageCode()).append("</p>");
-            content.append("<p><strong>Cena:</strong> ").append(serviceOrder.getPrice()).append(" zł</p>");
+            content.append("<p><strong>Cena:</strong> ").append(serviceOrder.getServicePrice()).append(" zł</p>");
             content.append("</div>");
 
             // Dodatkowe informacje
