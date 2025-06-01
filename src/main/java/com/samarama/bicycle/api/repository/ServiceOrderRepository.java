@@ -10,6 +10,7 @@ import org.springframework.stereotype.Repository;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface ServiceOrderRepository extends JpaRepository<ServiceOrder, Long>, JpaSpecificationExecutor<ServiceOrder> {
@@ -19,12 +20,14 @@ public interface ServiceOrderRepository extends JpaRepository<ServiceOrder, Long
     /**
      * Znajdź zamówienia serwisowe dla klienta
      */
-    List<ServiceOrder> findByClient(IncompleteUser client);
+    @Query("SELECT s FROM ServiceOrder s WHERE s.client = :client")
+    List<ServiceOrder> findByClient(@Param("client") IncompleteUser client);
 
     /**
      * Znajdź zamówienia serwisowe dla roweru
      */
-    List<ServiceOrder> findByBicycle(IncompleteBike bicycle);
+    @Query("SELECT s FROM ServiceOrder s WHERE s.bicycle = :bicycle")
+    List<ServiceOrder> findByBicycle(@Param("bicycle") IncompleteBike bicycle);
 
     /**
      * Znajdź zamówienia serwisowe według pakietu
@@ -39,14 +42,15 @@ public interface ServiceOrderRepository extends JpaRepository<ServiceOrder, Long
     /**
      * Znajdź zamówienia serwisowe według statusu
      */
-    List<ServiceOrder> findByStatus(TransportOrder.OrderStatus status);
+    @Query("SELECT s FROM ServiceOrder s WHERE s.status = :status")
+    List<ServiceOrder> findByStatus(@Param("status") TransportOrder.OrderStatus status);
 
     // === ZAPYTANIA SERWISOWE ===
 
     /**
      * Znajdź aktywne zamówienia serwisowe
      */
-    @Query("SELECT s FROM ServiceOrder s WHERE s.status != 'CANCELLED'")
+    @Query("SELECT s FROM ServiceOrder s WHERE s.status != 'CANCELLED' ORDER BY s.orderDate DESC")
     List<ServiceOrder> findAllActive();
 
     /**
@@ -102,7 +106,7 @@ public interface ServiceOrderRepository extends JpaRepository<ServiceOrder, Long
     /**
      * Średni czas serwisu w minutach
      */
-    @Query("SELECT AVG(FUNCTION('EXTRACT', EPOCH FROM (s.serviceCompletionDate - s.serviceStartDate)) / 60) " +
+    @Query("SELECT AVG(EXTRACT(EPOCH FROM (s.serviceCompletionDate - s.serviceStartDate)) / 60) " +
             "FROM ServiceOrder s WHERE s.serviceStartDate IS NOT NULL AND s.serviceCompletionDate IS NOT NULL")
     Double getAverageServiceTimeInMinutes();
 
@@ -110,7 +114,7 @@ public interface ServiceOrderRepository extends JpaRepository<ServiceOrder, Long
      * Najbliższe zamówienia serwisowe do rozpoczęcia
      */
     @Query("SELECT s FROM ServiceOrder s WHERE s.pickupDate >= CURRENT_DATE AND s.status IN ('PENDING', 'CONFIRMED') " +
-            "ORDER BY s.pickupDate, s.orderDate LIMIT :limit")
+            "ORDER BY s.pickupDate, s.orderDate")
     List<ServiceOrder> findUpcomingServiceOrders(@Param("limit") int limit);
 
     // === WYSZUKIWANIE ===
@@ -175,4 +179,44 @@ public interface ServiceOrderRepository extends JpaRepository<ServiceOrder, Long
             "GROUP BY s.servicePackageCode " +
             "ORDER BY totalRevenue DESC")
     List<Object[]> getServicePackageRevenue();
+
+    // === DODATKOWE PRZYDATNE ZAPYTANIA ===
+
+    /**
+     * Znajdź zamówienia z najdłuższym czasem serwisu
+     */
+    @Query("SELECT s FROM ServiceOrder s WHERE s.serviceStartDate IS NOT NULL AND s.serviceCompletionDate IS NOT NULL " +
+            "ORDER BY (s.serviceCompletionDate - s.serviceStartDate) DESC")
+    List<ServiceOrder> findOrdersWithLongestServiceTime();
+
+    /**
+     * Znajdź zamówienia bez rozpoczętego serwisu starsze niż X dni
+     */
+    @Query("SELECT s FROM ServiceOrder s WHERE s.status = 'PICKED_UP' AND s.serviceStartDate IS NULL " +
+            "AND s.pickupDate < :cutoffDate")
+    List<ServiceOrder> findOverdueServiceOrders(@Param("cutoffDate") LocalDate cutoffDate);
+
+    /**
+     * Statystyki dzienne - ile zamówień serwisowych na dzień
+     */
+    @Query("SELECT DATE(s.orderDate), COUNT(s) FROM ServiceOrder s " +
+            "WHERE s.orderDate BETWEEN :startDate AND :endDate " +
+            "GROUP BY DATE(s.orderDate) ORDER BY DATE(s.orderDate)")
+    List<Object[]> getDailyServiceOrderStats(@Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
+
+    /**
+     * Efektywność serwisu - % zamówień zakończonych w czasie
+     */
+    @Query("SELECT " +
+            "COUNT(CASE WHEN s.serviceCompletionDate IS NOT NULL THEN 1 END) * 100.0 / COUNT(*) as completionRate, " +
+            "AVG(EXTRACT(EPOCH FROM (s.serviceCompletionDate - s.serviceStartDate)) / 3600) as avgHours " +
+            "FROM ServiceOrder s WHERE s.serviceStartDate IS NOT NULL")
+    List<Object[]> getServiceEfficiencyStats();
+
+    /**
+     * Znajdź duplikaty zamówień (ten sam klient + rower + data)
+     */
+    @Query("SELECT s1 FROM ServiceOrder s1, ServiceOrder s2 WHERE " +
+            "s1.id != s2.id AND s1.client = s2.client AND s1.bicycle = s2.bicycle AND s1.pickupDate = s2.pickupDate")
+    List<ServiceOrder> findPotentialDuplicateOrders();
 }
