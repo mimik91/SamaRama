@@ -1,93 +1,92 @@
 package com.samarama.bicycle.api.service;
 
-import com.samarama.bicycle.api.dto.ServiceOrderDto;
-import com.samarama.bicycle.api.dto.ServiceOrderResponseDto;
-import com.samarama.bicycle.api.model.ServiceOrder;
+import com.samarama.bicycle.api.dto.*;
 import org.springframework.http.ResponseEntity;
 
 import java.util.List;
 
+/**
+ * Serwis do obsługi zamówień serwisowych (transport + serwis)
+ */
 public interface ServiceOrderService {
-    /**
-     * Get service orders for the current user
-     * @param userEmail email of the current user
-     * @return list of service order DTOs
-     */
-    List<ServiceOrderResponseDto> getUserServiceOrders(String userEmail);
+
+    // === TWORZENIE ZAMÓWIEŃ ===
 
     /**
-     * Get service orders for a specific bicycle
-     * @param bicycleId ID of the bicycle
-     * @param userEmail email of the current user
-     * @return list of service order DTOs
+     * Tworzy zamówienie serwisowe dla zalogowanego użytkownika
      */
-    List<ServiceOrderResponseDto> getBicycleServiceOrders(Long bicycleId, String userEmail);
+    ResponseEntity<?> createServiceOrder(ServiceOrderDto dto, String userEmail);
 
     /**
-     * Get a service order by ID
-     * @param orderId ID of the service order
-     * @param userEmail email of the current user
-     * @return the service order DTO or not found
+     * Tworzy zamówienie serwisowe dla gościa
      */
-    ResponseEntity<ServiceOrderResponseDto> getServiceOrderById(Long orderId, String userEmail);
+    ResponseEntity<?> createGuestServiceOrder(ServiceOrderDto dto);
+
+    // === POBIERANIE ZAMÓWIEŃ ===
 
     /**
-     * Create a new service order
-     * @param serviceOrderDto service order data
-     * @param userEmail email of the current user
-     * @return response with the result
+     * Pobiera zamówienia serwisowe użytkownika
      */
-    ResponseEntity<?> createServiceOrder(ServiceOrderDto serviceOrderDto, String userEmail);
+    List<UnifiedOrderResponseDto> getUserServiceOrders(String userEmail);
 
     /**
-     * Cancel a service order
-     * @param orderId ID of the service order
-     * @param userEmail email of the current user
-     * @return response with the result
+     * Pobiera szczegóły zamówienia serwisowego
      */
-    ResponseEntity<?> cancelServiceOrder(Long orderId, String userEmail);
+    ResponseEntity<UnifiedOrderResponseDto> getServiceOrderDetails(Long orderId, String userEmail);
+
+    // === AKTUALIZACJA ZAMÓWIEŃ ===
 
     /**
-     * Get price for a service package
-     * @param servicePackageCode the service package code (legacy method)
-     * @return the price for the service package
+     * Aktualizuje zamówienie serwisowe
      */
-    ResponseEntity<?> getServicePackagePrice(String servicePackageCode);
-
-    long countServiceOrders();
-
-    List<ServiceOrderResponseDto> getAllServiceOrders();
-
-    ResponseEntity<?> updateServiceOrder(Long orderId, ServiceOrderDto serviceOrderDto, String userEmail);
-
-    ResponseEntity<?> updateOrderStatus(Long orderId, ServiceOrder.OrderStatus newStatus, String userEmail);
-
-    ResponseEntity<ServiceOrderResponseDto> getServiceOrderByIdForAdmin(Long orderId);
+    ResponseEntity<?> updateServiceOrder(Long orderId, ServiceOrderDto dto, String userEmail);
 
     /**
-     * Aktualizuj zamówienie serwisowe (dla administratora)
-     * @param orderId ID zamówienia
-     * @param serviceOrderDto dane zamówienia do aktualizacji
-     * @param adminEmail email administratora
-     * @return wynik operacji
+     * Rozpoczyna serwis
      */
-    ResponseEntity<?> updateServiceOrderByAdmin(Long orderId, ServiceOrderDto serviceOrderDto, String adminEmail);
+    ResponseEntity<?> startService(Long orderId, String userEmail);
 
     /**
-     * Anuluj zamówienie serwisowe (dla administratora)
-     * @param orderId ID zamówienia
-     * @param adminEmail email administratora
-     * @return wynik operacji
+     * Kończy serwis
      */
-    ResponseEntity<?> cancelServiceOrderByAdmin(Long orderId, String adminEmail);
+    ResponseEntity<?> completeService(Long orderId, String userEmail);
 
     /**
-     * Aktualizuj status zamówienia (dla administratora)
-     * @param orderId ID zamówienia
-     * @param newStatus nowy status zamówienia
-     * @param adminEmail email administratora
-     * @return wynik operacji
+     * Aktualizuje notatki serwisowe
      */
-    ResponseEntity<?> updateOrderStatusByAdmin(Long orderId, ServiceOrder.OrderStatus newStatus, String adminEmail);
+    ResponseEntity<?> updateServiceNotes(Long orderId, String notes, String userEmail);
 
+    // === ADMIN ===
+
+    /**
+     * Pobiera wszystkie zamówienia serwisowe (admin)
+     */
+    List<UnifiedOrderResponseDto> getAllServiceOrders();
+
+    /**
+     * Aktualizuje zamówienie serwisowe (admin)
+     */
+    ResponseEntity<?> updateServiceOrderByAdmin(Long orderId, ServiceOrderDto dto, String adminEmail);
+
+    /**
+     * Usuwa zamówienie serwisowe (admin)
+     */
+    ResponseEntity<?> deleteServiceOrder(Long orderId, String adminEmail);
+
+    // === STATYSTYKI SERWISU ===
+
+    /**
+     * Pobiera statystyki pakietów serwisowych
+     */
+    List<Object[]> getServicePackageStatistics();
+
+    /**
+     * Pobiera średni czas serwisu
+     */
+    Double getAverageServiceTime();
+
+    /**
+     * Pobiera przychody z serwisu
+     */
+    List<Object[]> getServiceRevenue();
 }

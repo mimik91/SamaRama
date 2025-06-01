@@ -10,30 +10,30 @@ import java.time.LocalTime;
 import java.util.List;
 
 /**
- * DTO dla zamówienia TYLKO TRANSPORTU do zewnętrznego serwisu
- * (ServiceOrder obsługuje transport + serwis w twoim serwisie)
+ * DTO dla zamówienia transportu (bazowego)
+ * Może być czysto transportowe lub bazą dla ServiceOrderDto
  */
 public record TransportOrderDto(
         // === ROWERY ===
         List<Long> bicycleIds, // dla zalogowanych użytkowników
         List<GuestBicycleDto> bicycles, // dla gości
 
-        // === TRANSPORT ===
+        // === TRANSPORT - ODBIÓR ===
         @NotNull @Future LocalDate pickupDate,
         @NotBlank String pickupAddress,
         Double pickupLatitude,
         Double pickupLongitude,
-
-        String deliveryAddress, // gdzie dostarczyć (opcjonalne - może być z targetService)
-        Double deliveryLatitude,
-        Double deliveryLongitude,
-
-        @NotNull Long targetServiceId, // ID zewnętrznego serwisu
-        BigDecimal transportPrice,
-
-        // === SZCZEGÓŁY TRANSPORTU ===
         LocalTime pickupTimeFrom,
         LocalTime pickupTimeTo,
+
+        // === TRANSPORT - DOSTAWA ===
+        String deliveryAddress, // opcjonalne - może być z targetService
+        Double deliveryLatitude,
+        Double deliveryLongitude,
+        @NotNull Long targetServiceId, // ID serwisu docelowego
+
+        // === CENY I SZCZEGÓŁY ===
+        @NotNull BigDecimal transportPrice,
         Integer estimatedTime, // w minutach
         String transportNotes,
         String additionalNotes,
@@ -58,7 +58,8 @@ public record TransportOrderDto(
         return bicycleIds != null && !bicycleIds.isEmpty() &&
                 pickupDate != null &&
                 pickupAddress != null && !pickupAddress.trim().isEmpty() &&
-                targetServiceId != null;
+                targetServiceId != null &&
+                transportPrice != null;
     }
 
     /**
@@ -70,15 +71,8 @@ public record TransportOrderDto(
                 bicycles != null && !bicycles.isEmpty() &&
                 pickupDate != null &&
                 pickupAddress != null && !pickupAddress.trim().isEmpty() &&
-                targetServiceId != null;
-    }
-
-    /**
-     * Sprawdza czy ma współrzędne odbioru i dostawy
-     */
-    public boolean hasCompleteCoordinates() {
-        return pickupLatitude != null && pickupLongitude != null &&
-                deliveryLatitude != null && deliveryLongitude != null;
+                targetServiceId != null &&
+                transportPrice != null;
     }
 
     /**

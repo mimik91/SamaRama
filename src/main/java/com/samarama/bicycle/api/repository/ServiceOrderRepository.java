@@ -8,10 +8,13 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Repository
 public interface ServiceOrderRepository extends JpaRepository<ServiceOrder, Long>, JpaSpecificationExecutor<ServiceOrder> {
+
+    // === PODSTAWOWE ZAPYTANIA ===
 
     /**
      * Znajdź zamówienia serwisowe dla klienta
@@ -36,7 +39,9 @@ public interface ServiceOrderRepository extends JpaRepository<ServiceOrder, Long
     /**
      * Znajdź zamówienia serwisowe według statusu
      */
-    List<ServiceOrder> findByStatus(Order.OrderStatus status);
+    List<ServiceOrder> findByStatus(TransportOrder.OrderStatus status);
+
+    // === ZAPYTANIA SERWISOWE ===
 
     /**
      * Znajdź aktywne zamówienia serwisowe
@@ -47,7 +52,7 @@ public interface ServiceOrderRepository extends JpaRepository<ServiceOrder, Long
     /**
      * Znajdź zamówienia serwisowe gotowe do rozpoczęcia
      */
-    @Query("SELECT s FROM ServiceOrder s WHERE s.status IN ('CONFIRMED', 'PICKED_UP')")
+    @Query("SELECT s FROM ServiceOrder s WHERE s.status IN ('CONFIRMED', 'PICKED_UP') AND s.serviceStartDate IS NULL")
     List<ServiceOrder> findReadyToStart();
 
     /**
@@ -56,130 +61,118 @@ public interface ServiceOrderRepository extends JpaRepository<ServiceOrder, Long
     @Query("SELECT s FROM ServiceOrder s WHERE s.status = 'IN_SERVICE'")
     List<ServiceOrder> findInProgress();
 
-    // === METODY DO ZARZĄDZANIA SLOTAMI SERWISOWYMI ===
+    /**
+     * Znajdź zamówienia serwisowe zakończone ale nie odebrane
+     */
+    @Query("SELECT s FROM ServiceOrder s WHERE s.serviceCompletionDate IS NOT NULL AND s.status != 'ON_THE_WAY_BACK'")
+    List<ServiceOrder> findCompletedButNotPickedUp();
 
     /**
-     * Zlicz liczbę rowerów zaplanowanych do serwisu na określony dzień
-     * Wyklucza zamówienia anulowane
-     *
-     * @param date data odbioru
-     * @return liczba rowerów zaplanowanych na dany dzień
+     * Znajdź zamówienia serwisowe rozpoczęte w określonym przedziale czasowym
+     */
+    @Query("SELECT s FROM ServiceOrder s WHERE s.serviceStartDate BETWEEN :startDate AND :endDate")
+    List<ServiceOrder> findByServiceStartDateBetween(
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate
+    );
+
+    /**
+     * Znajdź zamówienia serwisowe zakończone w określonym przedziale czasowym
+     */
+    @Query("SELECT s FROM ServiceOrder s WHERE s.serviceCompletionDate BETWEEN :startDate AND :endDate")
+    List<ServiceOrder> findByServiceCompletionDateBetween(
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate
+    );
+
+    // === STATYSTYKI SERWISU ===
+
+    /**
+     * Zlicz zamówienia serwisowe na dzień
      */
     @Query("SELECT COUNT(s) FROM ServiceOrder s WHERE s.pickupDate = :date AND s.status != 'CANCELLED'")
-    int countBikesScheduledForDate(@Param("date") LocalDate date);
+    int countByPickupDate(@Param("date") LocalDate date);
 
     /**
-     * Zlicz liczbę rowerów zaplanowanych do serwisu na określony dzień według statusu
-     *
-     * @param date data odbioru
-     * @param status status zamówienia
-     * @return liczba rowerów zaplanowanych na dany dzień w określonym statusie
+     * Zlicz zamówienia serwisowe według pakietu
      */
-    @Query("SELECT COUNT(s) FROM ServiceOrder s WHERE s.pickupDate = :date AND s.status = :status")
-    int countBikesScheduledForDateAndStatus(@Param("date") LocalDate date, @Param("status") Order.OrderStatus status);
+    @Query("SELECT COUNT(s) FROM ServiceOrder s WHERE s.servicePackageCode = :packageCode AND s.status != 'CANCELLED'")
+    int countByServicePackageCode(@Param("packageCode") String packageCode);
 
     /**
-     * Znajdź zamówienia serwisowe na określony dzień
-     *
-     * @param date data odbioru
-     * @return lista zamówień na dany dzień
+     * Średni czas serwisu w minutach
      */
-    @Query("SELECT s FROM ServiceOrder s WHERE s.pickupDate = :date AND s.status != 'CANCELLED' ORDER BY s.orderDate")
-    List<ServiceOrder> findByPickupDate(@Param("date") LocalDate date);
+    @Query("SELECT AVG(FUNCTION('EXTRACT', EPOCH FROM (s.serviceCompletionDate - s.serviceStartDate)) / 60) " +
+            "FROM ServiceOrder s WHERE s.serviceStartDate IS NOT NULL AND s.serviceCompletionDate IS NOT NULL")
+    Double getAverageServiceTimeInMinutes();
 
     /**
-     * Znajdź zamówienia serwisowe w zakresie dat
-     *
-     * @param startDate data początkowa
-     * @param endDate data końcowa
-     * @return lista zamówień w zakresie dat
+     * Najbliższe zamówienia serwisowe do rozpoczęcia
      */
-    @Query("SELECT s FROM ServiceOrder s WHERE s.pickupDate BETWEEN :startDate AND :endDate AND s.status != 'CANCELLED' ORDER BY s.pickupDate, s.orderDate")
-    List<ServiceOrder> findByPickupDateBetween(@Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
-
-    /**
-     * Sprawdź czy dzień jest przepełniony (więcej zamówień niż dozwolone)
-     *
-     * @param date data odbioru
-     * @param maxBikesPerDay maksymalna liczba rowerów na dzień
-     * @return true jeśli dzień jest przepełniony
-     */
-    @Query("SELECT CASE WHEN COUNT(s) >= :maxBikesPerDay THEN true ELSE false END " +
-            "FROM ServiceOrder s WHERE s.pickupDate = :date AND s.status != 'CANCELLED'")
-    boolean isDateOverBooked(@Param("date") LocalDate date, @Param("maxBikesPerDay") int maxBikesPerDay);
-
-    /**
-     * Znajdź zamówienia serwisowe według pakietu serwisowego na określony dzień
-     *
-     * @param date data odbioru
-     * @param servicePackageCode kod pakietu serwisowego
-     * @return lista zamówień
-     */
-    @Query("SELECT s FROM ServiceOrder s WHERE s.pickupDate = :date AND s.servicePackageCode = :servicePackageCode AND s.status != 'CANCELLED'")
-    List<ServiceOrder> findByPickupDateAndServicePackageCode(@Param("date") LocalDate date, @Param("servicePackageCode") String servicePackageCode);
-
-    /**
-     * Zlicz zamówienia według pakietu serwisowego (statystyki)
-     *
-     * @param servicePackageCode kod pakietu serwisowego
-     * @return liczba zamówień dla danego pakietu
-     */
-    @Query("SELECT COUNT(s) FROM ServiceOrder s WHERE s.servicePackageCode = :servicePackageCode AND s.status != 'CANCELLED'")
-    int countByServicePackageCode(@Param("servicePackageCode") String servicePackageCode);
-
-    /**
-     * Znajdź najbliższe zamówienia serwisowe (przydatne do planowania)
-     *
-     * @param limit maksymalna liczba wyników
-     * @return lista najbliższych zamówień
-     */
-    @Query("SELECT s FROM ServiceOrder s WHERE s.pickupDate >= CURRENT_DATE AND s.status IN ('PENDING', 'CONFIRMED') ORDER BY s.pickupDate, s.orderDate LIMIT :limit")
+    @Query("SELECT s FROM ServiceOrder s WHERE s.pickupDate >= CURRENT_DATE AND s.status IN ('PENDING', 'CONFIRMED') " +
+            "ORDER BY s.pickupDate, s.orderDate LIMIT :limit")
     List<ServiceOrder> findUpcomingServiceOrders(@Param("limit") int limit);
 
-    /**
-     * Znajdź wszystkie aktywne zamówienia serwisowe (nieanulowane)
-     * Sortowane według daty odbioru i daty zamówienia
-     *
-     * @return lista wszystkich aktywnych zamówień serwisowych
-     */
-    @Query("SELECT s FROM ServiceOrder s WHERE s.status != 'CANCELLED' ORDER BY s.pickupDate, s.orderDate")
-    List<ServiceOrder> findAllActiveOrders();
+    // === WYSZUKIWANIE ===
 
     /**
-     * Zlicz wszystkie aktywne zamówienia serwisowe (dla statystyk)
-     *
-     * @return liczba aktywnych zamówień serwisowych
-     */
-    @Query("SELECT COUNT(s) FROM ServiceOrder s WHERE s.status != 'CANCELLED'")
-    long countAllActive();
-
-    // === WYSZUKIWANIE WEDŁUG INFORMACJI O KLIENCIE ===
-
-    /**
-     * Wyszukuje zamówienia serwisowe według informacji o kliencie (email lub telefon)
-     *
-     * @param searchTerm termin wyszukiwania (email lub telefon)
-     * @return lista zamówień pasujących do wyszukiwania
+     * Wyszukuje zamówienia serwisowe według informacji o kliencie
      */
     @Query("SELECT s FROM ServiceOrder s WHERE " +
             "LOWER(s.client.email) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
             "LOWER(s.client.phoneNumber) LIKE LOWER(CONCAT('%', :searchTerm, '%'))")
     List<ServiceOrder> searchByClientInfo(@Param("searchTerm") String searchTerm);
 
+    // === ZARZĄDZANIE SLOTAMI ===
+
+    /**
+     * Sprawdź czy dzień serwisowy jest przepełniony
+     */
+    @Query("SELECT CASE WHEN COUNT(s) >= :maxServicesPerDay THEN true ELSE false END " +
+            "FROM ServiceOrder s WHERE s.pickupDate = :date AND s.status != 'CANCELLED'")
+    boolean isServiceDateOverBooked(@Param("date") LocalDate date, @Param("maxServicesPerDay") int maxServicesPerDay);
+
+    /**
+     * Znajdź wszystkie aktywne zamówienia serwisowe
+     */
+    @Query("SELECT s FROM ServiceOrder s WHERE s.status != 'CANCELLED' ORDER BY s.pickupDate, s.orderDate")
+    List<ServiceOrder> findAllActiveOrders();
+
+    /**
+     * Zlicz wszystkie aktywne zamówienia serwisowe
+     */
+    @Query("SELECT COUNT(s) FROM ServiceOrder s WHERE s.status != 'CANCELLED'")
+    long countAllActive();
+
     // === ZLICZANIE W ZAKRESIE DAT ===
 
     /**
-     * Zlicza liczbę rowerów zaplanowanych w zakresie dat
-     * Zwraca pary [data, liczba_rowerów] dla każdej daty w zakresie która ma zamówienia
-     *
-     * @param startDate data początkowa
-     * @param endDate data końcowa
-     * @return lista par [LocalDate, Long] reprezentujących datę i liczbę rowerów
+     * Zlicza liczbę zamówień serwisowych w zakresie dat
      */
     @Query("SELECT s.pickupDate, COUNT(s) FROM ServiceOrder s " +
             "WHERE s.pickupDate BETWEEN :startDate AND :endDate " +
             "AND s.status != 'CANCELLED' " +
             "GROUP BY s.pickupDate " +
             "ORDER BY s.pickupDate")
-    List<Object[]> countBikesScheduledForDateRange(@Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
+    List<Object[]> countServiceOrdersForDateRange(@Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
+
+    // === ANALITYKA PAKIETÓW SERWISOWYCH ===
+
+    /**
+     * Statystyki pakietów serwisowych (najpopularniejsze)
+     */
+    @Query("SELECT s.servicePackageCode, COUNT(s) as orderCount " +
+            "FROM ServiceOrder s WHERE s.status != 'CANCELLED' " +
+            "GROUP BY s.servicePackageCode " +
+            "ORDER BY orderCount DESC")
+    List<Object[]> getServicePackageStatistics();
+
+    /**
+     * Przychody z pakietów serwisowych
+     */
+    @Query("SELECT s.servicePackageCode, SUM(s.servicePrice) as totalRevenue " +
+            "FROM ServiceOrder s WHERE s.status NOT IN ('CANCELLED', 'PENDING') " +
+            "GROUP BY s.servicePackageCode " +
+            "ORDER BY totalRevenue DESC")
+    List<Object[]> getServicePackageRevenue();
 }
