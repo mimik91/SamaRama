@@ -6,12 +6,11 @@ import com.samarama.bicycle.api.model.*;
 import com.samarama.bicycle.api.repository.*;
 import com.samarama.bicycle.api.service.EmailService;
 import com.samarama.bicycle.api.service.GuestOrderService;
-import com.samarama.bicycle.api.service.ServiceSlotService;
+import com.samarama.bicycle.api.service.helper.GuestOrderValidator;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -23,108 +22,78 @@ public class GuestOrderServiceImpl implements GuestOrderService {
     private final IncompleteBikeRepository incompleteBikeRepository;
     private final ServicePackageRepository servicePackageRepository;
     private final ServiceOrderRepository serviceOrderRepository;
-    private final CityValidator cityValidator;
-    private final ServiceSlotService serviceSlotService;
     private final EmailService emailService;
+    private final GuestOrderValidator validator;
 
     public GuestOrderServiceImpl(
             IncompleteUserRepository incompleteUserRepository,
             IncompleteBikeRepository incompleteBikeRepository,
             ServicePackageRepository servicePackageRepository,
             ServiceOrderRepository serviceOrderRepository,
-            CityValidator cityValidator,
-            ServiceSlotService serviceSlotService, EmailService emailService) {
+            EmailService emailService,
+            GuestOrderValidator validator) {
         this.incompleteUserRepository = incompleteUserRepository;
         this.incompleteBikeRepository = incompleteBikeRepository;
         this.servicePackageRepository = servicePackageRepository;
         this.serviceOrderRepository = serviceOrderRepository;
-        this.cityValidator = cityValidator;
-        this.serviceSlotService = serviceSlotService;
         this.emailService = emailService;
+        this.validator = validator;
     }
 
     @Override
     @Transactional
     public ResponseEntity<?> processGuestOrder(GuestServiceOrderDto orderDto) {
-        // Walidacja danych wejściowych
-        if (orderDto.bicycles() == null || orderDto.bicycles().isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Brak rowerów w zamówieniu"));
-        }
-
-        // Walidacja pakietu serwisowego
-        Optional<ServicePackage> packageOpt = servicePackageRepository.findById(orderDto.servicePackageId());
-        if (packageOpt.isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Nieprawidłowy pakiet serwisowy"));
-        }
-        ServicePackage servicePackage = packageOpt.get();
-
-        // Walidacja miasta
-        String city = orderDto.city();
-        if (city == null || !cityValidator.isValidCity(city)) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Nieprawidłowe miasto"));
-        }
-
-        // Walidacja daty odbioru
-        if (orderDto.pickupDate() == null || orderDto.pickupDate().isBefore(LocalDate.now())) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Nieprawidłowa data odbioru"));
-        }
-
-        // Walidacja dostępnych slotów serwisowych
-        int bikesCount = orderDto.bicycles().size();
-
-        // Sprawdź, czy liczba rowerów nie przekracza limitu na jedno zamówienie
-        if (!serviceSlotService.isWithinMaxBikesPerOrder(orderDto.pickupDate(), bikesCount)) {
-            int maxPerOrder = serviceSlotService.getMaxBikesPerOrder(orderDto.pickupDate());
-            return ResponseEntity.badRequest().body(Map.of(
-                    "message", "Przekroczono maksymalną liczbę rowerów na jedno zamówienie (" + maxPerOrder + "). Proszę rozłożyć zamówienie na kilka dni.",
-                    "maxBikesPerOrder", maxPerOrder
-            ));
-        }
-
-        // Sprawdź, czy są dostępne sloty serwisowe na wybrany dzień
-        if (!serviceSlotService.areSlotsAvailable(orderDto.pickupDate(), bikesCount)) {
-            int maxPerDay = serviceSlotService.getMaxBikesPerDay(orderDto.pickupDate());
-            int booked = serviceOrderRepository.countByPickupDate(orderDto.pickupDate());
-            int available = Math.max(0, maxPerDay - booked);
-
-            return ResponseEntity.badRequest().body(Map.of(
-                    "message", "Brak wystarczającej liczby wolnych miejsc na wybrany dzień. Dostępne miejsca: " + available + ". Proszę wybrać inny termin lub zmniejszyć liczbę rowerów.",
-                    "availableBikes", available,
-                    "maxBikesPerDay", maxPerDay
-            ));
-        }
-
-        // 1. Tworzenie użytkownika tymczasowego (IncompleteUser)
-        IncompleteUser incompleteUser = createOrFindIncompleteUser(orderDto);
-
-        // 2. Tworzenie rowerów
-        List<IncompleteBike> bikes = createIncompleteBikes(orderDto.bicycles(), incompleteUser);
-
-        // 3. Tworzenie zamówień serwisowych
-        List<ServiceOrder> orders = createServiceOrders(bikes, servicePackage, orderDto, incompleteUser);
-
-        // 4. Zapisywanie zamówień
-        List<ServiceOrder> savedOrders = serviceOrderRepository.saveAll(orders);
-
-        for (ServiceOrder savedOrder : savedOrders) {
-            try {
-                emailService.sendOrderNotificationEmail(savedOrder);
-            } catch (Exception e) {
-                // Log błędu ale nie przerywaj procesu
-                System.err.println("Failed to send email notification for guest order ID: " + savedOrder.getId() + ", error: " + e.getMessage());
+        try {
+            // Walidacja
+            List<String> errors = validator.validateGuestOrder(orderDto);
+            if (!errors.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "message", String.join("; ", errors),
+                        "errors", errors
+                ));
             }
+
+            // Pobierz pakiet serwisowy (już zwalidowany)
+            ServicePackage servicePackage = servicePackageRepository.findById(orderDto.servicePackageId()).get();
+
+            // 1. Tworzenie użytkownika tymczasowego (IncompleteUser)
+            IncompleteUser incompleteUser = createOrFindIncompleteUser(orderDto);
+
+            // 2. Tworzenie rowerów
+            List<IncompleteBike> bikes = createIncompleteBikes(orderDto.bicycles(), incompleteUser);
+
+            // 3. Tworzenie zamówień serwisowych
+            List<ServiceOrder> orders = createServiceOrders(bikes, servicePackage, orderDto, incompleteUser);
+
+            // 4. Zapisywanie zamówień
+            List<ServiceOrder> savedOrders = serviceOrderRepository.saveAll(orders);
+
+            // 5. Wysłanie powiadomień email
+            for (ServiceOrder savedOrder : savedOrders) {
+                try {
+                    emailService.sendOrderNotificationEmail(savedOrder);
+                } catch (Exception e) {
+                    // Log błędu ale nie przerywaj procesu
+                    System.err.println("Failed to send email notification for guest order ID: " + savedOrder.getId() + ", error: " + e.getMessage());
+                }
+            }
+
+            // 6. Pobranie ID zamówień
+            List<Long> orderIds = savedOrders.stream()
+                    .map(ServiceOrder::getId)
+                    .collect(Collectors.toList());
+
+            return ResponseEntity.ok(Map.of(
+                    "message", "Zamówienia serwisowe zostały utworzone pomyślnie",
+                    "orderIds", orderIds,
+                    "userId", incompleteUser.getId()
+            ));
+
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of(
+                    "message", "Wystąpił błąd podczas przetwarzania zamówienia: " + e.getMessage()
+            ));
         }
-
-        // Pobranie ID zamówień
-        List<Long> orderIds = savedOrders.stream()
-                .map(ServiceOrder::getId)
-                .collect(Collectors.toList());
-
-        return ResponseEntity.ok(Map.of(
-                "message", "Zamówienia serwisowe zostały utworzone pomyślnie",
-                "orderIds", orderIds,
-                "userId", incompleteUser.getId()
-        ));
     }
 
     private IncompleteUser createOrFindIncompleteUser(GuestServiceOrderDto orderDto) {
