@@ -6,7 +6,7 @@ import com.samarama.bicycle.api.model.*;
 import com.samarama.bicycle.api.repository.*;
 import com.samarama.bicycle.api.service.EmailService;
 import com.samarama.bicycle.api.service.GuestOrderService;
-import com.samarama.bicycle.api.service.helper.GuestOrderValidator;
+import com.samarama.bicycle.api.service.helper.OrderValidator;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,7 +26,7 @@ public class GuestOrderServiceImpl implements GuestOrderService {
     private final TransportOrderRepository transportOrderRepository; // Dodane
     private final BikeServiceRepository bikeServiceRepository; // Dodane
     private final EmailService emailService;
-    private final GuestOrderValidator validator;
+    private final OrderValidator validator;
 
     public GuestOrderServiceImpl(
             IncompleteUserRepository incompleteUserRepository,
@@ -36,7 +36,7 @@ public class GuestOrderServiceImpl implements GuestOrderService {
             TransportOrderRepository transportOrderRepository,
             BikeServiceRepository bikeServiceRepository,
             EmailService emailService,
-            GuestOrderValidator validator) {
+            OrderValidator validator) {
         this.incompleteUserRepository = incompleteUserRepository;
         this.incompleteBikeRepository = incompleteBikeRepository;
         this.servicePackageRepository = servicePackageRepository;
@@ -52,7 +52,7 @@ public class GuestOrderServiceImpl implements GuestOrderService {
     public ResponseEntity<?> processGuestOrder(ServiceOrTransportOrderDto orderDto) {
         try {
             // Walidacja
-            List<String> errors = validator.validateGuestOrder(orderDto);
+            List<String> errors = validator.validateGuestOrder(orderDto).getErrors();
             if (!errors.isEmpty()) {
                 return ResponseEntity.badRequest().body(Map.of(
                         "message", String.join("; ", errors),
