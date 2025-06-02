@@ -6,6 +6,7 @@ import com.samarama.bicycle.api.repository.ServiceOrderRepository;
 import com.samarama.bicycle.api.service.ServiceOrderService;
 import com.samarama.bicycle.api.service.EmailService;
 import com.samarama.bicycle.api.service.ServiceSlotService;
+import com.samarama.bicycle.api.service.helper.ServiceOrderHelper;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
