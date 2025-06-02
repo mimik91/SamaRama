@@ -340,10 +340,6 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
         return serviceOrderRepository.getServicePackageStatistics();
     }
 
-    @Override
-    public Double getAverageServiceTime() {
-        return serviceOrderRepository.getAverageServiceTimeInMinutes();
-    }
 
     @Override
     public List<Object[]> getServiceRevenue() {
@@ -375,5 +371,28 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
                 logger.warning("Failed to send email notification for service order: " + order.getId());
             }
         }
+    }
+
+    // Dodaj te metody do ServiceOrderServiceImpl
+
+    @Override
+    public List<UnifiedOrderResponseDto> getAllServiceOrdersAsUnified() {
+        List<ServiceOrder> orders = serviceOrderRepository.findAllActive();
+        return orders.stream()
+                .map(UnifiedOrderResponseDto::fromServiceOrder)
+                .sorted(Comparator.comparing(UnifiedOrderResponseDto::orderDate, Comparator.reverseOrder()))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public Optional<UnifiedOrderResponseDto> getOrderAsUnified(Long orderId) {
+        Optional<ServiceOrder> orderOpt = serviceOrderRepository.findById(orderId);
+
+        if (orderOpt.isEmpty()) {
+            return Optional.empty();
+        }
+
+        ServiceOrder order = orderOpt.get();
+        return Optional.of(UnifiedOrderResponseDto.fromServiceOrder(order));
     }
 }

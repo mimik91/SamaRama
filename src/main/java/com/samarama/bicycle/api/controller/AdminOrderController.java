@@ -1,3 +1,4 @@
+/*
 package com.samarama.bicycle.api.controller;
 
 import com.samarama.bicycle.api.dto.*;
@@ -37,36 +38,44 @@ public class AdminOrderController {
 
     // === POBIERANIE ZAMÓWIEŃ ===
 
-    /**
+    */
+/**
      * Pobiera wszystkie zamówienia (transport + serwis)
-     */
+     *//*
+
     @GetMapping
     public ResponseEntity<List<UnifiedOrderResponseDto>> getAllOrders() {
         List<UnifiedOrderResponseDto> orders = transportOrderService.getAllOrders();
         return ResponseEntity.ok(orders);
     }
 
-    /**
+    */
+/**
      * Pobiera tylko zamówienia transportowe
-     */
+     *//*
+
     @GetMapping("/transport")
     public ResponseEntity<List<UnifiedOrderResponseDto>> getTransportOrders() {
         List<UnifiedOrderResponseDto> orders = transportOrderService.getAllTransportOrders();
         return ResponseEntity.ok(orders);
     }
 
-    /**
+    */
+/**
      * Pobiera tylko zamówienia serwisowe
-     */
+     *//*
+
     @GetMapping("/service")
     public ResponseEntity<List<UnifiedOrderResponseDto>> getServiceOrders() {
         List<UnifiedOrderResponseDto> orders = serviceOrderService.getAllServiceOrders();
         return ResponseEntity.ok(orders);
     }
 
-    /**
+    */
+/**
      * Pobiera szczegóły zamówienia
-     */
+     *//*
+
     @GetMapping("/{orderId}")
     public ResponseEntity<UnifiedOrderResponseDto> getOrderDetails(@PathVariable Long orderId) {
         String adminEmail = getCurrentUserEmail();
@@ -85,18 +94,22 @@ public class AdminOrderController {
 
     // === WYSZUKIWANIE I FILTROWANIE ===
 
-    /**
+    */
+/**
      * Wyszukuje zamówienia po email/telefonie klienta
-     */
+     *//*
+
     @GetMapping("/search")
     public ResponseEntity<List<UnifiedOrderResponseDto>> searchOrders(@RequestParam String searchTerm) {
         List<UnifiedOrderResponseDto> orders = transportOrderService.searchOrders(searchTerm);
         return ResponseEntity.ok(orders);
     }
 
-    /**
+    */
+/**
      * Filtruje zamówienia według różnych kryteriów
-     */
+     *//*
+
     @GetMapping("/filter")
     public ResponseEntity<List<UnifiedOrderResponseDto>> filterOrders(
             @RequestParam(required = false) String status,
@@ -126,9 +139,11 @@ public class AdminOrderController {
 
     // === ZARZĄDZANIE STATUSEM ===
 
-    /**
+    */
+/**
      * Zmienia status zamówienia
-     */
+     *//*
+
     @PatchMapping("/{orderId}/status")
     public ResponseEntity<?> updateOrderStatus(
             @PathVariable Long orderId,
@@ -143,36 +158,44 @@ public class AdminOrderController {
         return transportOrderService.updateOrderStatusByAdmin(orderId, newStatus, adminEmail);
     }
 
-    /**
+    */
+/**
      * Potwierdza zamówienie
-     */
+     *//*
+
     @PostMapping("/{orderId}/confirm")
     public ResponseEntity<?> confirmOrder(@PathVariable Long orderId) {
         String adminEmail = getCurrentUserEmail();
         return transportOrderService.updateOrderStatusByAdmin(orderId, "CONFIRMED", adminEmail);
     }
 
-    /**
+    */
+/**
      * Oznacza zamówienie jako odebrane
-     */
+     *//*
+
     @PostMapping("/{orderId}/pickup")
     public ResponseEntity<?> markAsPickedUp(@PathVariable Long orderId) {
         String adminEmail = getCurrentUserEmail();
         return transportOrderService.updateOrderStatusByAdmin(orderId, "PICKED_UP", adminEmail);
     }
 
-    /**
+    */
+/**
      * Oznacza zamówienie jako w drodze powrotnej
-     */
+     *//*
+
     @PostMapping("/{orderId}/return")
     public ResponseEntity<?> markAsReturning(@PathVariable Long orderId) {
         String adminEmail = getCurrentUserEmail();
         return transportOrderService.updateOrderStatusByAdmin(orderId, "ON_THE_WAY_BACK", adminEmail);
     }
 
-    /**
+    */
+/**
      * Anuluje zamówienie
-     */
+     *//*
+
     @PostMapping("/{orderId}/cancel")
     public ResponseEntity<?> cancelOrder(@PathVariable Long orderId) {
         String adminEmail = getCurrentUserEmail();
@@ -181,27 +204,33 @@ public class AdminOrderController {
 
     // === OPERACJE SERWISOWE ===
 
-    /**
+    */
+/**
      * Rozpoczyna serwis (tylko dla ServiceOrder)
-     */
+     *//*
+
     @PostMapping("/{orderId}/start-service")
     public ResponseEntity<?> startService(@PathVariable Long orderId) {
         String adminEmail = getCurrentUserEmail();
         return serviceOrderService.startService(orderId, adminEmail);
     }
 
-    /**
+    */
+/**
      * Kończy serwis (tylko dla ServiceOrder)
-     */
+     *//*
+
     @PostMapping("/{orderId}/complete-service")
     public ResponseEntity<?> completeService(@PathVariable Long orderId) {
         String adminEmail = getCurrentUserEmail();
         return serviceOrderService.completeService(orderId, adminEmail);
     }
 
-    /**
+    */
+/**
      * Aktualizuje notatki serwisowe
-     */
+     *//*
+
     @PatchMapping("/{orderId}/service-notes")
     public ResponseEntity<?> updateServiceNotes(
             @PathVariable Long orderId,
@@ -214,9 +243,11 @@ public class AdminOrderController {
 
     // === AKTUALIZACJA ZAMÓWIEŃ ===
 
-    /**
+    */
+/**
      * Aktualizuje zamówienie transportowe
-     */
+     *//*
+
     @PutMapping("/transport/{orderId}")
     public ResponseEntity<?> updateTransportOrder(
             @PathVariable Long orderId,
@@ -226,9 +257,11 @@ public class AdminOrderController {
         return transportOrderService.updateTransportOrderByAdmin(orderId, dto, adminEmail);
     }
 
-    /**
+    */
+/**
      * Aktualizuje zamówienie serwisowe
-     */
+     *//*
+
     @PutMapping("/service/{orderId}")
     public ResponseEntity<?> updateServiceOrder(
             @PathVariable Long orderId,
@@ -240,9 +273,11 @@ public class AdminOrderController {
 
     // === USUWANIE ZAMÓWIEŃ ===
 
-    /**
+    */
+/**
      * Usuwa zamówienie transportowe
-     */
+     *//*
+
     @DeleteMapping("/transport/{orderId}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> deleteTransportOrder(@PathVariable Long orderId) {
@@ -250,9 +285,11 @@ public class AdminOrderController {
         return transportOrderService.deleteTransportOrder(orderId, adminEmail);
     }
 
-    /**
+    */
+/**
      * Usuwa zamówienie serwisowe
-     */
+     *//*
+
     @DeleteMapping("/service/{orderId}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> deleteServiceOrder(@PathVariable Long orderId) {
@@ -262,9 +299,11 @@ public class AdminOrderController {
 
     // === STATYSTYKI ===
 
-    /**
+    */
+/**
      * Pobiera statystyki zamówień
-     */
+     *//*
+
     @GetMapping("/statistics")
     public ResponseEntity<?> getOrderStatistics() {
         List<UnifiedOrderResponseDto> allOrders = transportOrderService.getAllOrders();
@@ -294,27 +333,29 @@ public class AdminOrderController {
         ));
     }
 
-    /**
+    */
+/**
      * Pobiera statystyki pakietów serwisowych
-     */
+     *//*
+
     @GetMapping("/service-statistics")
     public ResponseEntity<?> getServiceStatistics() {
         List<Object[]> packageStats = serviceOrderService.getServicePackageStatistics();
-        Double avgServiceTime = serviceOrderService.getAverageServiceTime();
         List<Object[]> revenue = serviceOrderService.getServiceRevenue();
 
         return ResponseEntity.ok(Map.of(
                 "packageStatistics", packageStats,
-                "averageServiceTimeMinutes", avgServiceTime,
                 "revenue", revenue
         ));
     }
 
     // === ZARZĄDZANIE SLOTAMI ===
 
-    /**
+    */
+/**
      * Pobiera dostępność slotów na zakres dat
-     */
+     *//*
+
     @GetMapping("/slots/availability")
     public ResponseEntity<?> getSlotAvailability(
             @RequestParam String startDate,
@@ -329,18 +370,22 @@ public class AdminOrderController {
         return ResponseEntity.ok(availability);
     }
 
-    /**
+    */
+/**
      * Pobiera konfiguracje slotów
-     */
+     *//*
+
     @GetMapping("/slots/config")
     public ResponseEntity<List<ServiceSlotConfigDto>> getSlotConfigs() {
         List<ServiceSlotConfigDto> configs = serviceSlotService.getAllSlotConfigs();
         return ResponseEntity.ok(configs);
     }
 
-    /**
+    */
+/**
      * Aktualizuje konfigurację slotów
-     */
+     *//*
+
     @PutMapping("/slots/config/{configId}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> updateSlotConfig(
@@ -350,9 +395,11 @@ public class AdminOrderController {
         return serviceSlotService.updateSlotConfig(configId, dto);
     }
 
-    /**
+    */
+/**
      * Tworzy nową konfigurację slotów
-     */
+     *//*
+
     @PostMapping("/slots/config")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> createSlotConfig(@Valid @RequestBody ServiceSlotConfigDto dto) {
@@ -361,9 +408,11 @@ public class AdminOrderController {
 
     // === RAPORTOWANIE ===
 
-    /**
+    */
+/**
      * Generuje raport zamówień za okres
-     */
+     *//*
+
     @GetMapping("/report")
     public ResponseEntity<?> generateOrderReport(
             @RequestParam String startDate,
@@ -396,9 +445,11 @@ public class AdminOrderController {
 
     // === UTILITY METHODS ===
 
-    /**
+    */
+/**
      * Pobiera dostępne statusy dla zamówień
-     */
+     *//*
+
     @GetMapping("/statuses")
     public ResponseEntity<?> getAvailableStatuses() {
         return ResponseEntity.ok(Map.of(
@@ -421,9 +472,11 @@ public class AdminOrderController {
         ));
     }
 
-    /**
+    */
+/**
      * Sprawdza uprawnienia administratora
-     */
+     *//*
+
     @GetMapping("/permissions")
     public ResponseEntity<?> getAdminPermissions() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -446,4 +499,4 @@ public class AdminOrderController {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         return authentication.getName();
     }
-}
+}*/

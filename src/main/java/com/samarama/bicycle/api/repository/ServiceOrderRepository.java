@@ -103,12 +103,7 @@ public interface ServiceOrderRepository extends JpaRepository<ServiceOrder, Long
     @Query("SELECT COUNT(s) FROM ServiceOrder s WHERE s.servicePackageCode = :packageCode AND s.status != 'CANCELLED'")
     int countByServicePackageCode(@Param("packageCode") String packageCode);
 
-    /**
-     * Średni czas serwisu w minutach
-     */
-    @Query("SELECT AVG(EXTRACT(EPOCH FROM (s.serviceCompletionDate - s.serviceStartDate)) / 60) " +
-            "FROM ServiceOrder s WHERE s.serviceStartDate IS NOT NULL AND s.serviceCompletionDate IS NOT NULL")
-    Double getAverageServiceTimeInMinutes();
+
 
     /**
      * Najbliższe zamówienia serwisowe do rozpoczęcia
@@ -204,19 +199,5 @@ public interface ServiceOrderRepository extends JpaRepository<ServiceOrder, Long
             "GROUP BY DATE(s.orderDate) ORDER BY DATE(s.orderDate)")
     List<Object[]> getDailyServiceOrderStats(@Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
 
-    /**
-     * Efektywność serwisu - % zamówień zakończonych w czasie
-     */
-    @Query("SELECT " +
-            "COUNT(CASE WHEN s.serviceCompletionDate IS NOT NULL THEN 1 END) * 100.0 / COUNT(*) as completionRate, " +
-            "AVG(EXTRACT(EPOCH FROM (s.serviceCompletionDate - s.serviceStartDate)) / 3600) as avgHours " +
-            "FROM ServiceOrder s WHERE s.serviceStartDate IS NOT NULL")
-    List<Object[]> getServiceEfficiencyStats();
 
-    /**
-     * Znajdź duplikaty zamówień (ten sam klient + rower + data)
-     */
-    @Query("SELECT s1 FROM ServiceOrder s1, ServiceOrder s2 WHERE " +
-            "s1.id != s2.id AND s1.client = s2.client AND s1.bicycle = s2.bicycle AND s1.pickupDate = s2.pickupDate")
-    List<ServiceOrder> findPotentialDuplicateOrders();
 }

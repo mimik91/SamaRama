@@ -5,6 +5,7 @@ import org.springframework.http.ResponseEntity;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Serwis do obsługi zamówień transportowych (bazowych)
@@ -100,4 +101,16 @@ public interface TransportOrderService {
      * Sprawdza dostępność slotów
      */
     boolean areSlotsAvailable(LocalDate date, int ordersCount);
+
+    // Dodaj te metody do interfejsu TransportOrderService
+
+    /**
+     * Pobiera wszystkie zamówienia transportowe jako UnifiedOrderResponseDto (admin)
+     */
+    List<UnifiedOrderResponseDto> getAllTransportOrdersAsUnified();
+
+    /**
+     * Pobiera zamówienie jako UnifiedOrderResponseDto (admin)
+     */
+    Optional<UnifiedOrderResponseDto> getOrderAsUnified(Long orderId);
 }

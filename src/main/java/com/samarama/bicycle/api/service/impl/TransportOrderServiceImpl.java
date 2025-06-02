@@ -725,4 +725,33 @@ public class TransportOrderServiceImpl implements TransportOrderService {
                 "utilizationPercentage", maxSlots > 0 ? (usedSlots * 100.0 / maxSlots) : 0
         );
     }
+
+    // Dodaj te metody do TransportOrderServiceImpl
+
+    @Override
+    public List<UnifiedOrderResponseDto> getAllTransportOrdersAsUnified() {
+        List<TransportOrder> orders = transportOrderRepository.findPureTransportOrders();
+        return orders.stream()
+                .map(UnifiedOrderResponseDto::fromTransportOrder)
+                .sorted(Comparator.comparing(UnifiedOrderResponseDto::orderDate, Comparator.reverseOrder()))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public Optional<UnifiedOrderResponseDto> getOrderAsUnified(Long orderId) {
+        Optional<TransportOrder> orderOpt = transportOrderRepository.findById(orderId);
+
+        if (orderOpt.isEmpty()) {
+            return Optional.empty();
+        }
+
+        TransportOrder order = orderOpt.get();
+
+        // Sprawdź czy to nie jest ServiceOrder - jeśli tak, zwróć empty
+        if (order instanceof ServiceOrder) {
+            return Optional.empty();
+        }
+
+        return Optional.of(UnifiedOrderResponseDto.fromTransportOrder(order));
+    }
 }

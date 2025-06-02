@@ -29,6 +29,114 @@ public class ServiceSlotController {
     }
 
     /**
+     * GŁÓWNY PUBLICZNY ENDPOINT - dostępność slotów
+     * Obsługuje różne scenariusze:
+     * - ?date=2025-06-01 (pojedyncza data)
+     * - ?startDate=2025-06-01&endDate=2025-06-07 (zakres dat)
+     * - ?startDate=2025-06-01&days=7 (startDate + liczba dni)
+     * - bez parametrów (dzisiejsza data)
+     */
+    @GetMapping("/availability")
+    public ResponseEntity<?> getSlotAvailability(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(required = false, defaultValue = "7") int days) {
+
+        try {
+            // Pojedyncza data
+            if (date != null) {
+                ServiceSlotAvailabilityDto availability = serviceSlotService.getSlotAvailability(date);
+                return ResponseEntity.ok(availability);
+            }
+
+            // Zakres dat
+            if (startDate != null && endDate != null) {
+                List<ServiceSlotAvailabilityDto> availability = serviceSlotService.getSlotAvailability(startDate, endDate);
+                return ResponseEntity.ok(availability);
+            }
+
+            // StartDate + liczba dni
+            if (startDate != null) {
+                List<ServiceSlotAvailabilityDto> availability = serviceSlotService.getNextDaysAvailability(startDate, days);
+                return ResponseEntity.ok(availability);
+            }
+
+            // Brak parametrów - dzisiejsza data
+            LocalDate today = LocalDate.now();
+            ServiceSlotAvailabilityDto availability = serviceSlotService.getSlotAvailability(today);
+            return ResponseEntity.ok(availability);
+
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", "Błąd podczas pobierania dostępności slotów"));
+        }
+    }
+
+    /**
+     * Pobierz dostępność slotów na następne N dni (publiczny)
+     */
+    @GetMapping("/availability/next-days")
+    public ResponseEntity<List<ServiceSlotAvailabilityDto>> getNextDaysAvailability(
+            @RequestParam(defaultValue = "7") int days,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate) {
+
+        LocalDate start = startDate != null ? startDate : LocalDate.now();
+        List<ServiceSlotAvailabilityDto> availability = serviceSlotService.getNextDaysAvailability(start, days);
+        return ResponseEntity.ok(availability);
+    }
+
+    /**
+     * Sprawdź dostępność slotów dla konkretnej liczby rowerów (publiczny)
+     */
+    @GetMapping("/check-availability")
+    public ResponseEntity<?> checkAvailability(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam(defaultValue = "1") int bikesCount) {
+
+        boolean available = serviceSlotService.areSlotsAvailable(date, bikesCount);
+        int maxBikesPerDay = serviceSlotService.getMaxBikesPerDay(date);
+        int maxBikesPerOrder = serviceSlotService.getMaxBikesPerOrder(date);
+        int availableBikes = maxBikesPerDay - serviceOrderRepository.countByPickupDate(date);
+
+        return ResponseEntity.ok(Map.of(
+                "date", date,
+                "available", available,
+                "bikesCount", bikesCount,
+                "maxBikesPerDay", maxBikesPerDay,
+                "maxBikesPerOrder", maxBikesPerOrder,
+                "availableBikes", Math.max(0, availableBikes),
+                "message", available ?
+                        "Wystarczająca liczba dostępnych slotów" :
+                        "Brak wystarczającej liczby slotów"
+        ));
+    }
+
+    /**
+     * Pobierz limity slotów dla konkretnej daty (publiczny)
+     */
+    @GetMapping("/limits/{date}")
+    public ResponseEntity<?> getSlotLimits(
+            @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+
+        int maxBikesPerDay = serviceSlotService.getMaxBikesPerDay(date);
+        int maxBikesPerOrder = serviceSlotService.getMaxBikesPerOrder(date);
+        int bookedBikes = serviceOrderRepository.countByPickupDate(date);
+        int availableBikes = Math.max(0, maxBikesPerDay - bookedBikes);
+
+        return ResponseEntity.ok(Map.of(
+                "date", date,
+                "maxBikesPerDay", maxBikesPerDay,
+                "maxBikesPerOrder", maxBikesPerOrder,
+                "bookedBikes", bookedBikes,
+                "availableBikes", availableBikes,
+                "utilizationPercentage", maxBikesPerDay > 0 ?
+                        Math.round((double) bookedBikes / maxBikesPerDay * 100) : 0
+        ));
+    }
+
+    // === CONFIGURATION ENDPOINTS (ADMIN ONLY) ===
+
+    /**
      * Pobierz wszystkie konfiguracje slotów (admin)
      */
     @GetMapping("/config")
@@ -78,67 +186,6 @@ public class ServiceSlotController {
     }
 
     /**
-     * Pobierz dostępność slotów na dzień (publiczny)
-     */
-    @GetMapping("/availability/{date}")
-    public ResponseEntity<ServiceSlotAvailabilityDto> getSlotAvailability(
-            @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-        ServiceSlotAvailabilityDto availability = serviceSlotService.getSlotAvailability(date);
-        return ResponseEntity.ok(availability);
-    }
-
-    /**
-     * Pobierz dostępność slotów na zakres dat (publiczny)
-     */
-    @GetMapping("/availability")
-    public ResponseEntity<List<ServiceSlotAvailabilityDto>> getSlotAvailabilityRange(
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
-
-        List<ServiceSlotAvailabilityDto> availability = serviceSlotService.getSlotAvailability(startDate, endDate);
-        return ResponseEntity.ok(availability);
-    }
-
-    /**
-     * Pobierz dostępność slotów na następne N dni (publiczny)
-     */
-    @GetMapping("/availability/next-days")
-    public ResponseEntity<List<ServiceSlotAvailabilityDto>> getNextDaysAvailability(
-            @RequestParam(defaultValue = "7") int days,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate) {
-
-        LocalDate start = startDate != null ? startDate : LocalDate.now();
-        List<ServiceSlotAvailabilityDto> availability = serviceSlotService.getNextDaysAvailability(start, days);
-        return ResponseEntity.ok(availability);
-    }
-
-    /**
-     * Sprawdź dostępność slotów dla konkretnej liczby rowerów (publiczny)
-     */
-    @GetMapping("/check-availability")
-    public ResponseEntity<?> checkAvailability(
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
-            @RequestParam(defaultValue = "1") int bikesCount) {
-
-        boolean available = serviceSlotService.areSlotsAvailable(date, bikesCount);
-        int maxBikesPerDay = serviceSlotService.getMaxBikesPerDay(date);
-        int maxBikesPerOrder = serviceSlotService.getMaxBikesPerOrder(date);
-        int availableBikes = maxBikesPerDay - serviceOrderRepository.countByPickupDate(date); // Używamy metody z ServiceOrderRepository
-
-        return ResponseEntity.ok(Map.of(
-                "date", date,
-                "available", available,
-                "bikesCount", bikesCount,
-                "maxBikesPerDay", maxBikesPerDay,
-                "maxBikesPerOrder", maxBikesPerOrder,
-                "availableBikes", Math.max(0, availableBikes),
-                "message", available ?
-                        "Wystarczająca liczba dostępnych slotów" :
-                        "Brak wystarczającej liczby slotów"
-        ));
-    }
-
-    /**
      * Pobierz statystyki wykorzystania slotów (admin)
      */
     @GetMapping("/stats")
@@ -178,28 +225,5 @@ public class ServiceSlotController {
     public ResponseEntity<?> initializeDefaultSlotConfig() {
         serviceSlotService.initializeDefaultSlotConfig();
         return ResponseEntity.ok(Map.of("message", "Domyślna konfiguracja slotów została zainicjalizowana"));
-    }
-
-    /**
-     * Pobierz limity slotów dla konkretnej daty (publiczny)
-     */
-    @GetMapping("/limits/{date}")
-    public ResponseEntity<?> getSlotLimits(
-            @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-
-        int maxBikesPerDay = serviceSlotService.getMaxBikesPerDay(date);
-        int maxBikesPerOrder = serviceSlotService.getMaxBikesPerOrder(date);
-        int bookedBikes = serviceOrderRepository.countByPickupDate(date); // Używamy metody z ServiceOrderRepository
-        int availableBikes = Math.max(0, maxBikesPerDay - bookedBikes);
-
-        return ResponseEntity.ok(Map.of(
-                "date", date,
-                "maxBikesPerDay", maxBikesPerDay,
-                "maxBikesPerOrder", maxBikesPerOrder,
-                "bookedBikes", bookedBikes,
-                "availableBikes", availableBikes,
-                "utilizationPercentage", maxBikesPerDay > 0 ?
-                        Math.round((double) bookedBikes / maxBikesPerDay * 100) : 0
-        ));
     }
 }

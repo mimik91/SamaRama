@@ -4,6 +4,7 @@ import com.samarama.bicycle.api.dto.*;
 import org.springframework.http.ResponseEntity;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Serwis do obsługi zamówień serwisowych (transport + serwis)
@@ -81,12 +82,19 @@ public interface ServiceOrderService {
     List<Object[]> getServicePackageStatistics();
 
     /**
-     * Pobiera średni czas serwisu
-     */
-    Double getAverageServiceTime();
-
-    /**
      * Pobiera przychody z serwisu
      */
     List<Object[]> getServiceRevenue();
+
+    // Dodaj te metody do interfejsu ServiceOrderService
+
+    /**
+     * Pobiera wszystkie zamówienia serwisowe jako UnifiedOrderResponseDto (admin)
+     */
+    List<UnifiedOrderResponseDto> getAllServiceOrdersAsUnified();
+
+    /**
+     * Pobiera zamówienie serwisowe jako UnifiedOrderResponseDto (admin)
+     */
+    Optional<UnifiedOrderResponseDto> getOrderAsUnified(Long orderId);
 }

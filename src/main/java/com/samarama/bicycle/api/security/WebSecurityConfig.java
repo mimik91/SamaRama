@@ -51,7 +51,6 @@ public class WebSecurityConfig {
                                 "/api/password/reset",
                                 "/api/password/**",
                                 "/api/guest-orders/**",
-                                "/api/transport-orders/**",
                                 "/api/service-packages/active",
                                 "/api/enumerations/**", // Added this line
                                 "/api/service-orders/package-price/**",

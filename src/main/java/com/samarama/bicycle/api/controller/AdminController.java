@@ -26,15 +26,6 @@ import java.util.stream.Collectors;
 
 /**
  * Kontroler administracyjny - centralizuje wszystkie funkcje zarządzania systemem
- *
- * POPRAWKI:
- * - Centralizacja funkcji admina
- * - Proper role validation
- * - Audit logging
- * - Data validation
- * - Pagination support
- * - Advanced filtering
- * - System statistics
  */
 @CrossOrigin(origins = "*", maxAge = 3600)
 @RestController
@@ -93,7 +84,7 @@ public class AdminController {
     // =================== DASHBOARD & OVERVIEW ===================
 
     /**
-     * POPRAWKA: Dodano kompletny dashboard z wszystkimi kluczowymi metrykami
+     * Dashboard z wszystkimi kluczowymi metrykami
      */
     @GetMapping("/dashboard")
     public ResponseEntity<Map<String, Object>> getDashboard() {
@@ -103,33 +94,35 @@ public class AdminController {
         try {
             Map<String, Object> dashboard = new HashMap<>();
 
-            // === PODSTAWOWE STATYSTYKI ===
-            dashboard.put("overview", getSystemOverview());
+            // Podstawowe statystyki
+            dashboard.put("totalUsers", userRepository.count());
+            dashboard.put("totalBicycles", bikeRepository.count());
+            dashboard.put("totalServices", 0); // TODO: dodać gdy będzie BikeServiceRepository
+            dashboard.put("pendingOrders", transportOrderRepository.countByStatus(TransportOrder.OrderStatus.PENDING));
 
-            // === ZAMÓWIENIA ===
-            dashboard.put("orders", getOrderStatistics());
+            // Informacje o użytkowniku
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null) {
+                Map<String, Object> user = new HashMap<>();
+                user.put("email", auth.getName());
+                dashboard.put("user", user);
 
-            // === UŻYTKOWNICY ===
-            dashboard.put("users", getUserStatistics());
-
-            // === SERWISY ===
-            dashboard.put("services", getServiceStatistics());
-
-            // === NAJBLIŻSZE WYDARZENIA ===
-            dashboard.put("upcoming", getUpcomingEvents());
-
-            // === ALERTY SYSTEMOWE ===
-            dashboard.put("alerts", getSystemAlerts());
+                List<String> authorities = auth.getAuthorities().stream()
+                        .map(GrantedAuthority::getAuthority)
+                        .collect(Collectors.toList());
+                dashboard.put("authorities", authorities);
+            }
 
             return ResponseEntity.ok(dashboard);
         } catch (Exception e) {
             logger.severe("Error loading dashboard for admin " + adminEmail + ": " + e.getMessage());
+            e.printStackTrace();
             return ResponseEntity.internalServerError().body(Map.of("message", "Błąd ładowania dashboardu"));
         }
     }
 
     /**
-     * POPRAWKA: Dodano szczegółowe statystyki systemowe
+     * Szczegółowe statystyki systemowe
      */
     @GetMapping("/statistics")
     public ResponseEntity<Map<String, Object>> getSystemStatistics(
@@ -153,8 +146,6 @@ public class AdminController {
             // Popularne pakiety serwisowe
             stats.put("popularPackages", serviceOrderService.getServicePackageStatistics());
 
-            // Średni czas serwisu
-            stats.put("averageServiceTime", serviceOrderService.getAverageServiceTime());
 
             // Statystyki użytkowników
             stats.put("userGrowth", getUserGrowthStatistics(startDate, endDate));
@@ -169,10 +160,10 @@ public class AdminController {
     // =================== ORDER MANAGEMENT ===================
 
     /**
-     * POPRAWKA: Dodano zaawansowane filtrowanie i paginację zamówień
+     * Endpoint dla wszystkich zamówień (serwisowe + transportowe)
      */
-    @GetMapping("/orders")
-    public ResponseEntity<Map<String, Object>> getAllOrders(
+    @GetMapping("/orders/all")
+    public ResponseEntity<Map<String, Object>> getAllOrdersUnified(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(defaultValue = "orderDate") String sortBy,
@@ -180,32 +171,37 @@ public class AdminController {
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String orderType,
             @RequestParam(required = false) String searchTerm,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo) {
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate pickupDateFrom,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate pickupDateTo) {
 
         String adminEmail = getCurrentUserEmail();
-        logAdminAction("VIEW_ORDERS", buildFilterString(status, orderType, searchTerm, dateFrom, dateTo), adminEmail);
+        logAdminAction("VIEW_ALL_ORDERS", buildFilterString(status, orderType, searchTerm, pickupDateFrom, pickupDateTo), adminEmail);
 
         try {
-            // POPRAWKA: Walidacja parametrów paginacji
-            if (size > 100) size = 100; // Maksymalnie 100 elementów na stronę
+            // Walidacja parametrów paginacji
+            if (size > 100) size = 100;
             if (size < 1) size = 20;
             if (page < 0) page = 0;
 
-            // POPRAWKA: Walidacja sortowania
-            String validatedSortBy = validateSortField(sortBy, Arrays.asList("orderDate", "pickupDate", "status", "totalPrice"));
-            Sort.Direction direction = "desc".equalsIgnoreCase(sortDir) ? Sort.Direction.DESC : Sort.Direction.ASC;
-
-            Pageable pageable = PageRequest.of(page, size, Sort.by(direction, validatedSortBy));
-
-            // Pobierz dane z filtrowaniem
+            // Pobierz wszystkie zamówienia (transport + service)
             List<UnifiedOrderResponseDto> allOrders = transportOrderService.getAllOrders();
 
-            // POPRAWKA: Zastosuj filtry
+            // Zastosuj filtry
             List<UnifiedOrderResponseDto> filteredOrders = applyOrderFilters(
-                    allOrders, status, orderType, searchTerm, dateFrom, dateTo);
+                    allOrders, status, orderType, searchTerm, pickupDateFrom, pickupDateTo);
 
-            // POPRAWKA: Ręczna paginacja (gdyby repository nie wspierało)
+            // Sortowanie
+            if ("orderDate".equals(sortBy)) {
+                filteredOrders.sort((a, b) -> "desc".equalsIgnoreCase(sortDir)
+                        ? b.orderDate().compareTo(a.orderDate())
+                        : a.orderDate().compareTo(b.orderDate()));
+            } else if ("pickupDate".equals(sortBy)) {
+                filteredOrders.sort((a, b) -> "desc".equalsIgnoreCase(sortDir)
+                        ? b.pickupDate().compareTo(a.pickupDate())
+                        : a.pickupDate().compareTo(b.pickupDate()));
+            }
+
+            // Paginacja
             int start = page * size;
             int end = Math.min(start + size, filteredOrders.size());
             List<UnifiedOrderResponseDto> pageContent = start > filteredOrders.size()
@@ -218,23 +214,137 @@ public class AdminController {
             response.put("totalPages", (int) Math.ceil((double) filteredOrders.size() / size));
             response.put("currentPage", page);
             response.put("pageSize", size);
-            response.put("filters", Map.of(
-                    "status", status,
-                    "orderType", orderType,
-                    "searchTerm", searchTerm,
-                    "dateFrom", dateFrom,
-                    "dateTo", dateTo
-            ));
 
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            logger.severe("Error loading orders: " + e.getMessage());
+            logger.severe("Error loading all orders: " + e.getMessage());
+            e.printStackTrace();
             return ResponseEntity.internalServerError().body(Map.of("message", "Błąd ładowania zamówień"));
         }
     }
 
     /**
-     * POPRAWKA: Bezpieczna aktualizacja statusu z walidacją
+     * Endpoint dla zamówień serwisowych
+     */
+    @GetMapping("/orders/service")
+    public ResponseEntity<Map<String, Object>> getServiceOrders(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "orderDate") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDir,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String searchTerm,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate pickupDateFrom,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate pickupDateTo) {
+
+        String adminEmail = getCurrentUserEmail();
+        logAdminAction("VIEW_SERVICE_ORDERS", buildFilterString(status, "SERVICE", searchTerm, pickupDateFrom, pickupDateTo), adminEmail);
+
+        try {
+            // Pobierz tylko zamówienia serwisowe
+            List<UnifiedOrderResponseDto> serviceOrders = serviceOrderService.getAllServiceOrdersAsUnified();
+
+            // Zastosuj filtry
+            List<UnifiedOrderResponseDto> filteredOrders = applyOrderFilters(
+                    serviceOrders, status, "SERVICE", searchTerm, pickupDateFrom, pickupDateTo);
+
+            // Paginacja
+            int start = page * size;
+            int end = Math.min(start + size, filteredOrders.size());
+            List<UnifiedOrderResponseDto> pageContent = start > filteredOrders.size()
+                    ? new ArrayList<>()
+                    : filteredOrders.subList(start, end);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("content", pageContent);
+            response.put("totalElements", filteredOrders.size());
+            response.put("totalPages", (int) Math.ceil((double) filteredOrders.size() / size));
+            response.put("currentPage", page);
+            response.put("pageSize", size);
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            logger.severe("Error loading service orders: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(Map.of("message", "Błąd ładowania zamówień serwisowych"));
+        }
+    }
+
+    /**
+     * Endpoint dla zamówień transportowych
+     */
+    @GetMapping("/orders/transport")
+    public ResponseEntity<Map<String, Object>> getTransportOrders(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "orderDate") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDir,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String searchTerm,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate pickupDateFrom,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate pickupDateTo) {
+
+        String adminEmail = getCurrentUserEmail();
+        logAdminAction("VIEW_TRANSPORT_ORDERS", buildFilterString(status, "TRANSPORT", searchTerm, pickupDateFrom, pickupDateTo), adminEmail);
+
+        try {
+            // Pobierz tylko zamówienia transportowe
+            List<UnifiedOrderResponseDto> transportOrders = transportOrderService.getAllTransportOrdersAsUnified();
+
+            // Zastosuj filtry
+            List<UnifiedOrderResponseDto> filteredOrders = applyOrderFilters(
+                    transportOrders, status, "TRANSPORT", searchTerm, pickupDateFrom, pickupDateTo);
+
+            // Paginacja i odpowiedź
+            int start = page * size;
+            int end = Math.min(start + size, filteredOrders.size());
+            List<UnifiedOrderResponseDto> pageContent = start > filteredOrders.size()
+                    ? new ArrayList<>()
+                    : filteredOrders.subList(start, end);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("content", pageContent);
+            response.put("totalElements", filteredOrders.size());
+            response.put("totalPages", (int) Math.ceil((double) filteredOrders.size() / size));
+            response.put("currentPage", page);
+            response.put("pageSize", size);
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            logger.severe("Error loading transport orders: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(Map.of("message", "Błąd ładowania zamówień transportowych"));
+        }
+    }
+
+    /**
+     * Endpoint dla szczegółów zamówienia
+     */
+    @GetMapping("/orders/{orderId}")
+    public ResponseEntity<?> getOrderDetails(@PathVariable Long orderId) {
+        String adminEmail = getCurrentUserEmail();
+        logAdminAction("VIEW_ORDER_DETAILS", "orderId=" + orderId, adminEmail);
+
+        try {
+            // Sprawdź w zamówieniach transportowych
+            Optional<UnifiedOrderResponseDto> transportOrder = transportOrderService.getOrderAsUnified(orderId);
+            if (transportOrder.isPresent()) {
+                return ResponseEntity.ok(transportOrder.get());
+            }
+
+            // Sprawdź w zamówieniach serwisowych
+            Optional<UnifiedOrderResponseDto> serviceOrder = serviceOrderService.getOrderAsUnified(orderId);
+            if (serviceOrder.isPresent()) {
+                return ResponseEntity.ok(serviceOrder.get());
+            }
+
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            logger.severe("Error loading order details: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(Map.of("message", "Błąd ładowania szczegółów zamówienia"));
+        }
+    }
+
+    /**
+     * Bezpieczna aktualizacja statusu z walidacją
      */
     @PatchMapping("/orders/{orderId}/status")
     public ResponseEntity<?> updateOrderStatus(
@@ -244,12 +354,12 @@ public class AdminController {
         String adminEmail = getCurrentUserEmail();
         String newStatus = request.get("status");
 
-        // POPRAWKA: Walidacja danych wejściowych
+        // Walidacja danych wejściowych
         if (newStatus == null || newStatus.trim().isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("message", "Status jest wymagany"));
         }
 
-        // POPRAWKA: Walidacja czy status jest poprawny
+        // Walidacja czy status jest poprawny
         if (!isValidOrderStatus(newStatus)) {
             return ResponseEntity.badRequest().body(Map.of(
                     "message", "Nieprawidłowy status",
@@ -260,7 +370,7 @@ public class AdminController {
         logAdminAction("UPDATE_ORDER_STATUS", "orderId=" + orderId + ", status=" + newStatus, adminEmail);
 
         try {
-            // POPRAWKA: Sprawdź czy zamówienie istnieje
+            // Sprawdź czy zamówienie istnieje
             if (!orderExists(orderId)) {
                 return ResponseEntity.notFound().build();
             }
@@ -274,7 +384,7 @@ public class AdminController {
     }
 
     /**
-     * POPRAWKA: Bezpieczne usuwanie zamówienia z walidacją
+     * Bezpieczne usuwanie zamówienia z walidacją
      */
     @DeleteMapping("/orders/{orderId}")
     @PreAuthorize("hasRole('ADMIN')") // Tylko ADMIN może usuwać
@@ -288,7 +398,7 @@ public class AdminController {
         logAdminAction("DELETE_ORDER", "orderId=" + orderId, adminEmail);
 
         try {
-            // POPRAWKA: Sprawdź czy zamówienie można usunąć
+            // Sprawdź czy zamówienie można usunąć
             if (!canDeleteOrder(orderId)) {
                 return ResponseEntity.badRequest().body(Map.of(
                         "message", "Nie można usunąć zamówienia w tym statusie"
@@ -305,7 +415,7 @@ public class AdminController {
     // =================== USER MANAGEMENT ===================
 
     /**
-     * POPRAWKA: Zarządzanie użytkownikami z paginacją i filtrowaniem
+     * Zarządzanie użytkownikami z paginacją i filtrowaniem
      */
     @GetMapping("/users")
     public ResponseEntity<Map<String, Object>> getAllUsers(
@@ -321,7 +431,7 @@ public class AdminController {
         logAdminAction("VIEW_USERS", "search=" + searchTerm + ", role=" + role, adminEmail);
 
         try {
-            // POPRAWKA: Walidacja parametrów
+            // Walidacja parametrów
             if (size > 100) size = 100;
             if (size < 1) size = 20;
             if (page < 0) page = 0;
@@ -331,7 +441,7 @@ public class AdminController {
 
             Pageable pageable = PageRequest.of(page, size, Sort.by(direction, validatedSortBy));
 
-            // POPRAWKA: Użyj repository z paginacją (zakładając że istnieje)
+            // Użyj repository z paginacją
             Page<User> userPage = getUsersWithFilters(pageable, searchTerm, role, verified);
 
             Map<String, Object> response = new HashMap<>();
@@ -351,7 +461,7 @@ public class AdminController {
     }
 
     /**
-     * POPRAWKA: Bezpieczna zmiana ról użytkownika
+     * Bezpieczna zmiana ról użytkownika
      */
     @PatchMapping("/users/{userId}/roles")
     @PreAuthorize("hasRole('ADMIN')") // Tylko ADMIN może zmieniać role
@@ -362,7 +472,7 @@ public class AdminController {
         String adminEmail = getCurrentUserEmail();
         Set<String> newRoles = request.get("roles");
 
-        // POPRAWKA: Walidacja ról
+        // Walidacja ról
         if (newRoles == null || newRoles.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("message", "Role są wymagane"));
         }
@@ -384,7 +494,7 @@ public class AdminController {
 
             User user = userOpt.get();
 
-            // POPRAWKA: Nie pozwól adminowi usunąć sobie uprawnień ADMIN
+            // Nie pozwól adminowi usunąć sobie uprawnień ADMIN
             if (user.getEmail().equals(adminEmail) && !newRoles.contains("ROLE_ADMIN")) {
                 return ResponseEntity.badRequest().body(Map.of(
                         "message", "Nie możesz usunąć sobie uprawnień administratora"
@@ -407,7 +517,7 @@ public class AdminController {
     // =================== SERVICE PACKAGE MANAGEMENT ===================
 
     /**
-     * POPRAWKA: Zarządzanie pakietami serwisowymi z walidacją
+     * Zarządzanie pakietami serwisowymi z walidacją
      */
     @PostMapping("/service-packages")
     public ResponseEntity<?> createServicePackage(@Valid @RequestBody ServicePackageDto packageDto) {
@@ -415,7 +525,7 @@ public class AdminController {
         logAdminAction("CREATE_SERVICE_PACKAGE", "code=" + packageDto.code(), adminEmail);
 
         try {
-            // POPRAWKA: Dodatkowa walidacja biznesowa
+            // Dodatkowa walidacja biznesowa
             if (servicePackageRepository.existsByCode(packageDto.code())) {
                 return ResponseEntity.badRequest().body(Map.of(
                         "message", "Pakiet o kodzie '" + packageDto.code() + "' już istnieje"
@@ -432,7 +542,7 @@ public class AdminController {
     // =================== BIKE SERVICE MANAGEMENT ===================
 
     /**
-     * POPRAWKA: Import serwisów z walidacją pliku
+     * Import serwisów z walidacją pliku
      */
     @PostMapping("/bike-services/import")
     public ResponseEntity<?> importBikeServices(@RequestParam("file") MultipartFile file) {
@@ -440,7 +550,7 @@ public class AdminController {
         logAdminAction("IMPORT_BIKE_SERVICES", "filename=" + file.getOriginalFilename(), adminEmail);
 
         try {
-            // POPRAWKA: Walidacja pliku
+            // Walidacja pliku
             if (file.isEmpty()) {
                 return ResponseEntity.badRequest().body(Map.of("message", "Plik jest pusty"));
             }
@@ -463,7 +573,7 @@ public class AdminController {
     // =================== SYSTEM CONFIGURATION ===================
 
     /**
-     * POPRAWKA: Zarządzanie konfiguracją slotów z walidacją
+     * Zarządzanie konfiguracją slotów z walidacją
      */
     @PostMapping("/service-slots/config")
     public ResponseEntity<?> createSlotConfig(@Valid @RequestBody ServiceSlotConfigDto configDto) {
@@ -472,7 +582,7 @@ public class AdminController {
                 "startDate=" + configDto.startDate() + ", maxBikes=" + configDto.maxBikesPerDay(), adminEmail);
 
         try {
-            // POPRAWKA: Walidacja biznesowa
+            // Walidacja biznesowa
             if (configDto.startDate().isBefore(LocalDate.now())) {
                 return ResponseEntity.badRequest().body(Map.of(
                         "message", "Data początkowa nie może być w przeszłości"
@@ -495,7 +605,7 @@ public class AdminController {
     // =================== AUDIT LOG ===================
 
     /**
-     * POPRAWKA: Log akcji administracyjnych
+     * Log akcji administracyjnych
      */
     @GetMapping("/audit-log")
     public ResponseEntity<?> getAuditLog(
@@ -535,64 +645,6 @@ public class AdminController {
         // TODO: Zapisz do tabeli audit_log
     }
 
-    private Map<String, Object> getSystemOverview() {
-        return Map.of(
-                "totalUsers", userRepository.count(),
-                "totalOrders", transportOrderRepository.count(),
-                "totalBicycles", bikeRepository.count(),
-                "activeServicePackages", servicePackageRepository.findByActiveTrue().size()
-        );
-    }
-
-    private Map<String, Object> getOrderStatistics() {
-        return Map.of(
-                "totalOrders", transportOrderRepository.count(),
-                "pendingOrders", transportOrderRepository.countByStatus(TransportOrder.OrderStatus.PENDING),
-                "completedOrders", transportOrderRepository.countByStatus(TransportOrder.OrderStatus.ON_THE_WAY_BACK),
-                "todayOrders", transportOrderRepository.countByPickupDate(LocalDate.now())
-        );
-    }
-
-    private Map<String, Object> getUserStatistics() {
-        long totalUsers = userRepository.count();
-        // TODO: Dodaj więcej statystyk użytkowników
-        return Map.of(
-                "totalUsers", totalUsers,
-                "verifiedUsers", totalUsers, // Placeholder - wymagałoby query
-                "newUsersThisMonth", 0 // Placeholder - wymagałoby query
-        );
-    }
-
-    private Map<String, Object> getServiceStatistics() {
-        return Map.of(
-                "averageServiceTime", serviceOrderService.getAverageServiceTime(),
-                "popularPackages", serviceOrderService.getServicePackageStatistics()
-        );
-    }
-
-    private List<String> getUpcomingEvents() {
-        // TODO: Implementacja nadchodzących wydarzeń
-        return Arrays.asList(
-                "5 zamówień do odbioru dzisiaj",
-                "3 serwisy do zakończenia",
-                "Konfiguracja slotów wygasa za 7 dni"
-        );
-    }
-
-    private List<String> getSystemAlerts() {
-        List<String> alerts = new ArrayList<>();
-
-        // Sprawdź przepełnienie slotów
-        int todayOrders = transportOrderRepository.countByPickupDate(LocalDate.now());
-        if (todayOrders > 10) {
-            alerts.add("Wysoka liczba zamówień na dzisiaj: " + todayOrders);
-        }
-
-        // TODO: Dodaj więcej alertów systemowych
-
-        return alerts;
-    }
-
     private List<Object[]> getOrderTrends(LocalDate startDate, LocalDate endDate) {
         return transportOrderRepository.countOrdersForDateRange(startDate, endDate);
     }
@@ -623,7 +675,7 @@ public class AdminController {
                 .filter(order -> status == null || order.status().equals(status))
                 .filter(order -> orderType == null || order.orderType().equals(orderType))
                 .filter(order -> searchTerm == null ||
-                        order.clientEmail().toLowerCase().contains(searchTerm.toLowerCase()) ||
+                        (order.clientEmail() != null && order.clientEmail().toLowerCase().contains(searchTerm.toLowerCase())) ||
                         (order.clientPhone() != null && order.clientPhone().contains(searchTerm)))
                 .filter(order -> dateFrom == null || !order.pickupDate().isBefore(dateFrom))
                 .filter(order -> dateTo == null || !order.pickupDate().isAfter(dateTo))
@@ -646,7 +698,7 @@ public class AdminController {
     }
 
     private boolean orderExists(Long orderId) {
-        return transportOrderRepository.existsById(orderId);
+        return transportOrderRepository.existsById(orderId) || serviceOrderRepository.existsById(orderId);
     }
 
     private boolean canDeleteOrder(Long orderId) {
