@@ -1,4 +1,3 @@
--- Create the base bicycle table (parent class)
 CREATE TABLE incomplete_bikes (
     id BIGSERIAL,
     brand VARCHAR(20) NOT NULL,
@@ -12,7 +11,6 @@ CREATE TABLE incomplete_bikes (
     FOREIGN KEY (owner_id) REFERENCES incomplete_users(id)
 );
 
--- Create the complete bicycles table (child class)
 CREATE TABLE bicycles (
     id BIGINT NOT NULL,
     frame_number VARCHAR(20),
@@ -21,7 +19,6 @@ CREATE TABLE bicycles (
     FOREIGN KEY (id) REFERENCES incomplete_bikes(id) ON DELETE CASCADE
 );
 
--- Create bicycle photos table
 CREATE TABLE bicycle_photos (
     id BIGSERIAL,
     bike_id BIGINT,
@@ -33,7 +30,6 @@ CREATE TABLE bicycle_photos (
     FOREIGN KEY (bike_id) REFERENCES incomplete_bikes(id) ON DELETE CASCADE
 );
 
--- Create bicycle enumeration tables
 CREATE TABLE bicycle_enumerations (
     id BIGSERIAL,
     type VARCHAR(50) NOT NULL UNIQUE,
@@ -46,6 +42,3 @@ CREATE TABLE bicycle_enumeration_values (
     PRIMARY KEY (enumeration_id, value),
     FOREIGN KEY (enumeration_id) REFERENCES bicycle_enumerations(id) ON DELETE CASCADE
 );
-
--- Add index for faster lookups
-CREATE INDEX idx_bicycle_enumerations_type ON bicycle_enumerations(type);
