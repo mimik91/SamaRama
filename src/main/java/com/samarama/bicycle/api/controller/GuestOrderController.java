@@ -37,8 +37,8 @@ public class GuestOrderController {
      * Tworzy zamówienie serwisowe dla gości (transport + serwis)
      */
     @PostMapping("/service")
-    public ResponseEntity<?> createGuestServiceOrder(@Valid @RequestBody GuestServiceOrderDto dto) {
-        logger.info("Received guest service order for email: " + dto.email());
+    public ResponseEntity<?> createGuestServiceOrder(@Valid @RequestBody ServiceOrTransportOrderDto dto) {
+        logger.info("Received guest service order for email: " + dto.clientEmail());
         try {
             return guestOrderService.processGuestOrder(dto);
         } catch (Exception e) {

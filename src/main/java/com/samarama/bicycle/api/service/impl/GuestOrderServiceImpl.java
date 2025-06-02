@@ -1,7 +1,7 @@
 package com.samarama.bicycle.api.service.impl;
 
 import com.samarama.bicycle.api.dto.GuestBicycleDto;
-import com.samarama.bicycle.api.dto.GuestServiceOrderDto;
+import com.samarama.bicycle.api.dto.ServiceOrTransportOrderDto;
 import com.samarama.bicycle.api.model.*;
 import com.samarama.bicycle.api.repository.*;
 import com.samarama.bicycle.api.service.EmailService;
@@ -49,7 +49,7 @@ public class GuestOrderServiceImpl implements GuestOrderService {
 
     @Override
     @Transactional
-    public ResponseEntity<?> processGuestOrder(GuestServiceOrderDto orderDto) {
+    public ResponseEntity<?> processGuestOrder(ServiceOrTransportOrderDto orderDto) {
         try {
             // Walidacja
             List<String> errors = validator.validateGuestOrder(orderDto);

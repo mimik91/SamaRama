@@ -1,6 +1,6 @@
 package com.samarama.bicycle.api.service.impl;
 
-import com.samarama.bicycle.api.dto.ServiceOrderDto;
+import com.samarama.bicycle.api.dto.ServiceOrTransportOrderDto;
 import com.samarama.bicycle.api.service.ServiceSlotService;
 import org.springframework.stereotype.Component;
 
@@ -29,7 +29,7 @@ public class ServiceOrderValidator {
     /**
      * Validates service order data for logged users
      */
-    public ValidationResult validateUserServiceOrder(ServiceOrderDto dto) {
+    public ValidationResult validateUserServiceOrder(ServiceOrTransportOrderDto dto) {
         List<String> errors = new ArrayList<>();
 
         // Basic data validation
@@ -55,7 +55,7 @@ public class ServiceOrderValidator {
     /**
      * Validates service order data for guest users
      */
-    public ValidationResult validateGuestServiceOrder(ServiceOrderDto dto) {
+    public ValidationResult validateGuestServiceOrder(ServiceOrTransportOrderDto dto) {
         List<String> errors = new ArrayList<>();
 
         // Basic data validation
@@ -142,7 +142,7 @@ public class ServiceOrderValidator {
         }
     }
 
-    private void validateServicePackage(ServiceOrderDto dto, List<String> errors) {
+    private void validateServicePackage(ServiceOrTransportOrderDto dto, List<String> errors) {
         boolean hasPackageId = dto.servicePackageId() != null;
         boolean hasPackageCode = dto.servicePackageCode() != null && !dto.servicePackageCode().trim().isEmpty();
 
@@ -181,7 +181,7 @@ public class ServiceOrderValidator {
         }
     }
 
-    private void validateGuestContact(ServiceOrderDto dto, List<String> errors) {
+    private void validateGuestContact(ServiceOrTransportOrderDto dto, List<String> errors) {
         if (dto.clientEmail() == null || dto.clientEmail().trim().isEmpty()) {
             errors.add("Email klienta jest wymagany");
         } else if (!isValidEmail(dto.clientEmail())) {

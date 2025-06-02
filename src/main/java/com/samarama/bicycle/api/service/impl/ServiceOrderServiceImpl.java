@@ -43,7 +43,7 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
 
     @Override
     @Transactional
-    public ResponseEntity<?> createServiceOrder(ServiceOrderDto dto, String userEmail) {
+    public ResponseEntity<?> createServiceOrder(ServiceOrTransportOrderDto dto, String userEmail) {
         try {
             // Validation
             ServiceOrderValidator.ValidationResult validation = serviceOrderValidator.validateUserServiceOrder(dto);
@@ -94,7 +94,7 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
 
     @Override
     @Transactional
-    public ResponseEntity<?> createGuestServiceOrder(ServiceOrderDto dto) {
+    public ResponseEntity<?> createGuestServiceOrder(ServiceOrTransportOrderDto dto) {
         try {
             // Validation
             ServiceOrderValidator.ValidationResult validation = serviceOrderValidator.validateGuestServiceOrder(dto);
@@ -175,7 +175,7 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
 
     @Override
     @Transactional
-    public ResponseEntity<?> updateServiceOrder(Long orderId, ServiceOrderDto dto, String userEmail) {
+    public ResponseEntity<?> updateServiceOrder(Long orderId, ServiceOrTransportOrderDto dto, String userEmail) {
         try {
             User user = serviceOrderHelper.getUserByEmail(userEmail);
             ServiceOrder order = getServiceOrderForUser(orderId, user);
@@ -299,7 +299,7 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
 
     @Override
     @Transactional
-    public ResponseEntity<?> updateServiceOrderByAdmin(Long orderId, ServiceOrderDto dto, String adminEmail) {
+    public ResponseEntity<?> updateServiceOrderByAdmin(Long orderId, ServiceOrTransportOrderDto dto, String adminEmail) {
         try {
             ServiceOrder order = getServiceOrderById(orderId);
 

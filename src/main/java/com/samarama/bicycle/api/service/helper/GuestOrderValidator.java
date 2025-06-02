@@ -1,6 +1,6 @@
 package com.samarama.bicycle.api.service.helper;
 
-import com.samarama.bicycle.api.dto.GuestServiceOrderDto;
+import com.samarama.bicycle.api.dto.ServiceOrTransportOrderDto;
 import com.samarama.bicycle.api.repository.ServicePackageRepository;
 import com.samarama.bicycle.api.service.ServiceSlotService;
 import com.samarama.bicycle.api.service.impl.CityValidator;
@@ -26,7 +26,7 @@ public class GuestOrderValidator {
         this.cityValidator = cityValidator;
     }
 
-    public List<String> validateGuestOrder(GuestServiceOrderDto orderDto) {
+    public List<String> validateGuestOrder(ServiceOrTransportOrderDto orderDto) {
         List<String> errors = new ArrayList<>();
 
         // Basic validation

@@ -1,6 +1,6 @@
 package com.samarama.bicycle.api.service;
 
-import com.samarama.bicycle.api.dto.GuestServiceOrderDto;
+import com.samarama.bicycle.api.dto.ServiceOrTransportOrderDto;
 import org.springframework.http.ResponseEntity;
 
 public interface GuestOrderService {
@@ -9,5 +9,5 @@ public interface GuestOrderService {
      * @param orderDto complete order data from guest
      * @return response with operation result
      */
-    ResponseEntity<?> processGuestOrder(GuestServiceOrderDto orderDto);
+    ResponseEntity<?> processGuestOrder(ServiceOrTransportOrderDto orderDto);
 }

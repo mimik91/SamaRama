@@ -16,12 +16,12 @@ public interface ServiceOrderService {
     /**
      * Tworzy zamówienie serwisowe dla zalogowanego użytkownika
      */
-    ResponseEntity<?> createServiceOrder(ServiceOrderDto dto, String userEmail);
+    ResponseEntity<?> createServiceOrder(ServiceOrTransportOrderDto dto, String userEmail);
 
     /**
      * Tworzy zamówienie serwisowe dla gościa
      */
-    ResponseEntity<?> createGuestServiceOrder(ServiceOrderDto dto);
+    ResponseEntity<?> createGuestServiceOrder(ServiceOrTransportOrderDto dto);
 
     // === POBIERANIE ZAMÓWIEŃ ===
 
@@ -40,7 +40,7 @@ public interface ServiceOrderService {
     /**
      * Aktualizuje zamówienie serwisowe
      */
-    ResponseEntity<?> updateServiceOrder(Long orderId, ServiceOrderDto dto, String userEmail);
+    ResponseEntity<?> updateServiceOrder(Long orderId, ServiceOrTransportOrderDto dto, String userEmail);
 
     /**
      * Rozpoczyna serwis
@@ -67,7 +67,7 @@ public interface ServiceOrderService {
     /**
      * Aktualizuje zamówienie serwisowe (admin)
      */
-    ResponseEntity<?> updateServiceOrderByAdmin(Long orderId, ServiceOrderDto dto, String adminEmail);
+    ResponseEntity<?> updateServiceOrderByAdmin(Long orderId, ServiceOrTransportOrderDto dto, String adminEmail);
 
     /**
      * Usuwa zamówienie serwisowe (admin)

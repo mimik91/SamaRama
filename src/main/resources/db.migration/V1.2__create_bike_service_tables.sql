@@ -4,30 +4,21 @@ CREATE TABLE bike_services (
     description VARCHAR(1000),
     email VARCHAR(100) UNIQUE,
     website VARCHAR(255),
-
-    -- Adres
     street VARCHAR(255),
     building VARCHAR(20),
     flat VARCHAR(20),
     postal_code VARCHAR(10),
     city VARCHAR(100),
-
-    -- Lokalizacja geograficzna
-    latitude DECIMAL(10,8),
-    longitude DECIMAL(11,8),
-
-    -- Kontakt
+    latitude DOUBLE PRECISION,
+    longitude DOUBLE PRECISION,
     phone_number VARCHAR(15),
     business_phone VARCHAR(15),
-
-    -- Metadane
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
-
     PRIMARY KEY (id)
 );
 
--- Dodanie indeksów dla lepszej wydajności
-CREATE INDEX idx_bike_services_city ON bike_services(city);
-CREATE INDEX idx_bike_services_email ON bike_services(email);
-CREATE INDEX idx_bike_services_location ON bike_services(latitude, longitude);
+INSERT INTO bike_services (id, name, description, city, latitude, longitude, created_at, updated_at)
+VALUES (1, 'SERWIS WŁASNY', 'Nasz własny serwis rowerowy', 'Kraków', 50.0647, 19.9450, NOW(), NOW());
+
+SELECT setval('bike_services_id_seq', 1);

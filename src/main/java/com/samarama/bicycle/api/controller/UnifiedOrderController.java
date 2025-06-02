@@ -147,7 +147,7 @@ public class UnifiedOrderController {
      */
     @PostMapping("/service")
     @PreAuthorize("hasRole('CLIENT')")
-    public ResponseEntity<?> createServiceOrder(@Valid @RequestBody ServiceOrderDto dto) {
+    public ResponseEntity<?> createServiceOrder(@Valid @RequestBody ServiceOrTransportOrderDto dto) {
         String userEmail = getCurrentUserEmail();
         return serviceOrderService.createServiceOrder(dto, userEmail);
     }

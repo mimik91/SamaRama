@@ -65,7 +65,7 @@ public class ServiceOrderHelper {
 
     // === SERVICE PACKAGE MANAGEMENT ===
 
-    public ServicePackage getServicePackage(ServiceOrderDto dto) {
+    public ServicePackage getServicePackage(ServiceOrTransportOrderDto dto) {
         if (dto.servicePackageId() != null) {
             return servicePackageRepository.findById(dto.servicePackageId())
                     .orElseThrow(() -> new RuntimeException("Service package not found"));
@@ -121,7 +121,7 @@ public class ServiceOrderHelper {
     // === SERVICE ORDER CREATION ===
 
     public List<ServiceOrder> createServiceOrdersForUser(List<IncompleteBike> bikes, User user,
-                                                         ServiceOrderDto dto, ServicePackage servicePackage,
+                                                         ServiceOrTransportOrderDto dto, ServicePackage servicePackage,
                                                          BikeService ownService) {
         List<ServiceOrder> orders = new ArrayList<>();
 
@@ -134,7 +134,7 @@ public class ServiceOrderHelper {
     }
 
     public List<ServiceOrder> createServiceOrdersForGuest(List<IncompleteBike> bikes, IncompleteUser guestUser,
-                                                          ServiceOrderDto dto, ServicePackage servicePackage,
+                                                          ServiceOrTransportOrderDto dto, ServicePackage servicePackage,
                                                           BikeService ownService) {
         List<ServiceOrder> orders = new ArrayList<>();
 
@@ -151,7 +151,7 @@ public class ServiceOrderHelper {
     }
 
     private ServiceOrder createServiceOrderBase(IncompleteBike bike, IncompleteUser client,
-                                                ServiceOrderDto dto, ServicePackage servicePackage,
+                                                ServiceOrTransportOrderDto dto, ServicePackage servicePackage,
                                                 BikeService ownService) {
         ServiceOrder order = new ServiceOrder();
 
@@ -188,7 +188,7 @@ public class ServiceOrderHelper {
 
     // === SERVICE ORDER UPDATES ===
 
-    public void updateServiceOrderFields(ServiceOrder order, ServiceOrderDto dto) {
+    public void updateServiceOrderFields(ServiceOrder order, ServiceOrTransportOrderDto dto) {
         // Update transport fields
         updateTransportFields(order, dto);
 
@@ -199,7 +199,7 @@ public class ServiceOrderHelper {
         updateBicycleIfProvided(order, dto);
     }
 
-    private void updateTransportFields(ServiceOrder order, ServiceOrderDto dto) {
+    private void updateTransportFields(ServiceOrder order, ServiceOrTransportOrderDto dto) {
         if (dto.pickupDate() != null) {
             order.setPickupDate(dto.pickupDate());
         }
@@ -232,7 +232,7 @@ public class ServiceOrderHelper {
         }
     }
 
-    private void updateServiceFields(ServiceOrder order, ServiceOrderDto dto) {
+    private void updateServiceFields(ServiceOrder order, ServiceOrTransportOrderDto dto) {
         if (dto.servicePackageId() != null) {
             ServicePackage servicePackage = servicePackageRepository.findById(dto.servicePackageId())
                     .orElseThrow(() -> new RuntimeException("Service package not found"));
@@ -256,7 +256,7 @@ public class ServiceOrderHelper {
         }
     }
 
-    private void updateBicycleIfProvided(ServiceOrder order, ServiceOrderDto dto) {
+    private void updateBicycleIfProvided(ServiceOrder order, ServiceOrTransportOrderDto dto) {
         if (dto.bicycleIds() != null && !dto.bicycleIds().isEmpty()) {
             Long bicycleId = dto.bicycleIds().get(0); // Take first bicycle
             Optional<IncompleteBike> bikeOpt = incompleteBikeRepository.findById(bicycleId);
@@ -271,7 +271,7 @@ public class ServiceOrderHelper {
 
     // === VALIDATION METHODS ===
 
-    public void validateServiceOrderData(ServiceOrderDto dto, boolean isGuest) {
+    public void validateServiceOrderData(ServiceOrTransportOrderDto dto, boolean isGuest) {
         if (isGuest) {
             validateGuestOrderData(dto);
         } else {
@@ -279,19 +279,19 @@ public class ServiceOrderHelper {
         }
     }
 
-    private void validateUserOrderData(ServiceOrderDto dto) {
+    private void validateUserOrderData(ServiceOrTransportOrderDto dto) {
         if (!dto.isValidForLoggedUser()) {
             throw new RuntimeException("Nieprawidłowe dane zamówienia");
         }
     }
 
-    private void validateGuestOrderData(ServiceOrderDto dto) {
+    private void validateGuestOrderData(ServiceOrTransportOrderDto dto) {
         if (!dto.isValidForGuest()) {
             throw new RuntimeException("Nieprawidłowe dane zamówienia gościa");
         }
     }
 
-    public void validatePickupDate(ServiceOrderDto dto) {
+    public void validatePickupDate(ServiceOrTransportOrderDto dto) {
         if (dto.pickupDate().isBefore(java.time.LocalDate.now())) {
             throw new RuntimeException("Data odbioru nie może być w przeszłości");
         }

@@ -13,8 +13,7 @@ import java.util.List;
  * DTO dla zamówienia serwisowego (transport + serwis)
  * Dziedziczy wszystkie pola transportu i dodaje informacje o serwisie
  */
-public record ServiceOrderDto(
-        // === ROWERY (z TransportOrderDto) ===
+public record ServiceOrTransportOrderDto(
         List<Long> bicycleIds,
         List<GuestBicycleDto> bicycles,
 
