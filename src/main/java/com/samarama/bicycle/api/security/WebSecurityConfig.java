@@ -61,8 +61,7 @@ public class WebSecurityConfig {
                                 "/bicycles/bike",
                                 "/api/bicycles/**",
                                 "/api/guest-orders/service-registration",
-                                "/api/bike-services/**",
-                                "/api/orders/**"
+                                "/api/bike-services/**"
                         ).permitAll()
 
                         // Endpoints for bike photos

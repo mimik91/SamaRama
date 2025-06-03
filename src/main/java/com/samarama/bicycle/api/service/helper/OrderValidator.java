@@ -43,7 +43,7 @@ public class OrderValidator {
         } else if (dto.isUserOrder()) {
             return validateUserOrder(dto);
         } else {
-            return ValidationResult.invalid("Nie można określić typu zamówienia - brak userId i clientEmail");
+            return ValidationResult.invalid("Nie można określić typu zamówienia - brak userId i email");
         }
     }
 
@@ -57,7 +57,7 @@ public class OrderValidator {
         errors.addAll(validateBasicFields(dto));
 
         // === UŻYTKOWNIK ===
-        if (dto.userId() == null) {
+        if (dto.getUserId() == null) {
             errors.add("ID użytkownika jest wymagane");
         }
 
@@ -71,7 +71,7 @@ public class OrderValidator {
         errors.addAll(validateOrderType(dto));
 
         // === SLOTY ===
-        if (dto.pickupDate() != null) {
+        if (dto.getPickupDate() != null) {
             errors.addAll(validateSlots(dto));
         }
 
@@ -103,7 +103,7 @@ public class OrderValidator {
         errors.addAll(validateServicePackageForGuest(dto));
 
         // === SLOTY ===
-        if (dto.pickupDate() != null) {
+        if (dto.getPickupDate() != null) {
             errors.addAll(validateSlots(dto));
         }
 
@@ -115,19 +115,19 @@ public class OrderValidator {
     private List<String> validateBasicFields(ServiceOrTransportOrderDto dto) {
         List<String> errors = new ArrayList<>();
 
-        if (dto.pickupDate() == null) {
+        if (dto.getPickupDate() == null) {
             errors.add("Data odbioru jest wymagana");
-        } else if (dto.pickupDate().isBefore(LocalDate.now())) {
+        } else if (dto.getPickupDate().isBefore(LocalDate.now())) {
             errors.add("Data odbioru nie może być w przeszłości");
         }
 
-        if (dto.targetServiceId() == null) {
-            errors.add("ID serwisu docelowego jest wymagane");
-        } else if (!bikeServiceRepository.existsById(dto.targetServiceId())) {
+        if (dto.getTargetServiceId() == null) {
+            dto.setTargetServiceId(6969696L);
+        } else if (!bikeServiceRepository.existsById(dto.getTargetServiceId())) {
             errors.add("Nieprawidłowy serwis docelowy");
         }
 
-        if (dto.transportPrice() != null && dto.transportPrice().compareTo(java.math.BigDecimal.ZERO) < 0) {
+        if (dto.getTransportPrice() != null && dto.getTransportPrice().compareTo(java.math.BigDecimal.ZERO) < 0) {
             errors.add("Cena transportu nie może być ujemna");
         }
 
@@ -139,15 +139,15 @@ public class OrderValidator {
     private List<String> validateGuestData(ServiceOrTransportOrderDto dto) {
         List<String> errors = new ArrayList<>();
 
-        if (dto.clientEmail() == null || dto.clientEmail().trim().isEmpty()) {
+        if (dto.getEmail() == null || dto.getEmail().trim().isEmpty()) {
             errors.add("Email jest wymagany");
-        } else if (!isValidEmail(dto.clientEmail())) {
+        } else if (!isValidEmail(dto.getEmail())) {
             errors.add("Nieprawidłowy format email");
         }
 
-        if (dto.clientPhone() == null || dto.clientPhone().trim().isEmpty()) {
+        if (dto.getPhone() == null || dto.getPhone().trim().isEmpty()) {
             errors.add("Numer telefonu jest wymagany");
-        } else if (!isValidPhone(dto.clientPhone())) {
+        } else if (!isValidPhone(dto.getPhone())) {
             errors.add("Nieprawidłowy format numeru telefonu");
         }
 
@@ -187,11 +187,11 @@ public class OrderValidator {
             errors.add("Nie można jednocześnie używać istniejących i nowych rowerów");
         }
 
-        if (dto.usesExistingBicycles() && (dto.bicycleIds() == null || dto.bicycleIds().isEmpty())) {
+        if (dto.usesExistingBicycles() && (dto.getBicycleIds() == null || dto.getBicycleIds().isEmpty())) {
             errors.add("Lista ID rowerów nie może być pusta");
         }
 
-        if (dto.usesNewBicycles() && (dto.bicycles() == null || dto.bicycles().isEmpty())) {
+        if (dto.usesNewBicycles() && (dto.getBicycles() == null || dto.getBicycles().isEmpty())) {
             errors.add("Lista nowych rowerów nie może być pusta");
         }
 
@@ -205,12 +205,12 @@ public class OrderValidator {
             errors.add("Gość musi podać dane rowerów");
         }
 
-        if (dto.bicycles() == null || dto.bicycles().isEmpty()) {
+        if (dto.getBicycles() == null || dto.getBicycles().isEmpty()) {
             errors.add("Brak rowerów w zamówieniu");
         } else {
             // Walidacja każdego roweru
-            for (int i = 0; i < dto.bicycles().size(); i++) {
-                var bike = dto.bicycles().get(i);
+            for (int i = 0; i < dto.getBicycles().size(); i++) {
+                var bike = dto.getBicycles().get(i);
                 if (bike.brand() == null || bike.brand().trim().isEmpty()) {
                     errors.add("Marka roweru #" + (i + 1) + " jest wymagana");
                 }
@@ -259,18 +259,18 @@ public class OrderValidator {
     private List<String> validateNewAddressFields(ServiceOrTransportOrderDto dto) {
         List<String> errors = new ArrayList<>();
 
-        if (dto.pickupStreet() == null || dto.pickupStreet().trim().isEmpty()) {
+        if (dto.getPickupStreet() == null || dto.getPickupStreet().trim().isEmpty()) {
             errors.add("Ulica jest wymagana");
         }
 
-        if (dto.pickupBuildingNumber() == null || dto.pickupBuildingNumber().trim().isEmpty()) {
+        if (dto.getPickupBuildingNumber() == null || dto.getPickupBuildingNumber().trim().isEmpty()) {
             errors.add("Numer budynku jest wymagany");
         }
 
-        if (dto.pickupCity() == null || dto.pickupCity().trim().isEmpty()) {
+        if (dto.getPickupCity() == null || dto.getPickupCity().trim().isEmpty()) {
             errors.add("Miasto jest wymagane");
-        } else if (!cityValidator.isValidCity(dto.pickupCity())) {
-            errors.add("Nieprawidłowe miasto: " + dto.pickupCity());
+        } else if (!cityValidator.isValidCity(dto.getPickupCity())) {
+            errors.add("Nieprawidłowe miasto: " + dto.getPickupCity());
         }
 
         return errors;
@@ -293,14 +293,14 @@ public class OrderValidator {
     private List<String> validateServiceOrder(ServiceOrTransportOrderDto dto) {
         List<String> errors = new ArrayList<>();
 
-        if (dto.servicePackageId() == null) {
+        if (dto.getServicePackageId() == null) {
             errors.add("Pakiet serwisowy jest wymagany dla zamówienia serwisowego");
-        } else if (!servicePackageRepository.existsById(dto.servicePackageId())) {
+        } else if (!servicePackageRepository.existsById(dto.getServicePackageId())) {
             errors.add("Nieprawidłowy pakiet serwisowy");
         }
 
         // Zamówienia serwisowe muszą być kierowane do serwisu własnego
-        if (dto.targetServiceId() != null && !dto.targetServiceId().equals(1L)) {
+        if (dto.getTargetServiceId() != null && !dto.getTargetServiceId().equals(1L)) {
             errors.add("Zamówienia serwisowe muszą być kierowane do serwisu własnego (ID=1)");
         }
 
@@ -311,12 +311,12 @@ public class OrderValidator {
         List<String> errors = new ArrayList<>();
 
         // Zamówienia transportowe nie mogą być kierowane do serwisu własnego
-        if (dto.targetServiceId() != null && dto.targetServiceId().equals(1L)) {
+        if (dto.getTargetServiceId() != null && dto.getTargetServiceId().equals(1L)) {
             errors.add("Zamówienia transportowe nie mogą być kierowane do serwisu własnego");
         }
 
         // Nie powinno mieć pakietu serwisowego
-        if (dto.servicePackageId() != null) {
+        if (dto.getServicePackageId() != null) {
             errors.add("Zamówienia transportowe nie powinny mieć pakietu serwisowego");
         }
 
@@ -326,9 +326,9 @@ public class OrderValidator {
     private List<String> validateServicePackageForGuest(ServiceOrTransportOrderDto dto) {
         List<String> errors = new ArrayList<>();
 
-        if (dto.servicePackageId() == null) {
+        if (dto.getServicePackageId() == null) {
             errors.add("Pakiet serwisowy jest wymagany");
-        } else if (!servicePackageRepository.existsById(dto.servicePackageId())) {
+        } else if (!servicePackageRepository.existsById(dto.getServicePackageId())) {
             errors.add("Nieprawidłowy pakiet serwisowy");
         }
 
@@ -347,12 +347,12 @@ public class OrderValidator {
             return errors; // Nie ma sensu sprawdzać slotów bez rowerów
         }
 
-        if (!serviceSlotService.isWithinMaxBikesPerOrder(dto.pickupDate(), bikesCount)) {
-            int maxPerOrder = serviceSlotService.getMaxBikesPerOrder(dto.pickupDate());
+        if (!serviceSlotService.isWithinMaxBikesPerOrder(dto.getPickupDate(), bikesCount)) {
+            int maxPerOrder = serviceSlotService.getMaxBikesPerOrder(dto.getPickupDate());
             errors.add("Przekroczono maksymalną liczbę rowerów na zamówienie (" + maxPerOrder + ")");
         }
 
-        if (!serviceSlotService.areSlotsAvailable(dto.pickupDate(), bikesCount)) {
+        if (!serviceSlotService.areSlotsAvailable(dto.getPickupDate(), bikesCount)) {
             errors.add("Brak wystarczającej liczby wolnych miejsc na wybrany dzień");
         }
 

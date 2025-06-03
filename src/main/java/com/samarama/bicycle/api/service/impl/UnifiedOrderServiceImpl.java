@@ -227,13 +227,14 @@ public class UnifiedOrderServiceImpl implements UnifiedOrderService {
 
             // Ustaw userId w DTO
             ServiceOrTransportOrderDto dtoWithUserId = new ServiceOrTransportOrderDto(
-                    dto.bicycleIds(), dto.bicycles(), userId, dto.clientEmail(), dto.clientPhone(),
-                    dto.pickupAddressId(), dto.pickupStreet(), dto.pickupBuildingNumber(),
-                    dto.pickupApartmentNumber(), dto.pickupCity(), dto.pickupPostalCode(),
-                    dto.pickupLatitude(), dto.pickupLongitude(), dto.pickupDate(),
-                    dto.transportPrice(), dto.transportNotes(), dto.targetServiceId(),
-                    dto.servicePackageId(), dto.serviceNotes(), dto.additionalNotes()
+                    dto.getBicycleIds(), dto.getBicycles(), userId, dto.getEmail(), dto.getPhone(),
+                    dto.getPickupAddressId(), dto.getPickupStreet(), dto.getPickupBuildingNumber(),
+                    dto.getPickupApartmentNumber(), dto.getPickupCity(), dto.getPickupPostalCode(),
+                    dto.getPickupLatitude(), dto.getPickupLongitude(), dto.getPickupDate(),
+                    dto.getTransportPrice(), dto.getTransportNotes(), dto.getTargetServiceId(),
+                    dto.getServicePackageId(), dto.getServiceNotes(), dto.getAdditionalNotes()
             );
+
 
             // Walidacja
             OrderValidator.ValidationResult validation = orderValidator.validateUserOrder(dtoWithUserId);
@@ -355,28 +356,6 @@ public class UnifiedOrderServiceImpl implements UnifiedOrderService {
         }
     }
 
-    // === METODY SERWISOWE ===
-
-    @Override
-    public ResponseEntity<?> startService(Long orderId, String userEmail) {
-        try {
-            return serviceOrderService.startService(orderId, userEmail);
-        } catch (Exception e) {
-            logger.severe("Error starting service: " + e.getMessage());
-            return ResponseEntity.badRequest().body(Map.of("message", "Błąd podczas rozpoczynania serwisu"));
-        }
-    }
-
-    @Override
-    public ResponseEntity<?> completeService(Long orderId, String userEmail) {
-        try {
-            return serviceOrderService.completeService(orderId, userEmail);
-        } catch (Exception e) {
-            logger.severe("Error completing service: " + e.getMessage());
-            return ResponseEntity.badRequest().body(Map.of("message", "Błąd podczas kończenia serwisu"));
-        }
-    }
-
     @Override
     public ResponseEntity<?> updateServiceNotes(Long orderId, String notes, String userEmail) {
         try {
@@ -400,26 +379,26 @@ public class UnifiedOrderServiceImpl implements UnifiedOrderService {
      */
     private ResponseEntity<?> createTransportOrderFromDto(ServiceOrTransportOrderDto dto, String userEmail) {
         TransportOrderDto transportDto = new TransportOrderDto(
-                dto.bicycleIds(),
-                dto.bicycles(),
-                dto.pickupDate(),
+                dto.getBicycleIds(),
+                dto.getBicycles(),
+                dto.getPickupDate(),
                 dto.getPickupAddressString(),
-                dto.pickupLatitude(),
-                dto.pickupLongitude(),
+                dto.getPickupLatitude(),
+                dto.getPickupLongitude(),
                 null, // pickupTimeFrom - stałe 18:00
                 null, // pickupTimeTo - stałe 22:00
                 null, // deliveryAddress - będzie ustawiony automatycznie
                 null, // deliveryLatitude
                 null, // deliveryLongitude
-                dto.targetServiceId(),
-                dto.transportPrice(),
+                dto.getTargetServiceId(),
+                dto.getTransportPrice(),
                 60, // estimatedTime
-                dto.transportNotes(),
-                dto.additionalNotes(),
-                dto.clientEmail(),
-                dto.clientPhone(),
+                dto.getTransportNotes(),
+                dto.getAdditionalNotes(),
+                dto.getEmail(),
+                dto.getPhone(),
                 null, // clientName - nie używamy
-                dto.pickupCity()
+                dto.getPickupCity()
         );
 
         return transportOrderService.createTransportOrder(transportDto, userEmail);

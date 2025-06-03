@@ -3,60 +3,98 @@ package com.samarama.bicycle.api.dto;
 import jakarta.validation.constraints.Future;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
+import lombok.Data;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.LocalTime;
 import java.util.List;
 
 /**
  * Ujednolicone DTO dla zamówień transportowych i serwisowych
  * Obsługuje zarówno użytkowników zalogowanych jak i gości
  */
-public record ServiceOrTransportOrderDto(
-        // === ROWERY ===
-        List<Long> bicycleIds,              // dla zalogowanych użytkowników
-        List<GuestBicycleDto> bicycles,     // dla gości lub nowych rowerów
+@Data
+public class ServiceOrTransportOrderDto {
 
-        // === UŻYTKOWNIK/GOŚĆ ===
-        Long userId,                        // dla zalogowanych użytkowników
-        String clientEmail,                 // dla gości
-        String clientPhone,                 // dla gości
+    // === ROWERY ===
+    private List<Long> bicycleIds;
+    private List<GuestBicycleDto> bicycles;
 
-        // === ADRES ODBIORU ===
-        Long pickupAddressId,               // jeśli adres istnieje w systemie
-        // Alternatywnie - bezpośrednie dane adresowe:
-        String pickupStreet,
-        String pickupBuildingNumber,
-        String pickupApartmentNumber,
-        String pickupCity,
-        String pickupPostalCode,
-        Double pickupLatitude,
-        Double pickupLongitude,
+    // === UŻYTKOWNIK/GOŚĆ ===
+    private Long userId;
+    private String email;
+    private String phone;
 
-        // === TRANSPORT ===
-        @NotNull @Future
-        LocalDate pickupDate,
+    // === ADRES ODBIORU ===
+    private Long pickupAddressId;
+    private String pickupStreet;
+    private String pickupBuildingNumber;
+    private String pickupApartmentNumber;
+    private String pickupCity;
+    private String pickupPostalCode;
+    private Double pickupLatitude;
+    private Double pickupLongitude;
 
-        @PositiveOrZero
-        BigDecimal transportPrice,          // domyślnie 0
-        String transportNotes,
-        Long targetServiceId,               // 1 = serwis własny, inne = zewnętrzne
+    // === TRANSPORT ===
+    @NotNull
+    @Future
+    private LocalDate pickupDate;
 
-        // === SERWIS (opcjonalne) ===
-        Long servicePackageId,
-        String serviceNotes,
+    @PositiveOrZero
+    private BigDecimal transportPrice;
+    private String transportNotes;
+    private Long targetServiceId;
 
-        // === DODATKOWE ===
-        String additionalNotes
-) {
-    // === METODY WALIDACYJNE ===
+    // === SERWIS (opcjonalne) ===
+    private Long servicePackageId;
+    private String serviceNotes;
+
+    // === DODATKOWE ===
+    private String additionalNotes;
+
+    // === KONSTRUKTOR ===
+    public ServiceOrTransportOrderDto() {
+        // Domyślny konstruktor dla pustego obiektu
+    }
+
+    public ServiceOrTransportOrderDto(
+            List<Long> bicycleIds, List<GuestBicycleDto> bicycles,
+            Long userId, String email, String phone,
+            Long pickupAddressId, String pickupStreet, String pickupBuildingNumber,
+            String pickupApartmentNumber, String pickupCity, String pickupPostalCode,
+            Double pickupLatitude, Double pickupLongitude,
+            LocalDate pickupDate, BigDecimal transportPrice, String transportNotes,
+            Long targetServiceId, Long servicePackageId, String serviceNotes,
+            String additionalNotes) {
+        this.bicycleIds = bicycleIds;
+        this.bicycles = bicycles;
+        this.userId = userId;
+        this.email = email;
+        this.phone = phone;
+        this.pickupAddressId = pickupAddressId;
+        this.pickupStreet = pickupStreet;
+        this.pickupBuildingNumber = pickupBuildingNumber;
+        this.pickupApartmentNumber = pickupApartmentNumber;
+        this.pickupCity = pickupCity;
+        this.pickupPostalCode = pickupPostalCode;
+        this.pickupLatitude = pickupLatitude;
+        this.pickupLongitude = pickupLongitude;
+        this.pickupDate = pickupDate;
+        this.transportPrice = transportPrice;
+        this.transportNotes = transportNotes;
+        this.targetServiceId = targetServiceId;
+        this.servicePackageId = servicePackageId;
+        this.serviceNotes = serviceNotes;
+        this.additionalNotes = additionalNotes;
+
+    }
 
     /**
      * Sprawdza czy to zamówienie gościa
      */
     public boolean isGuestOrder() {
-        return clientEmail != null && !clientEmail.trim().isEmpty();
+        return email != null && !email.trim().isEmpty();
     }
 
     /**
@@ -110,7 +148,7 @@ public record ServiceOrTransportOrderDto(
         return bicycles != null && !bicycles.isEmpty();
     }
 
-    // === WALIDACJA KOMPLETNOŚCI ===
+// === WALIDACJA KOMPLETNOŚCI ===
 
     /**
      * Walidacja dla zalogowanego użytkownika
@@ -128,12 +166,14 @@ public record ServiceOrTransportOrderDto(
      * Walidacja dla gościa
      */
     public boolean isValidForGuest() {
-        return clientEmail != null && !clientEmail.trim().isEmpty() &&
-                clientPhone != null && !clientPhone.trim().isEmpty() &&
+        if (this.transportPrice == null){
+            this.setTransportPrice(BigDecimal.valueOf(0));
+        }
+        return email != null && !email.trim().isEmpty() &&
+                phone != null && !phone.trim().isEmpty() &&
                 pickupDate != null &&
-                usesNewAddress() && // gość zawsze używa nowych adresów
-                usesNewBicycles() && // gość zawsze używa nowych rowerów
-                transportPrice != null &&
+                usesNewBicycles() &&
+                this.transportPrice != null &&
                 targetServiceId != null;
     }
 
@@ -154,7 +194,7 @@ public record ServiceOrTransportOrderDto(
                 !targetServiceId.equals(1L); // nie serwis własny
     }
 
-    // === METODY POMOCNICZE ===
+// === METODY POMOCNICZE ===
 
     /**
      * Zwraca całkowitą cenę zamówienia
@@ -230,7 +270,7 @@ public record ServiceOrTransportOrderDto(
         return address.toString();
     }
 
-    // === FACTORY METHODS ===
+// === FACTORY METHODS ===
 
     /**
      * Tworzy DTO dla zamówienia serwisowego użytkownika
@@ -274,4 +314,5 @@ public record ServiceOrTransportOrderDto(
                 servicePackageId, null, null
         );
     }
+
 }

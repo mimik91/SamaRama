@@ -42,21 +42,6 @@ public interface ServiceOrderService {
      */
     ResponseEntity<?> updateServiceOrder(Long orderId, ServiceOrTransportOrderDto dto, String userEmail);
 
-    /**
-     * Rozpoczyna serwis
-     */
-    ResponseEntity<?> startService(Long orderId, String userEmail);
-
-    /**
-     * Kończy serwis
-     */
-    ResponseEntity<?> completeService(Long orderId, String userEmail);
-
-    /**
-     * Aktualizuje notatki serwisowe
-     */
-    ResponseEntity<?> updateServiceNotes(Long orderId, String notes, String userEmail);
-
     // === ADMIN ===
 
     /**
@@ -74,19 +59,7 @@ public interface ServiceOrderService {
      */
     ResponseEntity<?> deleteServiceOrder(Long orderId, String adminEmail);
 
-    // === STATYSTYKI SERWISU ===
-
-    /**
-     * Pobiera statystyki pakietów serwisowych
-     */
-    List<Object[]> getServicePackageStatistics();
-
-    /**
-     * Pobiera przychody z serwisu
-     */
-    List<Object[]> getServiceRevenue();
-
-    // Dodaj te metody do interfejsu ServiceOrderService
+    // === UNIFIED DTO METHODS ===
 
     /**
      * Pobiera wszystkie zamówienia serwisowe jako UnifiedOrderResponseDto (admin)
@@ -97,4 +70,6 @@ public interface ServiceOrderService {
      * Pobiera zamówienie serwisowe jako UnifiedOrderResponseDto (admin)
      */
     Optional<UnifiedOrderResponseDto> getOrderAsUnified(Long orderId);
+
+    ResponseEntity<?> updateServiceNotes(Long orderId, String notes, String userEmail);
 }

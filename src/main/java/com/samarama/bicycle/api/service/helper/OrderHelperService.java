@@ -94,12 +94,12 @@ public class OrderHelperService {
      */
     public Address getOrCreateAddress(ServiceOrTransportOrderDto dto, Long userId) {
         // Jeśli podano ID adresu, spróbuj go pobrać
-        if (dto.pickupAddressId() != null) {
-            Optional<Address> existingAddress = addressRepository.findByIdAndUserId(dto.pickupAddressId(), userId);
+        if (dto.getPickupAddressId() != null) {
+            Optional<Address> existingAddress = addressRepository.findByIdAndUserId(dto.getPickupAddressId(), userId);
             if (existingAddress.isPresent()) {
                 return existingAddress.get();
             } else {
-                throw new RuntimeException("Adres o ID " + dto.pickupAddressId() + " nie należy do użytkownika lub nie istnieje");
+                throw new RuntimeException("Adres o ID " + dto.getPickupAddressId() + " nie należy do użytkownika lub nie istnieje");
             }
         }
 
@@ -116,13 +116,13 @@ public class OrderHelperService {
      */
     public Address createTemporaryAddressFromDto(ServiceOrTransportOrderDto dto, Long userId) {
         Address address = new Address();
-        address.setStreet(dto.pickupStreet());
-        address.setBuildingNumber(dto.pickupBuildingNumber());
-        address.setApartmentNumber(dto.pickupApartmentNumber());
-        address.setCity(dto.pickupCity());
-        address.setPostalCode(dto.pickupPostalCode());
-        address.setLatitude(dto.pickupLatitude());
-        address.setLongitude(dto.pickupLongitude());
+        address.setStreet(dto.getPickupStreet());
+        address.setBuildingNumber(dto.getPickupBuildingNumber());
+        address.setApartmentNumber(dto.getPickupApartmentNumber());
+        address.setCity(dto.getPickupCity());
+        address.setPostalCode(dto.getPickupPostalCode());
+        address.setLatitude(dto.getPickupLatitude());
+        address.setLongitude(dto.getPickupLongitude());
         address.setUserId(userId);
         address.setName("Adres z zamówienia"); // domyślna nazwa
         address.setActive(true);
@@ -146,16 +146,16 @@ public class OrderHelperService {
         }
 
         StringBuilder address = new StringBuilder();
-        address.append(dto.pickupStreet()).append(" ").append(dto.pickupBuildingNumber());
+        address.append(dto.getPickupStreet()).append(" ").append(dto.getPickupBuildingNumber());
 
-        if (dto.pickupApartmentNumber() != null && !dto.pickupApartmentNumber().trim().isEmpty()) {
-            address.append("/").append(dto.pickupApartmentNumber());
+        if (dto.getPickupApartmentNumber() != null && !dto.getPickupApartmentNumber().trim().isEmpty()) {
+            address.append("/").append(dto.getPickupApartmentNumber());
         }
 
-        address.append(", ").append(dto.pickupCity());
+        address.append(", ").append(dto.getPickupCity());
 
-        if (dto.pickupPostalCode() != null && !dto.pickupPostalCode().trim().isEmpty()) {
-            address.append(" ").append(dto.pickupPostalCode());
+        if (dto.getPickupPostalCode() != null && !dto.getPickupPostalCode().trim().isEmpty()) {
+            address.append(" ").append(dto.getPickupPostalCode());
         }
 
         return address.toString();
@@ -211,9 +211,9 @@ public class OrderHelperService {
      * Pobierz pakiet serwisowy i jego cenę
      */
     public ServicePackage getServicePackage(ServiceOrTransportOrderDto dto) {
-        if (dto.servicePackageId() != null) {
-            return servicePackageRepository.findById(dto.servicePackageId())
-                    .orElseThrow(() -> new RuntimeException("Service package not found: " + dto.servicePackageId()));
+        if (dto.getServicePackageId() != null) {
+            return servicePackageRepository.findById(dto.getServicePackageId())
+                    .orElseThrow(() -> new RuntimeException("Service package not found: " + dto.getServicePackageId()));
         } else {
             throw new RuntimeException("Brak ID pakietu serwisowego");
         }
@@ -297,7 +297,7 @@ public class OrderHelperService {
         serviceOrder.setPickupTimeTo(transportOrder.getPickupTimeTo());
         serviceOrder.setDeliveryAddress(transportOrder.getDeliveryAddress());
         serviceOrder.setDeliveryLatitude(transportOrder.getDeliveryLatitude());
-        serviceOrder.setDeliveryLongitude(transportOrder.getLongitude());
+        serviceOrder.setDeliveryLongitude(transportOrder.getDeliveryLongitude());
         serviceOrder.setTargetService(transportOrder.getTargetService());
         serviceOrder.setStatus(transportOrder.getStatus());
         serviceOrder.setOrderDate(transportOrder.getOrderDate());
@@ -317,11 +317,11 @@ public class OrderHelperService {
             throw new RuntimeException("Nieprawidłowe dane zamówienia dla użytkownika");
         }
 
-        if (dto.isServiceOrder() && dto.targetServiceId() != null && !dto.targetServiceId().equals(1L)) {
+        if (dto.isServiceOrder() && dto.getTargetServiceId() != null && !dto.getTargetServiceId().equals(1L)) {
             throw new RuntimeException("Zamówienie serwisowe musi być kierowane do serwisu własnego");
         }
 
-        if (dto.isTransportOnlyOrder() && dto.targetServiceId() != null && dto.targetServiceId().equals(1L)) {
+        if (dto.isTransportOnlyOrder() && dto.getTargetServiceId() != null && dto.getTargetServiceId().equals(1L)) {
             throw new RuntimeException("Zamówienie transportowe nie może być kierowane do serwisu własnego");
         }
     }

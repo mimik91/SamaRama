@@ -38,16 +38,16 @@ public class ServiceOrderValidator {
         }
 
         // Date validation
-        validatePickupDate(dto.pickupDate(), errors);
+        validatePickupDate(dto.getPickupDate(), errors);
 
         // City validation
-        validateCity(dto.pickupAddress(), null, errors);
+        validateCity(dto.getPickupAddressString(), null, errors);
 
         // Service package validation
         validateServicePackage(dto, errors);
 
         // Bicycles validation
-        validateBicycles(dto.bicycleIds(), null, errors);
+        validateBicycles(dto.getBicycleIds(), null, errors);
 
         return new ValidationResult(errors.isEmpty(), errors);
     }
@@ -64,16 +64,16 @@ public class ServiceOrderValidator {
         }
 
         // Date validation
-        validatePickupDate(dto.pickupDate(), errors);
+        validatePickupDate(dto.getPickupDate(), errors);
 
         // City validation
-        validateCity(dto.pickupAddress(), dto.city(), errors);
+        validateCity(dto.getPickupAddressString(), dto.getPickupCity(), errors);
 
         // Service package validation
         validateServicePackage(dto, errors);
 
         // Guest bicycles validation
-        validateGuestBicycles(dto.bicycles(), errors);
+        validateGuestBicycles(dto.getBicycles(), errors);
 
         // Guest contact validation
         validateGuestContact(dto, errors);
@@ -143,10 +143,9 @@ public class ServiceOrderValidator {
     }
 
     private void validateServicePackage(ServiceOrTransportOrderDto dto, List<String> errors) {
-        boolean hasPackageId = dto.servicePackageId() != null;
-        boolean hasPackageCode = dto.servicePackageCode() != null && !dto.servicePackageCode().trim().isEmpty();
+        boolean hasPackageId = dto.getServicePackageId() != null;
 
-        if (!hasPackageId && !hasPackageCode) {
+        if (!hasPackageId) {
             errors.add("Pakiet serwisowy jest wymagany");
         }
     }
@@ -182,15 +181,15 @@ public class ServiceOrderValidator {
     }
 
     private void validateGuestContact(ServiceOrTransportOrderDto dto, List<String> errors) {
-        if (dto.clientEmail() == null || dto.clientEmail().trim().isEmpty()) {
+        if (dto.getEmail() == null || dto.getEmail().trim().isEmpty()) {
             errors.add("Email klienta jest wymagany");
-        } else if (!isValidEmail(dto.clientEmail())) {
+        } else if (!isValidEmail(dto.getEmail())) {
             errors.add("Nieprawidłowy format email");
         }
 
-        if (dto.clientPhone() == null || dto.clientPhone().trim().isEmpty()) {
+        if (dto.getPhone() == null || dto.getPhone().trim().isEmpty()) {
             errors.add("Telefon klienta jest wymagany");
-        } else if (!isValidPhone(dto.clientPhone())) {
+        } else if (!isValidPhone(dto.getPhone())) {
             errors.add("Nieprawidłowy format telefonu");
         }
     }

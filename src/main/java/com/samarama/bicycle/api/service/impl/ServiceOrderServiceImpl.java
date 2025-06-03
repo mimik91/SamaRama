@@ -2,15 +2,17 @@ package com.samarama.bicycle.api.service.impl;
 
 import com.samarama.bicycle.api.dto.*;
 import com.samarama.bicycle.api.model.*;
-import com.samarama.bicycle.api.repository.ServiceOrderRepository;
+import com.samarama.bicycle.api.repository.*;
 import com.samarama.bicycle.api.service.ServiceOrderService;
 import com.samarama.bicycle.api.service.EmailService;
 import com.samarama.bicycle.api.service.ServiceSlotService;
-import com.samarama.bicycle.api.service.helper.ServiceOrderHelper;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.logging.Logger;
@@ -22,22 +24,34 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
     private static final Logger logger = Logger.getLogger(ServiceOrderServiceImpl.class.getName());
 
     private final ServiceOrderRepository serviceOrderRepository;
+    private final UserRepository userRepository;
+    private final IncompleteUserRepository incompleteUserRepository;
+    private final IncompleteBikeRepository incompleteBikeRepository;
+    private final ServicePackageRepository servicePackageRepository;
+    private final BikeServiceRepository bikeServiceRepository;
     private final ServiceSlotService serviceSlotService;
     private final EmailService emailService;
-    private final ServiceOrderHelper serviceOrderHelper;
-    private final ServiceOrderValidator serviceOrderValidator;
+
+    @Value("${app.internal.service.id}")
+    private String internalServiceIdString;
 
     public ServiceOrderServiceImpl(
             ServiceOrderRepository serviceOrderRepository,
+            UserRepository userRepository,
+            IncompleteUserRepository incompleteUserRepository,
+            IncompleteBikeRepository incompleteBikeRepository,
+            ServicePackageRepository servicePackageRepository,
+            BikeServiceRepository bikeServiceRepository,
             ServiceSlotService serviceSlotService,
-            EmailService emailService,
-            ServiceOrderHelper serviceOrderHelper,
-            ServiceOrderValidator serviceOrderValidator) {
+            EmailService emailService) {
         this.serviceOrderRepository = serviceOrderRepository;
+        this.userRepository = userRepository;
+        this.incompleteUserRepository = incompleteUserRepository;
+        this.incompleteBikeRepository = incompleteBikeRepository;
+        this.servicePackageRepository = servicePackageRepository;
+        this.bikeServiceRepository = bikeServiceRepository;
         this.serviceSlotService = serviceSlotService;
         this.emailService = emailService;
-        this.serviceOrderHelper = serviceOrderHelper;
-        this.serviceOrderValidator = serviceOrderValidator;
     }
 
     // === CREATION METHODS ===
@@ -45,41 +59,63 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
     @Override
     @Transactional
     public ResponseEntity<?> createServiceOrder(ServiceOrTransportOrderDto dto, String userEmail) {
+
+
+        // Pobierz użytkownika
+        User user = getUserByEmail(userEmail);
+        dto.setUserId(user.getId());
+
         try {
-            // Validation
-            ServiceOrderValidator.ValidationResult validation = serviceOrderValidator.validateUserServiceOrder(dto);
-            if (!validation.isValid()) {
-                return ResponseEntity.badRequest().body(Map.of("message", validation.getFirstError()));
+
+            if(dto.getTargetServiceId() == null){
+                dto.setTargetServiceId(Long.parseLong(internalServiceIdString));
+            }
+            // Walidacja danych wejściowych
+            if (!dto.isValidForLoggedUser()) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Nieprawidłowe dane zamówienia"));
             }
 
-            // Check slot availability
-            int bikesCount = dto.bicycleIds().size();
-            ServiceOrderValidator.SlotValidationResult slotValidation =
-                    serviceOrderValidator.validateSlotAvailability(dto.pickupDate(), bikesCount);
+            if (!dto.isServiceOrder()) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Pakiet serwisowy jest wymagany"));
+            }
 
-            if (!slotValidation.isAvailable()) {
+            // Walidacja daty
+            if (dto.getPickupDate().isBefore(LocalDate.now())) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Data odbioru nie może być w przeszłości"));
+            }
+
+            // Sprawdź dostępność slotów
+            int bikesCount = dto.getBicycleIds().size();
+            if (!serviceSlotService.areSlotsAvailable(dto.getPickupDate(), bikesCount)) {
                 return ResponseEntity.badRequest().body(Map.of(
-                        "message", slotValidation.getMessage(),
-                        "details", slotValidation.getAdditionalInfo()
+                        "message", "Brak dostępnych miejsc na wybrany dzień",
+                        "availableSlots", getAvailableSlots(dto.getPickupDate())
                 ));
             }
 
-            // Get entities
-            User user = serviceOrderHelper.getUserByEmail(userEmail);
-            ServicePackage servicePackage = serviceOrderHelper.getServicePackage(dto);
-            BikeService ownService = serviceOrderHelper.getOwnService();
-            List<IncompleteBike> bikes = serviceOrderHelper.validateAndGetBikes(dto.bicycleIds(), user.getId());
 
-            // Create orders
-            List<ServiceOrder> orders = serviceOrderHelper.createServiceOrdersForUser(
-                    bikes, user, dto, servicePackage, ownService);
 
-            // Save and notify
+            // Pobierz pakiet serwisowy
+            ServicePackage servicePackage = servicePackageRepository.findById(dto.getServicePackageId())
+                    .orElseThrow(() -> new RuntimeException("Service package not found"));
+
+            // Pobierz serwis własny
+            BikeService ownService = getOwnService();
+
+            // Walidacja rowerów
+            List<IncompleteBike> bikes = validateAndGetBikes(dto.getBicycleIds(), user.getId());
+
+            // Utwórz zamówienia serwisowe
+            List<ServiceOrder> orders = createServiceOrdersForUser(bikes, user, dto, servicePackage, ownService);
+
+            // Zapisz zamówienia
             List<ServiceOrder> savedOrders = serviceOrderRepository.saveAll(orders);
+
+            // Wyślij powiadomienia email
             sendEmailNotifications(savedOrders);
 
-            // Log success
-            savedOrders.forEach(order -> serviceOrderHelper.logServiceOrderCreation(order, userEmail));
+            // Log akcji
+            savedOrders.forEach(order -> logServiceOrderCreation(order, userEmail));
 
             return ResponseEntity.ok(Map.of(
                     "message", "Zamówienia serwisowe zostały utworzone pomyślnie",
@@ -90,6 +126,9 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
         } catch (RuntimeException e) {
             logger.warning("Failed to create service order for user " + userEmail + ": " + e.getMessage());
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        } catch (Exception e) {
+            logger.severe("Error creating service order: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(Map.of("message", "Wystąpił błąd podczas tworzenia zamówienia"));
         }
     }
 
@@ -97,35 +136,45 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
     @Transactional
     public ResponseEntity<?> createGuestServiceOrder(ServiceOrTransportOrderDto dto) {
         try {
-            // Validation
-            ServiceOrderValidator.ValidationResult validation = serviceOrderValidator.validateGuestServiceOrder(dto);
-            if (!validation.isValid()) {
-                return ResponseEntity.badRequest().body(Map.of("message", validation.getFirstError()));
+            if (!dto.isValidForGuest()) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Nieprawidłowe dane zamówienia gościa"));
             }
 
-            // Check slot availability
-            int bikesCount = dto.bicycles().size();
-            ServiceOrderValidator.SlotValidationResult slotValidation =
-                    serviceOrderValidator.validateSlotAvailability(dto.pickupDate(), bikesCount);
+            if (!dto.isServiceOrder()) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Pakiet serwisowy jest wymagany"));
+            }
 
-            if (!slotValidation.isAvailable()) {
+            // Walidacja daty
+            if (dto.getPickupDate().isBefore(LocalDate.now())) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Data odbioru nie może być w przeszłości"));
+            }
+
+            // Sprawdź dostępność slotów
+            int bikesCount = dto.getBicycles().size();
+            if (!serviceSlotService.areSlotsAvailable(dto.getPickupDate(), bikesCount)) {
                 return ResponseEntity.badRequest().body(Map.of(
-                        "message", slotValidation.getMessage(),
-                        "details", slotValidation.getAdditionalInfo()
+                        "message", "Brak dostępnych miejsc na wybrany dzień",
+                        "availableSlots", getAvailableSlots(dto.getPickupDate())
                 ));
             }
 
-            // Get entities
-            IncompleteUser guestUser = serviceOrderHelper.createOrFindIncompleteUser(dto.clientEmail(), dto.clientPhone());
-            ServicePackage servicePackage = serviceOrderHelper.getServicePackage(dto);
-            BikeService ownService = serviceOrderHelper.getOwnService();
-            List<IncompleteBike> bikes = serviceOrderHelper.createIncompleteBikes(dto.bicycles(), guestUser);
+            // Utwórz lub znajdź użytkownika tymczasowego
+            IncompleteUser guestUser = createOrFindIncompleteUser(dto.getEmail(), dto.getPhone());
 
-            // Create orders
-            List<ServiceOrder> orders = serviceOrderHelper.createServiceOrdersForGuest(
-                    bikes, guestUser, dto, servicePackage, ownService);
+            // Pobierz pakiet serwisowy
+            ServicePackage servicePackage = servicePackageRepository.findById(dto.getServicePackageId())
+                    .orElseThrow(() -> new RuntimeException("Service package not found"));
 
-            // Save orders
+            // Pobierz serwis własny
+            BikeService ownService = getOwnService();
+
+            // Utwórz rowery
+            List<IncompleteBike> bikes = createIncompleteBikes(dto.getBicycles(), guestUser);
+
+            // Utwórz zamówienia serwisowe
+            List<ServiceOrder> orders = createServiceOrdersForGuest(bikes, guestUser, dto, servicePackage, ownService);
+
+            // Zapisz zamówienia
             List<ServiceOrder> savedOrders = serviceOrderRepository.saveAll(orders);
 
             return ResponseEntity.ok(Map.of(
@@ -137,6 +186,9 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
         } catch (RuntimeException e) {
             logger.warning("Failed to create guest service order: " + e.getMessage());
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        } catch (Exception e) {
+            logger.severe("Error creating guest service order: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(Map.of("message", "Wystąpił błąd podczas tworzenia zamówienia"));
         }
     }
 
@@ -144,7 +196,7 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
 
     @Override
     public List<UnifiedOrderResponseDto> getUserServiceOrders(String userEmail) {
-        User user = serviceOrderHelper.getUserByEmail(userEmail);
+        User user = getUserByEmail(userEmail);
         List<ServiceOrder> orders = serviceOrderRepository.findByClient(user);
 
         return orders.stream()
@@ -155,7 +207,7 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
 
     @Override
     public ResponseEntity<UnifiedOrderResponseDto> getServiceOrderDetails(Long orderId, String userEmail) {
-        User user = serviceOrderHelper.getUserByEmail(userEmail);
+        User user = getUserByEmail(userEmail);
 
         Optional<ServiceOrder> orderOpt = serviceOrderRepository.findById(orderId);
         if (orderOpt.isEmpty()) {
@@ -178,18 +230,18 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
     @Transactional
     public ResponseEntity<?> updateServiceOrder(Long orderId, ServiceOrTransportOrderDto dto, String userEmail) {
         try {
-            User user = serviceOrderHelper.getUserByEmail(userEmail);
+            User user = getUserByEmail(userEmail);
             ServiceOrder order = getServiceOrderForUser(orderId, user);
 
             // Check if can modify
-            if (!serviceOrderValidator.canUserModifyOrder(order, userEmail)) {
+            if (!canUserModifyOrder(order, userEmail)) {
                 return ResponseEntity.badRequest().body(Map.of(
                         "message", "Zamówienie można modyfikować tylko w statusie PENDING lub CONFIRMED"
                 ));
             }
 
             // Update fields
-            serviceOrderHelper.updateServiceOrderFields(order, dto);
+            updateServiceOrderFields(order, dto);
             order.setLastModifiedBy(userEmail);
             order.setLastModifiedDate(LocalDateTime.now());
 
@@ -205,93 +257,13 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
         }
     }
 
-    // === SERVICE LIFECYCLE METHODS ===
 
-    @Override
-    @Transactional
-    public ResponseEntity<?> startService(Long orderId, String userEmail) {
-        try {
-            ServiceOrder order = getServiceOrderById(orderId);
-
-            ServiceOrderValidator.ValidationResult validation = serviceOrderValidator.validateServiceStart(order);
-            if (!validation.isValid()) {
-                return ResponseEntity.badRequest().body(Map.of("message", validation.getFirstError()));
-            }
-
-            order.startService();
-            order.setLastModifiedBy(userEmail);
-            order.setLastModifiedDate(LocalDateTime.now());
-
-            serviceOrderRepository.save(order);
-            serviceOrderHelper.logServiceAction("START_SERVICE", orderId, userEmail);
-
-            return ResponseEntity.ok(Map.of(
-                    "message", "Serwis został rozpoczęty",
-                    "serviceStartDate", order.getServiceStartDate()
-            ));
-
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
-        }
-    }
-
-    @Override
-    @Transactional
-    public ResponseEntity<?> completeService(Long orderId, String userEmail) {
-        try {
-            ServiceOrder order = getServiceOrderById(orderId);
-
-            ServiceOrderValidator.ValidationResult validation = serviceOrderValidator.validateServiceCompletion(order);
-            if (!validation.isValid()) {
-                return ResponseEntity.badRequest().body(Map.of("message", validation.getFirstError()));
-            }
-
-            order.completeService();
-            order.setLastModifiedBy(userEmail);
-            order.setLastModifiedDate(LocalDateTime.now());
-
-            serviceOrderRepository.save(order);
-            serviceOrderHelper.logServiceAction("COMPLETE_SERVICE", orderId, userEmail);
-
-            return ResponseEntity.ok(Map.of(
-                    "message", "Serwis został zakończony",
-                    "serviceCompletionDate", order.getServiceCompletionDate(),
-                    "serviceDuration", order.getServiceDurationDisplay()
-            ));
-
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
-        }
-    }
-
-    @Override
-    @Transactional
-    public ResponseEntity<?> updateServiceNotes(Long orderId, String notes, String userEmail) {
-        try {
-            ServiceOrder order = getServiceOrderById(orderId);
-
-            order.setServiceNotes(notes);
-            order.setLastModifiedBy(userEmail);
-            order.setLastModifiedDate(LocalDateTime.now());
-
-            serviceOrderRepository.save(order);
-            serviceOrderHelper.logServiceAction("UPDATE_NOTES", orderId, userEmail);
-
-            return ResponseEntity.ok(Map.of(
-                    "message", "Notatki serwisowe zostały zaktualizowane",
-                    "serviceNotes", notes
-            ));
-
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
-        }
-    }
 
     // === ADMIN METHODS ===
 
     @Override
     public List<UnifiedOrderResponseDto> getAllServiceOrders() {
-        List<ServiceOrder> orders = serviceOrderRepository.findAllActive();
+        List<ServiceOrder> orders = serviceOrderRepository.findAll();
         return orders.stream()
                 .map(UnifiedOrderResponseDto::fromServiceOrder)
                 .sorted(Comparator.comparing(UnifiedOrderResponseDto::orderDate, Comparator.reverseOrder()))
@@ -304,12 +276,11 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
         try {
             ServiceOrder order = getServiceOrderById(orderId);
 
-            serviceOrderHelper.updateServiceOrderFields(order, dto);
+            updateServiceOrderFields(order, dto);
             order.setLastModifiedBy(adminEmail);
             order.setLastModifiedDate(LocalDateTime.now());
 
             serviceOrderRepository.save(order);
-            serviceOrderHelper.logServiceAction("ADMIN_UPDATE", orderId, adminEmail);
 
             return ResponseEntity.ok(Map.of(
                     "message", "Zamówienie zostało zaktualizowane",
@@ -329,25 +300,51 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
         }
 
         serviceOrderRepository.deleteById(orderId);
-        serviceOrderHelper.logServiceAction("ADMIN_DELETE", orderId, adminEmail);
 
         return ResponseEntity.ok(Map.of("message", "Zamówienie zostało usunięte"));
     }
 
-    // === STATISTICS METHODS ===
+
 
     @Override
-    public List<Object[]> getServicePackageStatistics() {
-        return serviceOrderRepository.getServicePackageStatistics();
+    public List<UnifiedOrderResponseDto> getAllServiceOrdersAsUnified() {
+        return getAllServiceOrders();
     }
 
+    @Override
+    public Optional<UnifiedOrderResponseDto> getOrderAsUnified(Long orderId) {
+        Optional<ServiceOrder> orderOpt = serviceOrderRepository.findById(orderId);
+        return orderOpt.map(UnifiedOrderResponseDto::fromServiceOrder);
+    }
 
     @Override
-    public List<Object[]> getServiceRevenue() {
-        return serviceOrderRepository.getServicePackageRevenue();
+    @Transactional
+    public ResponseEntity<?> updateServiceNotes(Long orderId, String notes, String userEmail) {
+        try {
+            ServiceOrder order = getServiceOrderById(orderId);
+
+            order.setServiceNotes(notes);
+            order.setLastModifiedBy(userEmail);
+            order.setLastModifiedDate(LocalDateTime.now());
+
+            serviceOrderRepository.save(order);
+
+            return ResponseEntity.ok(Map.of(
+                    "message", "Notatki serwisowe zostały zaktualizowane",
+                    "serviceNotes", notes
+            ));
+
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
     }
 
     // === PRIVATE HELPER METHODS ===
+
+    private User getUserByEmail(String email) {
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found: " + email));
+    }
 
     private ServiceOrder getServiceOrderById(Long orderId) {
         return serviceOrderRepository.findById(orderId)
@@ -364,6 +361,211 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
         return order;
     }
 
+    private BikeService getOwnService() {
+        return bikeServiceRepository.findById(1L)
+                .orElseThrow(() -> new RuntimeException("Own service not found"));
+    }
+
+    private List<IncompleteBike> validateAndGetBikes(List<Long> bicycleIds, Long userId) {
+        List<IncompleteBike> bikes = new ArrayList<>();
+        for (Long bicycleId : bicycleIds) {
+            IncompleteBike bike = incompleteBikeRepository.findById(bicycleId)
+                    .orElseThrow(() -> new RuntimeException("Bike not found: " + bicycleId));
+
+            if (bike.getOwner() == null || !bike.getOwner().getId().equals(userId)) {
+                throw new RuntimeException("Brak uprawnień do roweru: " + bicycleId);
+            }
+
+            bikes.add(bike);
+        }
+        return bikes;
+    }
+
+    private IncompleteUser createOrFindIncompleteUser(String email, String phone) {
+        Optional<IncompleteUser> existingUser = incompleteUserRepository.findByEmail(email);
+
+        if (existingUser.isPresent()) {
+            IncompleteUser user = existingUser.get();
+            if (phone != null) {
+                user.setPhoneNumber(phone);
+            }
+            return incompleteUserRepository.save(user);
+        } else {
+            IncompleteUser newUser = new IncompleteUser();
+            newUser.setEmail(email);
+            newUser.setPhoneNumber(phone);
+            newUser.setCreatedAt(LocalDateTime.now());
+            return incompleteUserRepository.save(newUser);
+        }
+    }
+
+    private List<IncompleteBike> createIncompleteBikes(List<GuestBicycleDto> bicycleDtos, IncompleteUser owner) {
+        List<IncompleteBike> bikes = new ArrayList<>();
+
+        for (GuestBicycleDto bikeDto : bicycleDtos) {
+            IncompleteBike bike = new IncompleteBike();
+            bike.setBrand(bikeDto.brand());
+            bike.setModel(bikeDto.model());
+            if (bikeDto.additionalInfo() != null && !bikeDto.additionalInfo().isEmpty()) {
+                bike.setType(bikeDto.additionalInfo());
+            }
+            bike.setOwner(owner);
+            bike.setCreatedAt(LocalDateTime.now());
+
+            bikes.add(incompleteBikeRepository.save(bike));
+        }
+
+        return bikes;
+    }
+
+    private List<ServiceOrder> createServiceOrdersForUser(
+            List<IncompleteBike> bikes, User user, ServiceOrTransportOrderDto dto,
+            ServicePackage servicePackage, BikeService ownService) {
+
+        List<ServiceOrder> orders = new ArrayList<>();
+        BigDecimal transportPrice = calculateTransportPrice(bikes.size());
+
+        for (IncompleteBike bike : bikes) {
+            ServiceOrder order = new ServiceOrder();
+
+            // Pola bazowe z TransportOrder
+            order.setBicycle(bike);
+            order.setClient(user);
+            order.setPickupDate(dto.getPickupDate());
+            order.setPickupAddress(getPickupAddress(dto));
+            order.setPickupLatitude(dto.getPickupLatitude());
+            order.setPickupLongitude(dto.getPickupLongitude());
+            order.setPickupTimeFrom(null); // Stały czas 18-22
+            order.setPickupTimeTo(null);
+
+            order.setTargetService(ownService);
+            order.setDeliveryAddress("SERWIS WŁASNY");
+            order.setDeliveryLatitude(ownService.getLatitude());
+            order.setDeliveryLongitude(ownService.getLongitude());
+
+            order.setTransportPrice(transportPrice);
+            order.setEstimatedTime(60);
+            order.setTransportNotes(dto.getTransportNotes());
+            order.setAdditionalNotes(dto.getAdditionalNotes());
+            order.setStatus(TransportOrder.OrderStatus.PENDING);
+            order.setOrderDate(LocalDateTime.now());
+
+            // Pola specyficzne dla ServiceOrder
+            order.setServicePackage(servicePackage);
+            order.setServicePackageCode(servicePackage.getCode());
+            order.setServicePrice(servicePackage.getPrice());
+            order.setServiceNotes(dto.getServiceNotes());
+            order.setServiceStartDate(null);
+            order.setServiceCompletionDate(null);
+
+            orders.add(order);
+        }
+
+        return orders;
+    }
+
+    private List<ServiceOrder> createServiceOrdersForGuest(
+            List<IncompleteBike> bikes, IncompleteUser guestUser, ServiceOrTransportOrderDto dto,
+            ServicePackage servicePackage, BikeService ownService) {
+
+        List<ServiceOrder> orders = new ArrayList<>();
+        BigDecimal transportPrice = calculateTransportPrice(bikes.size());
+
+        for (IncompleteBike bike : bikes) {
+            ServiceOrder order = new ServiceOrder();
+
+            // Pola bazowe z TransportOrder
+            order.setBicycle(bike);
+            order.setClient(guestUser);
+            order.setPickupDate(dto.getPickupDate());
+            order.setPickupAddress(getPickupAddress(dto));
+            order.setPickupLatitude(dto.getPickupLatitude());
+            order.setPickupLongitude(dto.getPickupLongitude());
+            order.setPickupTimeFrom(null);
+            order.setPickupTimeTo(null);
+
+            order.setTargetService(ownService);
+            order.setDeliveryAddress("SERWIS WŁASNY");
+            order.setDeliveryLatitude(ownService.getLatitude());
+            order.setDeliveryLongitude(ownService.getLongitude());
+
+            order.setTransportPrice(transportPrice);
+            order.setEstimatedTime(60);
+            order.setTransportNotes(dto.getTransportNotes());
+            order.setAdditionalNotes(dto.getAdditionalNotes());
+            order.setStatus(TransportOrder.OrderStatus.PENDING);
+            order.setOrderDate(LocalDateTime.now());
+
+            // Pola specyficzne dla ServiceOrder
+            order.setServicePackage(servicePackage);
+            order.setServicePackageCode(servicePackage.getCode());
+            order.setServicePrice(servicePackage.getPrice());
+            order.setServiceNotes(dto.getServiceNotes());
+            order.setServiceStartDate(null);
+            order.setServiceCompletionDate(null);
+
+            orders.add(order);
+        }
+
+        return orders;
+    }
+
+    private String getPickupAddress(ServiceOrTransportOrderDto dto) {
+        if (dto.usesNewAddress()) {
+            return dto.getPickupAddressString();
+        }
+        // TODO: Pobierz adres z bazy gdy używa pickupAddressId
+        return "Adres odbioru";
+    }
+
+    private BigDecimal calculateTransportPrice(int bikesCount) {
+        BigDecimal baseCost = new BigDecimal("30.00");
+        BigDecimal perBikeCost = new BigDecimal("15.00");
+
+        BigDecimal totalCost = baseCost;
+        if (bikesCount > 1) {
+            totalCost = totalCost.add(perBikeCost.multiply(new BigDecimal(bikesCount - 1)));
+        }
+
+        // 10% rabat dla serwisu własnego
+        return totalCost.multiply(new BigDecimal("0.9"));
+    }
+
+    private void updateServiceOrderFields(ServiceOrder order, ServiceOrTransportOrderDto dto) {
+        if (dto.getPickupDate() != null) {
+            order.setPickupDate(dto.getPickupDate());
+        }
+        if (dto.getTransportPrice() != null) {
+            order.setTransportPrice(dto.getTransportPrice());
+        }
+        if (dto.getTransportNotes() != null) {
+            order.setTransportNotes(dto.getTransportNotes());
+        }
+        if (dto.getAdditionalNotes() != null) {
+            order.setAdditionalNotes(dto.getAdditionalNotes());
+        }
+        if (dto.getServiceNotes() != null) {
+            order.setServiceNotes(dto.getServiceNotes());
+        }
+        if (dto.getServicePackageId() != null) {
+            ServicePackage servicePackage = servicePackageRepository.findById(dto.getServicePackageId())
+                    .orElseThrow(() -> new RuntimeException("Service package not found"));
+            order.setServicePackage(servicePackage);
+            order.setServicePackageCode(servicePackage.getCode());
+            order.setServicePrice(servicePackage.getPrice());
+        }
+    }
+
+    private boolean canUserModifyOrder(ServiceOrder order, String userEmail) {
+        return order.canBeCancelled();
+    }
+
+    private int getAvailableSlots(LocalDate date) {
+        int maxSlots = serviceSlotService.getMaxBikesPerDay(date);
+        int usedSlots = serviceOrderRepository.countByPickupDate(date);
+        return Math.max(0, maxSlots - usedSlots);
+    }
+
     private void sendEmailNotifications(List<ServiceOrder> orders) {
         for (ServiceOrder order : orders) {
             try {
@@ -374,26 +576,14 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
         }
     }
 
-    // Dodaj te metody do ServiceOrderServiceImpl
-
-    @Override
-    public List<UnifiedOrderResponseDto> getAllServiceOrdersAsUnified() {
-        List<ServiceOrder> orders = serviceOrderRepository.findAllActive();
-        return orders.stream()
-                .map(UnifiedOrderResponseDto::fromServiceOrder)
-                .sorted(Comparator.comparing(UnifiedOrderResponseDto::orderDate, Comparator.reverseOrder()))
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    public Optional<UnifiedOrderResponseDto> getOrderAsUnified(Long orderId) {
-        Optional<ServiceOrder> orderOpt = serviceOrderRepository.findById(orderId);
-
-        if (orderOpt.isEmpty()) {
-            return Optional.empty();
-        }
-
-        ServiceOrder order = orderOpt.get();
-        return Optional.of(UnifiedOrderResponseDto.fromServiceOrder(order));
+    private void logServiceOrderCreation(ServiceOrder order, String userEmail) {
+        logger.info(String.format(
+                "Service order created: ID=%d, User=%s, Package=%s, Date=%s, TotalPrice=%s",
+                order.getId(),
+                userEmail,
+                order.getServicePackageCode(),
+                order.getPickupDate(),
+                order.getTotalPrice()
+        ));
     }
 }

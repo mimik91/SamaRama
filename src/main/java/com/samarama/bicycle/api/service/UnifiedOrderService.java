@@ -103,16 +103,6 @@ public interface UnifiedOrderService {
     // === METODY SERWISOWE ===
 
     /**
-     * Rozpoczyna serwis
-     */
-    ResponseEntity<?> startService(Long orderId, String userEmail);
-
-    /**
-     * Kończy serwis
-     */
-    ResponseEntity<?> completeService(Long orderId, String userEmail);
-
-    /**
      * Aktualizuje notatki serwisowe
      */
     ResponseEntity<?> updateServiceNotes(Long orderId, String notes, String userEmail);

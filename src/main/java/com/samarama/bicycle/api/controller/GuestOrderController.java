@@ -1,14 +1,13 @@
 package com.samarama.bicycle.api.controller;
 
 import com.samarama.bicycle.api.dto.*;
-import com.samarama.bicycle.api.service.GuestOrderService;
+import com.samarama.bicycle.api.service.UnifiedOrderService;
 import com.samarama.bicycle.api.service.TransportOrderService;
 import com.samarama.bicycle.api.service.EmailService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
@@ -20,132 +19,80 @@ public class GuestOrderController {
 
     private static final Logger logger = Logger.getLogger(GuestOrderController.class.getName());
 
-    private final GuestOrderService guestOrderService;
+    private final UnifiedOrderService unifiedOrderService;
     private final TransportOrderService transportOrderService;
     private final EmailService emailService;
 
     public GuestOrderController(
-            GuestOrderService guestOrderService,
+            UnifiedOrderService unifiedOrderService,
             TransportOrderService transportOrderService,
             EmailService emailService) {
-        this.guestOrderService = guestOrderService;
+        this.unifiedOrderService = unifiedOrderService;
         this.transportOrderService = transportOrderService;
         this.emailService = emailService;
     }
 
     /**
      * Tworzy zamówienie serwisowe dla gości (transport + serwis)
+     * DELEGUJE DO UnifiedOrderService
      */
     @PostMapping("/service")
     public ResponseEntity<?> createGuestServiceOrder(@Valid @RequestBody ServiceOrTransportOrderDto dto) {
-        logger.info("Received guest service order for email: " + dto.clientEmail());
-        try {
-            return guestOrderService.processGuestOrder(dto);
-        } catch (Exception e) {
-            logger.severe("Error creating guest service order: " + e.getMessage());
-            return ResponseEntity.internalServerError().body(Map.of(
-                    "message", "Wystąpił błąd podczas przetwarzania zamówienia: " + e.getMessage()
+        logger.info("Received guest service order for email: " + dto.getEmail());
+
+        // Walidacja - musi być zamówienie serwisowe
+        if (!dto.isServiceOrder()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "message", "Endpoint /service wymaga servicePackageId"
             ));
         }
+
+        // Deleguj do UnifiedOrderService
+        return unifiedOrderService.createGuestOrder(dto);
     }
 
     /**
      * Tworzy zamówienie transportowe dla gości (TYLKO transport)
+     * POZOSTAJE JAK BYŁO
      */
     @PostMapping("/transport")
     public ResponseEntity<?> createGuestTransportOrder(@Valid @RequestBody TransportOrderDto dto) {
+        // Konwertuj TransportOrderDto do ServiceOrTransportOrderDto
+        ServiceOrTransportOrderDto unifiedDto = convertToUnifiedDto(dto);
+
+        // Walidacja - nie może być serwis własny
+        if (dto.targetServiceId().equals(1L)) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "message", "Dla serwisu własnego użyj endpointu /service"
+            ));
+        }
+
         return transportOrderService.createGuestTransportOrder(dto);
     }
 
     /**
      * Oblicza koszt transportu
+     * POZOSTAJE JAK BYŁO
      */
     @PostMapping("/calculate-transport-cost")
     public ResponseEntity<?> calculateTransportCost(@RequestBody Map<String, Object> request) {
-        try {
-            Integer bicycleCount = (Integer) request.get("bicycleCount");
-            Double distance = request.get("distance") != null ?
-                    ((Number) request.get("distance")).doubleValue() : null;
-            Long targetServiceId = request.get("targetServiceId") != null ?
-                    ((Number) request.get("targetServiceId")).longValue() : null;
-
-            if (bicycleCount == null || bicycleCount <= 0) {
-                return ResponseEntity.badRequest().body(Map.of(
-                        "message", "Liczba rowerów jest wymagana i musi być większa od 0"
-                ));
-            }
-
-            // Kalkulacja kosztów transportu
-            BigDecimal baseCost = new BigDecimal("30.00");
-            BigDecimal perBikeCost = new BigDecimal("15.00");
-            BigDecimal perKmCost = new BigDecimal("2.50");
-
-            BigDecimal totalCost = baseCost;
-
-            // Koszt za dodatkowe rowery
-            if (bicycleCount > 1) {
-                totalCost = totalCost.add(perBikeCost.multiply(new BigDecimal(bicycleCount - 1)));
-            }
-
-            // Koszt za dystans
-            if (distance != null && distance > 0) {
-                totalCost = totalCost.add(perKmCost.multiply(new BigDecimal(distance)));
-            }
-
-            // Rabat dla serwisu własnego
-            String discountInfo = "0%";
-            if (targetServiceId != null && targetServiceId.equals(1L)) {
-                totalCost = totalCost.multiply(new BigDecimal("0.9")); // 10% rabatu
-                discountInfo = "10%";
-            }
-
-            return ResponseEntity.ok(Map.of(
-                    "transportCost", totalCost,
-                    "breakdown", Map.of(
-                            "baseCost", baseCost,
-                            "additionalBikes", bicycleCount > 1 ? perBikeCost.multiply(new BigDecimal(bicycleCount - 1)) : BigDecimal.ZERO,
-                            "distanceCost", distance != null ? perKmCost.multiply(new BigDecimal(distance)) : BigDecimal.ZERO,
-                            "discount", discountInfo
-                    ),
-                    "currency", "PLN",
-                    "description", targetServiceId != null && targetServiceId.equals(1L) ?
-                            "Koszt transportu do naszego serwisu (z rabatem)" :
-                            "Koszt transportu do zewnętrznego serwisu"
-            ));
-
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of(
-                    "message", "Błąd podczas kalkulacji kosztów: " + e.getMessage()
-            ));
-        }
+        return unifiedOrderService.calculateTransportCost(request);
     }
 
     /**
      * Sprawdza dostępność slotów dla gości
+     * DELEGUJE DO UnifiedOrderService
      */
     @GetMapping("/check-availability")
     public ResponseEntity<?> checkAvailability(
             @RequestParam String date,
             @RequestParam(defaultValue = "1") int ordersCount) {
-        try {
-            java.time.LocalDate localDate = java.time.LocalDate.parse(date);
-            boolean available = transportOrderService.areSlotsAvailable(localDate, ordersCount);
-            int usedSlots = transportOrderService.countOrdersForDate(localDate);
-
-            return ResponseEntity.ok(Map.of(
-                    "date", date,
-                    "available", available,
-                    "usedSlots", usedSlots,
-                    "requestedOrders", ordersCount,
-                    "message", available ? "Sloty dostępne" : "Brak dostępnych slotów"
-            ));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Nieprawidłowa data: " + date));
-        }
+        return unifiedOrderService.checkAvailability(date, ordersCount);
     }
 
     /**
      * Rejestracja serwisu (legacy endpoint)
+     * POZOSTAJE JAK BYŁO
      */
     @PostMapping("/service-registration")
     public ResponseEntity<?> serviceRegistration(@RequestBody List<String> serviceData) {
@@ -173,6 +120,34 @@ public class GuestOrderController {
     }
 
     // === HELPER METHODS ===
+
+    /**
+     * Konwertuje TransportOrderDto do ServiceOrTransportOrderDto
+     */
+    private ServiceOrTransportOrderDto convertToUnifiedDto(TransportOrderDto dto) {
+        return new ServiceOrTransportOrderDto(
+                dto.bicycleIds(),           // bicycleIds
+                dto.bicycles(),             // bicycles (guest bikes)
+                null,                       // userId
+                dto.clientEmail(),          // email
+                dto.clientPhone(),          // phone
+                null,                       // pickupAddressId
+                null,                       // pickupStreet - będzie wyciągnięte z address
+                null,                       // pickupBuildingNumber
+                null,                       // pickupApartmentNumber
+                dto.city(),                 // pickupCity
+                null,                       // pickupPostalCode
+                dto.pickupLatitude(),       // pickupLatitude
+                dto.pickupLongitude(),      // pickupLongitude
+                dto.pickupDate(),           // pickupDate
+                dto.transportPrice(),       // transportPrice
+                dto.transportNotes(),       // transportNotes
+                dto.targetServiceId(),      // targetServiceId
+                null,                       // servicePackageId - brak dla transportu
+                null,                       // serviceNotes
+                dto.additionalNotes()       // additionalNotes
+        );
+    }
 
     private ServiceRegisterDto parseServiceData(String data) {
         ServiceRegisterDto dto = new ServiceRegisterDto();

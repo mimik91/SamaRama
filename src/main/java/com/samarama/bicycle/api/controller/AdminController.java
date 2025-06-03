@@ -143,9 +143,6 @@ public class AdminController {
             // Statystyki przychodów
             stats.put("revenue", getRevenueStatistics(startDate, endDate));
 
-            // Popularne pakiety serwisowe
-            stats.put("popularPackages", serviceOrderService.getServicePackageStatistics());
-
 
             // Statystyki użytkowników
             stats.put("userGrowth", getUserGrowthStatistics(startDate, endDate));
