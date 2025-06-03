@@ -64,6 +64,9 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
         // Pobierz użytkownika
         User user = getUserByEmail(userEmail);
         dto.setUserId(user.getId());
+        if(dto.getTransportPrice() == null){
+            dto.setTransportPrice(BigDecimal.valueOf(0L));
+        }
 
         try {
 
