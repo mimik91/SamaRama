@@ -4,11 +4,13 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
@@ -123,6 +125,10 @@ public class BikeService {
     @Size(max = 15)
     @Column(name = "business_phone")
     private String businessPhone;
+
+    @PositiveOrZero
+    @Column(name = "transport_cost", nullable = false)
+    private BigDecimal transportCost = BigDecimal.ZERO;
 
     // === METADANE ===
 

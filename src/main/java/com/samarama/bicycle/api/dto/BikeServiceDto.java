@@ -3,7 +3,9 @@ package com.samarama.bicycle.api.dto;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.DecimalMin;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
@@ -53,6 +55,10 @@ public record BikeServiceDto(
         @Size(max = 15)
         String businessPhone,
 
+        // Koszt transportu
+        @DecimalMin(value = "0.0", message = "Koszt transportu nie może być ujemny")
+        BigDecimal transportCost,
+
         // Metadane (tylko do odczytu)
         LocalDateTime createdAt,
         LocalDateTime updatedAt
@@ -76,6 +82,7 @@ public record BikeServiceDto(
                         entity.getLongitude(),
                         entity.getPhoneNumber(),
                         entity.getBusinessPhone(),
+                        entity.getTransportCost(),
                         entity.getCreatedAt(),
                         entity.getUpdatedAt()
                 );
@@ -99,6 +106,7 @@ public record BikeServiceDto(
                 entity.setLongitude(this.longitude);
                 entity.setPhoneNumber(this.phoneNumber);
                 entity.setBusinessPhone(this.businessPhone);
+                entity.setTransportCost(this.transportCost);
                 return entity;
         }
 
@@ -148,5 +156,22 @@ public record BikeServiceDto(
          */
         public boolean hasCoordinates() {
                 return latitude != null && longitude != null;
+        }
+
+        /**
+         * Sprawdza czy serwis ma ustawiony koszt transportu
+         */
+        public boolean hasTransportCost() {
+                return transportCost != null && transportCost.compareTo(BigDecimal.ZERO) >= 0;
+        }
+
+        /**
+         * Zwraca sformatowany koszt transportu jako string
+         */
+        public String getFormattedTransportCost() {
+                if (transportCost == null) {
+                        return "Brak danych";
+                }
+                return String.format("%.2f zł", transportCost);
         }
 }

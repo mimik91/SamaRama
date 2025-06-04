@@ -226,28 +226,23 @@ public class TransportOrderServiceImpl implements TransportOrderService {
     }
 
     @Override
-    public List<UnifiedOrderResponseDto> getUserTransportOrders(String userEmail) {
-        User user = getUserByEmail(userEmail);
-        List<TransportOrder> orders = transportOrderRepository.findPureTransportOrders();
-
-        return orders.stream()
-                .filter(order -> order.getClient().getId().equals(user.getId()))
-                .map(UnifiedOrderResponseDto::fromTransportOrder)
-                .sorted(Comparator.comparing(UnifiedOrderResponseDto::orderDate, Comparator.reverseOrder()))
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    public List<UnifiedOrderResponseDto> getAllUserOrders(String userEmail) {
+    public List<ServiceOrderResponseDto> getAllUserOrders(String userEmail) {
         User user = getUserByEmail(userEmail);
         List<TransportOrder> orders = transportOrderRepository.findByClient(user);
 
-        return orders.stream()
-                .map(order -> order instanceof ServiceOrder ?
-                        UnifiedOrderResponseDto.fromServiceOrder((ServiceOrder) order) :
-                        UnifiedOrderResponseDto.fromTransportOrder(order))
-                .sorted(Comparator.comparing(UnifiedOrderResponseDto::orderDate, Comparator.reverseOrder()))
+        List<ServiceOrderResponseDto> answer =  orders.stream()
+                .map(order -> {
+                    if (order instanceof ServiceOrder) {
+                        // Jeśli to ServiceOrder, użyj ServiceOrderResponseDto
+                        return ServiceOrderResponseDto.fromServiceOrder((ServiceOrder) order);
+                    } else {
+                        // Jeśli to zwykły TransportOrder, przekonwertuj na ServiceOrderResponseDto
+                        return ServiceOrderResponseDto.fromTransportOrder(order);
+                    }
+                })
+                .sorted(Comparator.comparing(ServiceOrderResponseDto::orderDate, Comparator.reverseOrder()))
                 .collect(Collectors.toList());
+        return answer;
     }
 
     @Override
@@ -754,4 +749,6 @@ public class TransportOrderServiceImpl implements TransportOrderService {
 
         return Optional.of(UnifiedOrderResponseDto.fromTransportOrder(order));
     }
+
+
 }

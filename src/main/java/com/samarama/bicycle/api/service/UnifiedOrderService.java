@@ -52,11 +52,6 @@ public interface UnifiedOrderService {
     ResponseEntity<List<AddressDto>> getUserAddresses(String userEmail);
 
     /**
-     * Pobiera zamówienia użytkownika
-     */
-    ResponseEntity<List<UnifiedOrderResponseDto>> getUserOrders(String userEmail);
-
-    /**
      * Pobiera szczegóły zamówienia użytkownika
      */
     ResponseEntity<UnifiedOrderResponseDto> getUserOrderDetails(Long orderId, String userEmail);

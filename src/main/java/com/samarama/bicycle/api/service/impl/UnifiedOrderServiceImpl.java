@@ -190,16 +190,6 @@ public class UnifiedOrderServiceImpl implements UnifiedOrderService {
         }
     }
 
-    @Override
-    public ResponseEntity<List<UnifiedOrderResponseDto>> getUserOrders(String userEmail) {
-        try {
-            List<UnifiedOrderResponseDto> orders = transportOrderService.getAllUserOrders(userEmail);
-            return ResponseEntity.ok(orders);
-        } catch (Exception e) {
-            logger.severe("Error getting user orders: " + e.getMessage());
-            return ResponseEntity.internalServerError().build();
-        }
-    }
 
     @Override
     public ResponseEntity<UnifiedOrderResponseDto> getUserOrderDetails(Long orderId, String userEmail) {
@@ -272,7 +262,7 @@ public class UnifiedOrderServiceImpl implements UnifiedOrderService {
     @Override
     public ResponseEntity<?> getUserStatistics(String userEmail) {
         try {
-            List<UnifiedOrderResponseDto> orders = transportOrderService.getAllUserOrders(userEmail);
+            List<ServiceOrderResponseDto> orders = transportOrderService.getAllUserOrders(userEmail);
 
             long totalOrders = orders.size();
             long transportOrders = orders.stream().filter(o -> "TRANSPORT".equals(o.orderType())).count();

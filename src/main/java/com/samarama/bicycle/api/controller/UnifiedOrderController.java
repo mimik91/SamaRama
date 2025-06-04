@@ -62,11 +62,11 @@ public class UnifiedOrderController {
     /**
      * Moje zamówienia
      */
-    @GetMapping("/my")
+    @GetMapping("/service")
     @PreAuthorize("hasRole('CLIENT')")
-    public ResponseEntity<List<UnifiedOrderResponseDto>> getMyOrders() {
+    public ResponseEntity<List<ServiceOrderResponseDto>> getMyOrders() {
         String userEmail = getCurrentUserEmail();
-        List<UnifiedOrderResponseDto> orders = transportOrderService.getAllUserOrders(userEmail);
+        List<ServiceOrderResponseDto> orders = transportOrderService.getAllUserOrders(userEmail);
         return ResponseEntity.ok(orders);
     }
 
@@ -103,21 +103,11 @@ public class UnifiedOrderController {
     /**
      * Anuluj zamówienie
      */
-    @DeleteMapping("/{orderId}")
+    @DeleteMapping("/service/{orderId}")
     @PreAuthorize("hasRole('CLIENT')")
     public ResponseEntity<?> cancelOrder(@PathVariable Long orderId) {
         String userEmail = getCurrentUserEmail();
         return transportOrderService.cancelOrder(orderId, userEmail);
-    }
-
-    // =================== DLA GOŚCI ===================
-
-    /**
-     * Zamówienie gościa (tylko serwisowe)
-     */
-    @PostMapping("/guest")
-    public ResponseEntity<?> createGuestOrder(@Valid @RequestBody ServiceOrTransportOrderDto dto) {
-        return serviceOrderService.createGuestServiceOrder(dto);
     }
 
     // =================== POMOCNICZE ===================

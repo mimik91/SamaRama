@@ -5,6 +5,7 @@ import com.samarama.bicycle.api.dto.ServiceOrTransportOrderDto;
 import com.samarama.bicycle.api.model.*;
 import com.samarama.bicycle.api.repository.*;
 import com.samarama.bicycle.api.service.AddressService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -28,7 +29,9 @@ public class OrderHelperService {
     private final BikeServiceRepository bikeServiceRepository;
     private final ServicePackageRepository servicePackageRepository;
     private final AddressRepository addressRepository;
-    private final AddressService addressService;
+
+    @Value("${app.internal.service.id}")
+    private String internalServiceIdString;
 
     public OrderHelperService(
             UserRepository userRepository,
@@ -36,15 +39,14 @@ public class OrderHelperService {
             IncompleteBikeRepository incompleteBikeRepository,
             BikeServiceRepository bikeServiceRepository,
             ServicePackageRepository servicePackageRepository,
-            AddressRepository addressRepository,
-            AddressService addressService) {
+            AddressRepository addressRepository) {
         this.userRepository = userRepository;
         this.incompleteUserRepository = incompleteUserRepository;
         this.incompleteBikeRepository = incompleteBikeRepository;
         this.bikeServiceRepository = bikeServiceRepository;
         this.servicePackageRepository = servicePackageRepository;
         this.addressRepository = addressRepository;
-        this.addressService = addressService;
+
     }
 
     // === USER OPERATIONS ===
@@ -223,7 +225,7 @@ public class OrderHelperService {
      * Pobierz serwis własny (ID = 1)
      */
     public BikeService getOwnService() {
-        return bikeServiceRepository.findById(1L)
+        return bikeServiceRepository.findById(Long.parseLong(internalServiceIdString))
                 .orElseThrow(() -> new RuntimeException("Own service not found"));
     }
 
@@ -236,32 +238,6 @@ public class OrderHelperService {
     }
 
     // === PRICE CALCULATIONS ===
-
-    /**
-     * Oblicz cenę transportu dla zamówienia
-     */
-    public BigDecimal calculateTransportPrice(ServiceOrTransportOrderDto dto, boolean isOwnService) {
-        if (dto.getTransportPrice().compareTo(BigDecimal.ZERO) > 0) {
-            return dto.getTransportPrice(); // Użyj podanej ceny
-        }
-
-        // Kalkulacja automatyczna
-        BigDecimal baseCost = new BigDecimal("30.00");
-        BigDecimal perBikeCost = new BigDecimal("15.00");
-        int bikesCount = dto.getBicycleCount();
-
-        BigDecimal totalCost = baseCost;
-        if (bikesCount > 1) {
-            totalCost = totalCost.add(perBikeCost.multiply(new BigDecimal(bikesCount - 1)));
-        }
-
-        // Rabat 10% dla serwisu własnego
-        if (isOwnService) {
-            totalCost = totalCost.multiply(new BigDecimal("0.9"));
-        }
-
-        return totalCost;
-    }
 
     /**
      * Utwórz ServiceOrder z TransportOrder i pakietem serwisowym

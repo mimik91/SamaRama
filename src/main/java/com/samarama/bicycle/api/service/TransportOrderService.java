@@ -26,15 +26,11 @@ public interface TransportOrderService {
 
     // === POBIERANIE ZAMÓWIEŃ ===
 
-    /**
-     * Pobiera zamówienia transportowe użytkownika (TYLKO czyste transport)
-     */
-    List<UnifiedOrderResponseDto> getUserTransportOrders(String userEmail);
 
     /**
      * Pobiera wszystkie zamówienia (transport + serwis) użytkownika
      */
-    List<UnifiedOrderResponseDto> getAllUserOrders(String userEmail);
+    List<ServiceOrderResponseDto> getAllUserOrders(String userEmail);
 
     /**
      * Pobiera szczegóły zamówienia

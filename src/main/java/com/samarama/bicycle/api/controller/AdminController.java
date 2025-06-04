@@ -220,6 +220,20 @@ public class AdminController {
         }
     }
 
+    @GetMapping("/bike-services")
+    public ResponseEntity<List<BikeServiceDto>> getAllBikeServicesForAdmin() {
+        String adminEmail = getCurrentUserEmail();
+        logAdminAction("VIEW_BIKE_SERVICES", "admin_view", adminEmail);
+
+        try {
+            List<BikeServiceDto> bikeServices = bikeServiceService.getAllBikeServicesForAdmin();
+            return ResponseEntity.ok(bikeServices);
+        } catch (Exception e) {
+            logger.severe("Error loading bike services for admin: " + e.getMessage());
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
     /**
      * Endpoint dla zamówień serwisowych
      */
