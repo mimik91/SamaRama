@@ -18,7 +18,5 @@ CREATE TABLE bike_services (
     PRIMARY KEY (id)
 );
 
-INSERT INTO bike_services (id, name, description, city, latitude, longitude, created_at, updated_at)
-VALUES (1, 'SERWIS WŁASNY', 'Nasz własny serwis rowerowy', 'Kraków', 50.0647, 19.9450, NOW(), NOW());
 
 SELECT setval('bike_services_id_seq', 1);

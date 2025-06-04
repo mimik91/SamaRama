@@ -9,7 +9,7 @@ INSERT INTO bike_services (
     updated_at
 ) VALUES (
     2137,
-    'Serwis Domyślny',
+    'Serwis Cyclopick.pl',
     'Domyślny serwis rowerowy w Krakowie',
     'Kiełkowskiego',
     '10b',

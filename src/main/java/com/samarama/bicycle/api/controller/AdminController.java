@@ -234,6 +234,61 @@ public class AdminController {
         }
     }
 
+    @PutMapping("/bike-services/{id}")
+    public ResponseEntity<?> updateBikeService(
+            @PathVariable Long id,
+            @Valid @RequestBody BikeServiceDto bikeServiceDto) {
+
+        String adminEmail = getCurrentUserEmail();
+        logAdminAction("UPDATE_BIKE_SERVICE", "id=" + id + ", name=" + bikeServiceDto.name(), adminEmail);
+
+        try {
+            return bikeServiceService.updateBikeService(id, bikeServiceDto);
+        } catch (Exception e) {
+            logger.severe("Error updating bike service: " + e.getMessage());
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("message", "Błąd aktualizacji serwisu: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Usuwanie serwisu rowerowego
+     */
+    @DeleteMapping("/bike-services/{id}")
+    @PreAuthorize("hasRole('ADMIN')") // Tylko ADMIN może usuwać
+    public ResponseEntity<?> deleteBikeService(@PathVariable Long id) {
+        String adminEmail = getCurrentUserEmail();
+
+        if (!hasAdminRole()) {
+            return ResponseEntity.status(403)
+                    .body(Map.of("message", "Tylko administrator może usuwać serwisy"));
+        }
+
+        logAdminAction("DELETE_BIKE_SERVICE", "id=" + id, adminEmail);
+
+        try {
+            return bikeServiceService.deleteBikeService(id);
+        } catch (Exception e) {
+            logger.severe("Error deleting bike service: " + e.getMessage());
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("message", "Błąd usuwania serwisu: " + e.getMessage()));
+        }
+    }
+
+    @PostMapping("/bike-services")
+    public ResponseEntity<?> createBikeService(@Valid @RequestBody BikeServiceDto bikeServiceDto) {
+        String adminEmail = getCurrentUserEmail();
+        logAdminAction("CREATE_BIKE_SERVICE", "name=" + bikeServiceDto.name(), adminEmail);
+
+        try {
+            return bikeServiceService.createBikeService(bikeServiceDto);
+        } catch (Exception e) {
+            logger.severe("Error creating bike service: " + e.getMessage());
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("message", "Błąd tworzenia serwisu: " + e.getMessage()));
+        }
+    }
+
     /**
      * Endpoint dla zamówień serwisowych
      */

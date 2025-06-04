@@ -12,10 +12,14 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.BufferedReader;
+import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.PushbackInputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.logging.Logger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
@@ -192,38 +196,52 @@ public class BikeServiceServiceImpl implements BikeServiceService {
             int successCount = 0;
             int errorCount = 0;
 
-            try (BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8))) {
+            // PROSTE ROZWIĄZANIE: Przeczytaj plik jako bytes, a potem jako string
+            byte[] fileBytes = file.getBytes();
+            String csvContent = new String(fileBytes, StandardCharsets.UTF_8);
 
-                String line;
-                boolean isFirstLine = true;
-                int lineNumber = 0;
+            // Usuń BOM jeśli istnieje
+            if (csvContent.startsWith("\uFEFF")) {
+                csvContent = csvContent.substring(1);
+            }
 
-                while ((line = reader.readLine()) != null) {
-                    lineNumber++;
+            logger.info("CSV file size: " + csvContent.length() + " characters");
 
-                    // Pomijamy nagłówek
-                    if (isFirstLine) {
-                        isFirstLine = false;
-                        continue;
+            String[] lines = csvContent.split("\\r?\\n");
+            logger.info("CSV lines count: " + lines.length);
+
+            boolean isFirstLine = true;
+            int lineNumber = 0;
+
+            for (String line : lines) {
+                lineNumber++;
+
+                // Pomijamy nagłówek
+                if (isFirstLine) {
+                    isFirstLine = false;
+                    logger.info("CSV Header: " + line);
+                    continue;
+                }
+
+                // Pomijamy puste linie
+                if (line.trim().isEmpty()) {
+                    continue;
+                }
+
+                try {
+                    logger.info("Processing line " + lineNumber + ": " + line);
+
+                    BikeService service = parseCsvLine(line, lineNumber);
+                    if (service != null) {
+                        servicesToSave.add(service);
+                        successCount++;
+
+                        logger.info("Parsed service: " + service.getName() + " at " + service.getStreet() + " " + service.getBuilding());
                     }
-
-                    // Pomijamy puste linie
-                    if (line.trim().isEmpty()) {
-                        continue;
-                    }
-
-                    try {
-                        BikeService service = parseCsvLine(line, lineNumber);
-                        if (service != null) {
-                            servicesToSave.add(service);
-                            successCount++;
-                        }
-                    } catch (Exception e) {
-                        errorCount++;
-                        errors.add("Linia " + lineNumber + ": " + e.getMessage());
-                        logger.warning("Błąd parsowania linii " + lineNumber + ": " + e.getMessage());
-                    }
+                } catch (Exception e) {
+                    errorCount++;
+                    errors.add("Linia " + lineNumber + ": " + e.getMessage());
+                    logger.warning("Błąd parsowania linii " + lineNumber + ": " + e.getMessage());
                 }
             }
 
@@ -251,6 +269,7 @@ public class BikeServiceServiceImpl implements BikeServiceService {
 
         } catch (Exception e) {
             logger.severe("Błąd podczas importu CSV: " + e.getMessage());
+            e.printStackTrace();
             return ResponseEntity.badRequest()
                     .body(Map.of("message", "Błąd podczas importu pliku: " + e.getMessage()));
         }
@@ -327,30 +346,39 @@ public class BikeServiceServiceImpl implements BikeServiceService {
     }
 
     private void parseAddress(BikeService service, String address) {
-        // Próbujemy wyciągnąć miasto i ulicę z adresu
+        // Wzorce dla różnych formatów adresów
+        // Format 1: "Ulica Numer, Miasto"
+        // Format 2: "Ulica Numer Mieszkanie, Miasto"
+        // Format 3: "Ulica, Miasto" (bez numeru)
+
         String[] addressParts = address.split(",");
 
         if (addressParts.length >= 2) {
-            // Format z przecinkiem: "ulica, miasto"
-            service.setStreet(addressParts[0].trim());
+            // Mamy przecinek - ostatnia część to miasto
+            String streetPart = addressParts[0].trim();
             String cityPart = addressParts[addressParts.length - 1].trim();
 
-            // Wyciągnij miasto (zwykle na końcu)
-            String[] cityWords = cityPart.split("\\s+");
-            if (cityWords.length > 0) {
-                service.setCity(cityWords[cityWords.length - 1]);
-            }
-        } else {
-            // Format bez przecinka - próbujemy wykryć miasto
-            service.setStreet(address);
+            // Parsuj część z ulicą i numerem
+            parseStreetAndNumber(service, streetPart);
 
-            // Sprawdź czy adres zawiera znane miasta
-            if (address.toLowerCase().contains("kraków") || address.toLowerCase().contains("krakow")) {
-                service.setCity("Kraków");
-            } else if (address.toLowerCase().contains("wieliczka")) {
-                service.setCity("Wieliczka");
+            // Ustaw miasto
+            service.setCity(extractCityName(cityPart));
+
+        } else if (addressParts.length == 1) {
+            // Brak przecinka - spróbuj wykryć format
+            String fullAddress = address.trim();
+
+            // Sprawdź czy kończy się znanym miastem
+            String detectedCity = detectCityFromAddress(fullAddress);
+            if (detectedCity != null) {
+                service.setCity(detectedCity);
+                // Usuń miasto z adresu i parsuj resztę
+                String streetPart = fullAddress.replace(detectedCity, "").trim();
+                parseStreetAndNumber(service, streetPart);
             } else {
-                service.setCity("Kraków"); // Domyślnie Kraków
+                // Nie udało się wykryć miasta - parsuj całość jako ulicę
+                parseStreetAndNumber(service, fullAddress);
+                service.setCity("Kraków"); // Domyślnie
             }
         }
     }
@@ -408,5 +436,154 @@ public class BikeServiceServiceImpl implements BikeServiceService {
 
         fields.add(currentField.toString());
         return fields.toArray(new String[0]);
+    }
+
+    private void parseStreetAndNumber(BikeService service, String streetPart) {
+        if (streetPart == null || streetPart.trim().isEmpty()) {
+            return;
+        }
+
+        streetPart = streetPart.trim();
+
+        // Wzorzec: wszystko do ostatniej spacji to ulica, po spacji to numer
+        // Przykłady: "Wielkotyrnowska 12", "Aleja Mickiewicza 24A", "ul. Floriańska 15"
+        Pattern pattern = Pattern.compile("^(.+?)\\s+([0-9]+[A-Za-z]?(?:/[0-9]+[A-Za-z]?)?)$");
+        Matcher matcher = pattern.matcher(streetPart);
+
+        if (matcher.matches()) {
+            String street = matcher.group(1).trim();
+            String buildingNumber = matcher.group(2).trim();
+
+            service.setStreet(street);
+
+            // Sprawdź czy numer zawiera mieszkanie (format: "12/4")
+            if (buildingNumber.contains("/")) {
+                String[] parts = buildingNumber.split("/");
+                service.setBuilding(parts[0]);
+                if (parts.length > 1) {
+                    service.setFlat(parts[1]);
+                }
+            } else {
+                service.setBuilding(buildingNumber);
+            }
+        } else {
+            // Nie udało się wyodrębnić numeru - cała część to ulica
+            service.setStreet(streetPart);
+        }
+    }
+
+    /**
+     * Wyciąga nazwę miasta (usuwa kod pocztowy)
+     */
+    private String extractCityName(String cityPart) {
+        if (cityPart == null || cityPart.trim().isEmpty()) {
+            return null;
+        }
+
+        // Usuń kod pocztowy (XX-XXX)
+        String cleaned = cityPart.replaceAll("\\d{2}-\\d{3}", "").trim();
+
+        if (!cleaned.isEmpty()) {
+            return cleaned;
+        }
+
+        return cityPart.trim();
+    }
+
+    /**
+     * Próbuje wykryć miasto na końcu adresu
+     */
+    private String detectCityFromAddress(String address) {
+        String lowerAddress = address.toLowerCase();
+
+        // Lista znanych miast
+        String[] cities = {
+                "kraków", "krakow", "wieliczka", "skawina",
+                "niepołomice", "niepolomice", "warszawa",
+                "gdańsk", "gdansk", "wrocław", "wroclaw",
+                "poznań", "poznan", "łódź", "lodz"
+        };
+
+        for (String city : cities) {
+            if (lowerAddress.endsWith(" " + city) || lowerAddress.equals(city)) {
+                // Zwróć z poprawną wielkością liter
+                return city;
+            }
+        }
+
+        return null;
+    }
+
+    private BufferedReader createBufferedReaderWithProperEncoding(MultipartFile file) throws Exception {
+        InputStream inputStream = file.getInputStream();
+
+        // Najpierw spróbuj wykryć kodowanie przez sprawdzenie BOM
+        PushbackInputStream pushbackInputStream = new PushbackInputStream(inputStream, 3);
+        byte[] bom = new byte[3];
+        int bytesRead = pushbackInputStream.read(bom);
+
+        String encoding = "UTF-8"; // Domyślnie UTF-8
+
+        if (bytesRead >= 3) {
+            if (bom[0] == (byte) 0xEF && bom[1] == (byte) 0xBB && bom[2] == (byte) 0xBF) {
+                // UTF-8 BOM - zostaw UTF-8
+                encoding = "UTF-8";
+            } else {
+                // Brak BOM - sprawdź inne kodowania
+                pushbackInputStream.unread(bom, 0, bytesRead);
+
+                // Dla polskich znaków często używane kodowania
+                encoding = detectPolishEncoding(pushbackInputStream);
+            }
+        } else {
+            // Przywróć przeczytane bajty
+            pushbackInputStream.unread(bom, 0, bytesRead);
+        }
+
+        logger.info("Wykryte kodowanie CSV: " + encoding);
+
+        return new BufferedReader(new InputStreamReader(pushbackInputStream, encoding));
+    }
+
+    /**
+     * Próbuje wykryć polskie kodowanie na podstawie zawartości
+     */
+    private String detectPolishEncoding(PushbackInputStream inputStream) throws Exception {
+        // Przeczytaj próbkę danych
+        byte[] sample = new byte[1024];
+        int sampleSize = inputStream.read(sample);
+        inputStream.unread(sample, 0, sampleSize);
+
+        // Testuj różne kodowania z polskimi znakami
+        String[] encodings = {"UTF-8", "ISO-8859-2", "Windows-1250", "CP852"};
+
+        for (String encoding : encodings) {
+            try {
+                String testString = new String(sample, 0, sampleSize, encoding);
+
+                // Sprawdź czy zawiera sensowne polskie znaki
+                if (containsValidPolishCharacters(testString)) {
+                    logger.info("Wykryto kodowanie na podstawie polskich znaków: " + encoding);
+                    return encoding;
+                }
+            } catch (Exception e) {
+                // Ignoruj błędy kodowania
+            }
+        }
+
+        // Jeśli nic nie pasuje, użyj UTF-8
+        return "UTF-8";
+    }
+
+    /**
+     * Sprawdza czy string zawiera prawidłowe polskie znaki
+     */
+    private boolean containsValidPolishCharacters(String text) {
+        // Sprawdź czy zawiera polskie litery i czy nie ma "romba ze znakiem zapytania"
+        boolean hasPolishChars = text.matches(".*[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ].*");
+        boolean hasReplacementChars = text.contains("�") || text.contains("?");
+
+        // Dobry kandydat jeśli ma polskie znaki i nie ma znaków zastępczych
+        return hasPolishChars && !hasReplacementChars;
     }
 }
