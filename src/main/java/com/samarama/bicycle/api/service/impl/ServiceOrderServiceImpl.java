@@ -59,20 +59,10 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
     @Override
     @Transactional
     public ResponseEntity<?> createServiceOrder(ServiceOrTransportOrderDto dto, String userEmail) {
-
-
-        // Pobierz użytkownika
-        User user = getUserByEmail(userEmail);
-        dto.setUserId(user.getId());
-        if(dto.getTransportPrice() == null){
-            dto.setTransportPrice(BigDecimal.valueOf(0L));
-        }
-
         try {
+            // === NORMALIZACJA DTO ===
+            normalizeServiceOrderDto(dto, userEmail);
 
-            if(dto.getTargetServiceId() == null){
-                dto.setTargetServiceId(Long.parseLong(internalServiceIdString));
-            }
             // Walidacja danych wejściowych
             if (!dto.isValidForLoggedUser()) {
                 return ResponseEntity.badRequest().body(Map.of("message", "Nieprawidłowe dane zamówienia"));
@@ -96,7 +86,8 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
                 ));
             }
 
-
+            // Pobierz użytkownika
+            User user = getUserByEmail(userEmail);
 
             // Pobierz pakiet serwisowy
             ServicePackage servicePackage = servicePackageRepository.findById(dto.getServicePackageId())
@@ -139,6 +130,9 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
     @Transactional
     public ResponseEntity<?> createGuestServiceOrder(ServiceOrTransportOrderDto dto) {
         try {
+            // === NORMALIZACJA DTO ===
+            normalizeGuestServiceOrderDto(dto);
+
             if (!dto.isValidForGuest()) {
                 return ResponseEntity.badRequest().body(Map.of("message", "Nieprawidłowe dane zamówienia gościa"));
             }
@@ -262,11 +256,33 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
 
 
 
+    @Override
+    @Transactional
+    public ResponseEntity<?> updateServiceNotes(Long orderId, String notes, String userEmail) {
+        try {
+            ServiceOrder order = getServiceOrderById(orderId);
+
+            order.setServiceNotes(notes);
+            order.setLastModifiedBy(userEmail);
+            order.setLastModifiedDate(LocalDateTime.now());
+
+            serviceOrderRepository.save(order);
+
+            return ResponseEntity.ok(Map.of(
+                    "message", "Notatki serwisowe zostały zaktualizowane",
+                    "serviceNotes", notes
+            ));
+
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
     // === ADMIN METHODS ===
 
     @Override
     public List<UnifiedOrderResponseDto> getAllServiceOrders() {
-        List<ServiceOrder> orders = serviceOrderRepository.findAll();
+        List<ServiceOrder> orders = serviceOrderRepository.findAllActive();
         return orders.stream()
                 .map(UnifiedOrderResponseDto::fromServiceOrder)
                 .sorted(Comparator.comparing(UnifiedOrderResponseDto::orderDate, Comparator.reverseOrder()))
@@ -303,11 +319,12 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
         }
 
         serviceOrderRepository.deleteById(orderId);
+        logger.info("Admin " + adminEmail + " deleted service order " + orderId);
 
         return ResponseEntity.ok(Map.of("message", "Zamówienie zostało usunięte"));
     }
 
-
+    // === UNIFIED ORDER METHODS ===
 
     @Override
     public List<UnifiedOrderResponseDto> getAllServiceOrdersAsUnified() {
@@ -320,25 +337,55 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
         return orderOpt.map(UnifiedOrderResponseDto::fromServiceOrder);
     }
 
-    @Override
-    @Transactional
-    public ResponseEntity<?> updateServiceNotes(Long orderId, String notes, String userEmail) {
-        try {
-            ServiceOrder order = getServiceOrderById(orderId);
+    // === NORMALIZATION METHODS ===
 
-            order.setServiceNotes(notes);
-            order.setLastModifiedBy(userEmail);
-            order.setLastModifiedDate(LocalDateTime.now());
+    /**
+     * Normalizuje DTO dla zamówienia serwisowego użytkownika zalogowanego
+     * Ustawia userId, targetServiceId oraz transportPrice na odpowiednie wartości
+     */
+    private void normalizeServiceOrderDto(ServiceOrTransportOrderDto dto, String userEmail) {
+        // 1. Przypisz userId zalogowanego użytkownika
+        if (dto.getUserId() == null) {
+            Optional<User> user = userRepository.findByEmail(userEmail);
+            if(user.isPresent()){
+                dto.setUserId(user.get().getId());
+                logger.info("Assigned userId " + user.get().getId() + " to service order for user: " + userEmail);
+            }
+        }
 
-            serviceOrderRepository.save(order);
+        // 2. Ustaw targetServiceId na serwis własny (zamówienia serwisowe zawsze do nas)
+        if (dto.getTargetServiceId() == null) {
+            dto.setTargetServiceId(Long.parseLong(internalServiceIdString));
+            logger.info("Set targetServiceId to " + internalServiceIdString + " (internal service) for service order");
+        }
 
-            return ResponseEntity.ok(Map.of(
-                    "message", "Notatki serwisowe zostały zaktualizowane",
-                    "serviceNotes", notes
-            ));
+        // 3. Ustaw transportPrice na 0 (dla serwisu transport wliczony w cenę pakietu)
+        if (dto.getTransportPrice() == null) {
+            dto.setTransportPrice(BigDecimal.ZERO);
+            logger.info("Set transportPrice to 0 for service order (included in package price)");
+        }
+    }
 
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+    /**
+     * Normalizuje DTO dla zamówienia serwisowego gościa
+     * Ustawia targetServiceId oraz transportPrice na odpowiednie wartości
+     */
+    private void normalizeGuestServiceOrderDto(ServiceOrTransportOrderDto dto) {
+        // 1. Ustaw targetServiceId na serwis własny (goście mogą tylko do naszego serwisu)
+        if (dto.getTargetServiceId() == null) {
+            dto.setTargetServiceId(Long.parseLong(internalServiceIdString));
+            logger.info("Set targetServiceId to " + internalServiceIdString + " (internal service) for guest service order");
+        }
+
+        // 2. Ustaw transportPrice na 0 (dla serwisu transport wliczony w cenę pakietu)
+        if (dto.getTransportPrice() == null) {
+            dto.setTransportPrice(BigDecimal.ZERO);
+            logger.info("Set transportPrice to 0 for guest service order (included in package price)");
+        }
+
+        // 3. Walidacja - goście mogą tylko do serwisu własnego
+        if (!dto.getTargetServiceId().equals(Long.parseLong(internalServiceIdString))) {
+            throw new RuntimeException("Goście mogą składać zamówienia tylko do serwisu własnego (ID: " + internalServiceIdString + ")");
         }
     }
 
@@ -365,8 +412,8 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
     }
 
     private BikeService getOwnService() {
-        return bikeServiceRepository.findById(1L)
-                .orElseThrow(() -> new RuntimeException("Own service not found"));
+        return bikeServiceRepository.findById(Long.parseLong(internalServiceIdString))
+                .orElseThrow(() -> new RuntimeException("Internal service not found: " + internalServiceIdString));
     }
 
     private List<IncompleteBike> validateAndGetBikes(List<Long> bicycleIds, Long userId) {
@@ -426,7 +473,7 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
             ServicePackage servicePackage, BikeService ownService) {
 
         List<ServiceOrder> orders = new ArrayList<>();
-        BigDecimal transportPrice = calculateTransportPrice(bikes.size());
+        BigDecimal transportPrice = dto.getTransportPrice(); // Używamy znormalizowanej ceny (0)
 
         for (IncompleteBike bike : bikes) {
             ServiceOrder order = new ServiceOrder();
@@ -472,7 +519,7 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
             ServicePackage servicePackage, BikeService ownService) {
 
         List<ServiceOrder> orders = new ArrayList<>();
-        BigDecimal transportPrice = calculateTransportPrice(bikes.size());
+        BigDecimal transportPrice = dto.getTransportPrice(); // Używamy znormalizowanej ceny (0)
 
         for (IncompleteBike bike : bikes) {
             ServiceOrder order = new ServiceOrder();
@@ -519,19 +566,6 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
         }
         // TODO: Pobierz adres z bazy gdy używa pickupAddressId
         return "Adres odbioru";
-    }
-
-    private BigDecimal calculateTransportPrice(int bikesCount) {
-        BigDecimal baseCost = new BigDecimal("30.00");
-        BigDecimal perBikeCost = new BigDecimal("15.00");
-
-        BigDecimal totalCost = baseCost;
-        if (bikesCount > 1) {
-            totalCost = totalCost.add(perBikeCost.multiply(new BigDecimal(bikesCount - 1)));
-        }
-
-        // 10% rabat dla serwisu własnego
-        return totalCost.multiply(new BigDecimal("0.9"));
     }
 
     private void updateServiceOrderFields(ServiceOrder order, ServiceOrTransportOrderDto dto) {

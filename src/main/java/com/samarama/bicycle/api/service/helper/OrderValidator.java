@@ -5,6 +5,7 @@ import com.samarama.bicycle.api.repository.ServicePackageRepository;
 import com.samarama.bicycle.api.repository.BikeServiceRepository;
 import com.samarama.bicycle.api.service.ServiceSlotService;
 import com.samarama.bicycle.api.service.impl.CityValidator;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
@@ -22,6 +23,9 @@ public class OrderValidator {
     private final BikeServiceRepository bikeServiceRepository;
     private final ServiceSlotService serviceSlotService;
     private final CityValidator cityValidator;
+
+    @Value("${app.internal.service.id}")
+    private String internalServiceIdString;
 
     public OrderValidator(
             ServicePackageRepository servicePackageRepository,
@@ -122,7 +126,7 @@ public class OrderValidator {
         }
 
         if (dto.getTargetServiceId() == null) {
-            dto.setTargetServiceId(6969696L);
+            dto.setTargetServiceId(Long.parseLong(internalServiceIdString));
         } else if (!bikeServiceRepository.existsById(dto.getTargetServiceId())) {
             errors.add("Nieprawidłowy serwis docelowy");
         }

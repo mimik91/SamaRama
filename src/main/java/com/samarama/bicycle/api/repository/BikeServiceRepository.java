@@ -7,9 +7,12 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface BikeServiceRepository extends JpaRepository<BikeService, Long> {
+
+    Optional<BikeService> findServiceById(Long id);
 
     /**
      * Znajdź serwisy które mają współrzędne geograficzne

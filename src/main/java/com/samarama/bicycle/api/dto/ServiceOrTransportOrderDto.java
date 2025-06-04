@@ -206,13 +206,6 @@ public class ServiceOrTransportOrderDto {
     }
 
     /**
-     * Zwraca cenę transportu (domyślnie 0)
-     */
-    public BigDecimal getTransportPrice() {
-        return transportPrice != null ? transportPrice : BigDecimal.ZERO;
-    }
-
-    /**
      * Zwraca liczbę rowerów
      */
     public int getBicycleCount() {
