@@ -46,45 +46,7 @@ public class UnifiedOrderServiceImpl implements UnifiedOrderService {
 
     // === PUBLICZNE METODY ===
 
-    @Override
-    public ResponseEntity<List<BikeServicePinDto>> getAvailableServices() {
-        List<BikeServicePinDto> services = bikeServiceService.getAllBikeServicePins();
-        return ResponseEntity.ok(services);
-    }
 
-    @Override
-    public ResponseEntity<List<ServicePackageDto>> getServicePackages() {
-        List<ServicePackageDto> packages = servicePackageService.getActiveServicePackages().stream()
-                .map(ServicePackageDto::fromEntity)
-                .toList();
-        return ResponseEntity.ok(packages);
-    }
-
-    @Override
-    public ResponseEntity<BikeServiceDto> getServiceDetails(Long serviceId) {
-        return bikeServiceService.getBikeServiceDetails(serviceId)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
-    }
-
-    @Override
-    public ResponseEntity<?> checkAvailability(String date, int bikesCount) {
-        try {
-            LocalDate localDate = LocalDate.parse(date);
-            boolean available = transportOrderService.areSlotsAvailable(localDate, bikesCount);
-            int usedSlots = transportOrderService.countOrdersForDate(localDate);
-
-            return ResponseEntity.ok(Map.of(
-                    "date", date,
-                    "available", available,
-                    "usedSlots", usedSlots,
-                    "requestedBikes", bikesCount,
-                    "pickupTimeWindow", "18:00 - 22:00"
-            ));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Nieprawidłowa data: " + date));
-        }
-    }
 
     @Override
     public ResponseEntity<?> calculateTransportCost(Map<String, Object> request) {
@@ -136,60 +98,6 @@ public class UnifiedOrderServiceImpl implements UnifiedOrderService {
             ));
         }
     }
-
-    @Override
-    public ResponseEntity<?> getOrderInfo() {
-        return ResponseEntity.ok(Map.of(
-                "orderTypes", Map.of(
-                        "TRANSPORT", "Transport do zewnętrznego serwisu",
-                        "SERVICE", "Transport + serwis w naszym serwisie"
-                ),
-                "statuses", List.of(
-                        Map.of("value", "PENDING", "label", "Oczekujące"),
-                        Map.of("value", "CONFIRMED", "label", "Potwierdzone"),
-                        Map.of("value", "PICKED_UP", "label", "Odebrane"),
-                        Map.of("value", "IN_SERVICE", "label", "W serwisie"),
-                        Map.of("value", "ON_THE_WAY_BACK", "label", "W drodze powrotnej"),
-                        Map.of("value", "CANCELLED", "label", "Anulowane")
-                ),
-                "pickupTime", Map.of(
-                        "from", "18:00",
-                        "to", "22:00",
-                        "description", "Stały czas odbioru między 18:00 a 22:00"
-                ),
-                "modification", Map.of(
-                        "canModifyStatuses", List.of("PENDING", "CONFIRMED"),
-                        "cannotModifyStatuses", List.of("PICKED_UP", "IN_SERVICE", "ON_THE_WAY_BACK", "CANCELLED"),
-                        "message", "Zamówienia można modyfikować tylko w statusie PENDING lub CONFIRMED"
-                ),
-                "serviceTypes", Map.of(
-                        "transport", Map.of(
-                                "description", "Tylko transport do zewnętrznego serwisu",
-                                "targetService", "Nie może być serwis własny (ID=1)"
-                        ),
-                        "service", Map.of(
-                                "description", "Transport + serwis w naszym serwisie",
-                                "targetService", "Zawsze serwis własny (ID=1)",
-                                "requiresPackage", true
-                        )
-                )
-        ));
-    }
-
-    // === METODY DLA UŻYTKOWNIKÓW ===
-
-    @Override
-    public ResponseEntity<List<AddressDto>> getUserAddresses(String userEmail) {
-        try {
-            Long userId = getUserId(userEmail);
-            List<AddressDto> addresses = addressService.getUserAddresses(userId);
-            return ResponseEntity.ok(addresses);
-        } catch (Exception e) {
-            logger.severe("Error getting user addresses: " + e.getMessage());
-            return ResponseEntity.internalServerError().build();
-        }
-    }
-
 
     @Override
     public ResponseEntity<UnifiedOrderResponseDto> getUserOrderDetails(Long orderId, String userEmail) {
@@ -256,33 +164,6 @@ public class UnifiedOrderServiceImpl implements UnifiedOrderService {
         } catch (Exception e) {
             logger.severe("Error cancelling order: " + e.getMessage());
             return ResponseEntity.badRequest().body(Map.of("message", "Błąd podczas anulowania zamówienia"));
-        }
-    }
-
-    @Override
-    public ResponseEntity<?> getUserStatistics(String userEmail) {
-        try {
-            List<ServiceOrderResponseDto> orders = transportOrderService.getAllUserOrders(userEmail);
-
-            long totalOrders = orders.size();
-            long transportOrders = orders.stream().filter(o -> "TRANSPORT".equals(o.orderType())).count();
-            long serviceOrders = orders.stream().filter(o -> "SERVICE".equals(o.orderType())).count();
-            long pendingOrders = orders.stream().filter(o -> "PENDING".equals(o.status())).count();
-            long completedOrders = orders.stream().filter(o -> "ON_THE_WAY_BACK".equals(o.status())).count();
-            long cancelledOrders = orders.stream().filter(o -> "CANCELLED".equals(o.status())).count();
-
-            return ResponseEntity.ok(Map.of(
-                    "totalOrders", totalOrders,
-                    "transportOrders", transportOrders,
-                    "serviceOrders", serviceOrders,
-                    "pendingOrders", pendingOrders,
-                    "completedOrders", completedOrders,
-                    "cancelledOrders", cancelledOrders,
-                    "activeOrders", totalOrders - completedOrders - cancelledOrders
-            ));
-        } catch (Exception e) {
-            logger.severe("Error getting user statistics: " + e.getMessage());
-            return ResponseEntity.internalServerError().build();
         }
     }
 

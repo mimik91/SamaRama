@@ -56,16 +56,8 @@ public class GuestOrderController {
      * POZOSTAJE JAK BYŁO
      */
     @PostMapping("/transport")
-    public ResponseEntity<?> createGuestTransportOrder(@Valid @RequestBody TransportOrderDto dto) {
-        // Konwertuj TransportOrderDto do ServiceOrTransportOrderDto
-        ServiceOrTransportOrderDto unifiedDto = convertToUnifiedDto(dto);
+    public ResponseEntity<?> createGuestTransportOrder(@Valid @RequestBody ServiceOrTransportOrderDto dto) {
 
-        // Walidacja - nie może być serwis własny
-        if (dto.targetServiceId().equals(1L)) {
-            return ResponseEntity.badRequest().body(Map.of(
-                    "message", "Dla serwisu własnego użyj endpointu /service"
-            ));
-        }
 
         return transportOrderService.createGuestTransportOrder(dto);
     }
@@ -79,16 +71,6 @@ public class GuestOrderController {
         return unifiedOrderService.calculateTransportCost(request);
     }
 
-    /**
-     * Sprawdza dostępność slotów dla gości
-     * DELEGUJE DO UnifiedOrderService
-     */
-    @GetMapping("/check-availability")
-    public ResponseEntity<?> checkAvailability(
-            @RequestParam String date,
-            @RequestParam(defaultValue = "1") int ordersCount) {
-        return unifiedOrderService.checkAvailability(date, ordersCount);
-    }
 
     /**
      * Rejestracja serwisu (legacy endpoint)

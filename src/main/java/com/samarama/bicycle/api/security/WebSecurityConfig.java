@@ -60,7 +60,6 @@ public class WebSecurityConfig {
                                 "/api/account/public/**",
                                 "/bicycles/bike",
                                 "/api/bicycles/**",
-                                "/api/guest-orders/service-registration",
                                 "/api/bike-services/**"
                         ).permitAll()
 

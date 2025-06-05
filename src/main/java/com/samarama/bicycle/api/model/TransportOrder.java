@@ -50,13 +50,25 @@ public class TransportOrder {
     @JoinColumn(name = "client_id", nullable = false)
     private IncompleteUser client;
 
-    // === INFORMACJE O ODBIORZE ===
+    // === INFORMACJE O ODBIORZE - ROZBITY ADRES ===
 
     @Column(name = "pickup_date", nullable = false)
     private LocalDate pickupDate;
 
-    @Column(name = "pickup_address", nullable = false)
-    private String pickupAddress;
+    @Column(name = "pickup_street", nullable = false)
+    private String pickupStreet;
+
+    @Column(name = "pickup_building", nullable = false)
+    private String pickupBuilding;
+
+    @Column(name = "pickup_apartment")
+    private String pickupApartment;
+
+    @Column(name = "pickup_city", nullable = false)
+    private String pickupCity;
+
+    @Column(name = "pickup_postal_code")
+    private String pickupPostalCode;
 
     @Column(name = "pickup_latitude")
     private Double pickupLatitude;
@@ -70,10 +82,22 @@ public class TransportOrder {
     @Column(name = "pickup_time_to")
     private LocalTime pickupTimeTo;
 
-    // === INFORMACJE O DOSTAWIE ===
+    // === INFORMACJE O DOSTAWIE - ROZBITY ADRES ===
 
-    @Column(name = "delivery_address", nullable = false)
-    private String deliveryAddress;
+    @Column(name = "delivery_street", nullable = false)
+    private String deliveryStreet;
+
+    @Column(name = "delivery_building", nullable = false)
+    private String deliveryBuilding;
+
+    @Column(name = "delivery_apartment")
+    private String deliveryApartment;
+
+    @Column(name = "delivery_city", nullable = false)
+    private String deliveryCity;
+
+    @Column(name = "delivery_postal_code")
+    private String deliveryPostalCode;
 
     @Column(name = "delivery_latitude")
     private Double deliveryLatitude;
@@ -84,6 +108,8 @@ public class TransportOrder {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "target_service_id", nullable = false)
     private BikeService targetService; // może być serwis własny lub zewnętrzny
+
+
 
     // === STATUS I DATY ===
 
@@ -231,6 +257,108 @@ public class TransportOrder {
         return null;
     }
 
+    // === NOWE METODY DLA ROZBITEGO ADRESU ===
+
+    /**
+     * Zwraca pełny adres odbioru jako jeden string
+     */
+    public String getFullPickupAddress() {
+        StringBuilder address = new StringBuilder();
+
+        if (pickupStreet != null) {
+            address.append(pickupStreet);
+        }
+
+        if (pickupBuilding != null) {
+            if (address.length() > 0) address.append(" ");
+            address.append(pickupBuilding);
+        }
+
+        if (pickupApartment != null && !pickupApartment.trim().isEmpty()) {
+            address.append("/").append(pickupApartment);
+        }
+
+        if (pickupCity != null) {
+            if (address.length() > 0) address.append(", ");
+            address.append(pickupCity);
+        }
+
+        if (pickupPostalCode != null && !pickupPostalCode.trim().isEmpty()) {
+            if (address.length() > 0) address.append(" ");
+            address.append(pickupPostalCode);
+        }
+
+        return address.toString();
+    }
+
+    /**
+     * Zwraca pełny adres dostawy jako jeden string
+     */
+    public String getFullDeliveryAddress() {
+        StringBuilder address = new StringBuilder();
+
+        if (deliveryStreet != null) {
+            address.append(deliveryStreet);
+        }
+
+        if (deliveryBuilding != null) {
+            if (address.length() > 0) address.append(" ");
+            address.append(deliveryBuilding);
+        }
+
+        if (deliveryApartment != null && !deliveryApartment.trim().isEmpty()) {
+            address.append("/").append(deliveryApartment);
+        }
+
+        if (deliveryCity != null) {
+            if (address.length() > 0) address.append(", ");
+            address.append(deliveryCity);
+        }
+
+        if (deliveryPostalCode != null && !deliveryPostalCode.trim().isEmpty()) {
+            if (address.length() > 0) address.append(" ");
+            address.append(deliveryPostalCode);
+        }
+
+        return address.toString();
+    }
+
+    /**
+     * Ustawia adres odbioru z obiektu Address lub rozbitych pól
+     */
+    public void setPickupAddressFromComponents(String street, String building, String apartment, String city, String postalCode) {
+        this.pickupStreet = street;
+        this.pickupBuilding = building;
+        this.pickupApartment = apartment;
+        this.pickupCity = city;
+        this.pickupPostalCode = postalCode;
+    }
+
+    /**
+     * Ustawia adres dostawy z obiektu Address lub rozbitych pól
+     */
+    public void setDeliveryAddressFromComponents(String street, String building, String apartment, String city, String postalCode) {
+        this.deliveryStreet = street;
+        this.deliveryBuilding = building;
+        this.deliveryApartment = apartment;
+        this.deliveryCity = city;
+        this.deliveryPostalCode = postalCode;
+    }
+
+    /**
+     * Ustawia adres dostawy z BikeService
+     */
+    public void setDeliveryAddressFromService(BikeService service) {
+        this.deliveryStreet = service.getStreet();
+        this.deliveryBuilding = service.getBuilding();
+        this.deliveryApartment = service.getFlat();
+        this.deliveryCity = service.getCity();
+        this.deliveryPostalCode = service.getPostalCode();
+        this.deliveryLatitude = service.getLatitude();
+        this.deliveryLongitude = service.getLongitude();
+
+    }
+
     // === LIFECYCLE HOOKS ===
 
     @PrePersist
@@ -241,10 +369,8 @@ public class TransportOrder {
         if (status == null) {
             status = OrderStatus.PENDING;
         }
-        if (deliveryAddress == null && targetService != null) {
-            deliveryAddress = targetService.getFullAddress();
-            deliveryLatitude = targetService.getLatitude();
-            deliveryLongitude = targetService.getLongitude();
+        if (deliveryStreet == null && targetService != null) {
+            setDeliveryAddressFromService(targetService);
         }
     }
 
@@ -252,6 +378,8 @@ public class TransportOrder {
     protected void onUpdate() {
         lastModifiedDate = LocalDateTime.now();
     }
+
+
 
     // === KONSTRUKTORY ===
 
@@ -261,10 +389,21 @@ public class TransportOrder {
         this.client = client;
         this.targetService = targetService;
         this.transportPrice = transportPrice != null ? transportPrice : BigDecimal.ZERO;
-        this.deliveryAddress = targetService.getFullAddress();
-        this.deliveryLatitude = targetService.getLatitude();
-        this.deliveryLongitude = targetService.getLongitude();
+
+        setDeliveryAddressFromService(targetService);
+
         this.status = OrderStatus.PENDING;
         this.orderDate = LocalDateTime.now();
+    }
+
+    /**
+     * Konstruktor z rozbitym adresem odbioru
+     */
+    public TransportOrder(IncompleteBike bicycle, IncompleteUser client,
+                          String pickupStreet, String pickupBuilding, String pickupApartment,
+                          String pickupCity, String pickupPostalCode,
+                          BikeService targetService, BigDecimal transportPrice) {
+        this(bicycle, client, targetService, transportPrice);
+        setPickupAddressFromComponents(pickupStreet, pickupBuilding, pickupApartment, pickupCity, pickupPostalCode);
     }
 }

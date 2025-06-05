@@ -145,10 +145,17 @@ public class TransportOrderServiceImpl implements TransportOrderService {
 
     @Override
     @Transactional
-    public ResponseEntity<?> createGuestTransportOrder(TransportOrderDto dto) {
-        // Walidacja danych gościa
-        if (!dto.isValidForGuest()) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Nieprawidłowe dane zamówienia gościa"));
+    public ResponseEntity<?> createGuestTransportOrder(ServiceOrTransportOrderDto dto) {
+        // Walidacja typu zamówienia - tylko TRANSPORT
+        if (!dto.isTransportOrder()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "message", "Ten endpoint obsługuje tylko zamówienia transportowe. Dla serwisu użyj /api/service-orders/guest"
+            ));
+        }
+
+        // Walidacja danych transportowych
+        if (!dto.isValidForTransport()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Nieprawidłowe dane zamówienia transportowego"));
         }
 
         // Walidacja daty
@@ -157,8 +164,13 @@ public class TransportOrderServiceImpl implements TransportOrderService {
         }
 
         // Walidacja miasta
-        if (dto.city() == null || !cityValidator.isValidCity(dto.city())) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Nieprawidłowe miasto"));
+        if (dto.pickupCity() == null || !cityValidator.isValidCity(dto.pickupCity())) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Nieprawidłowe miasto: " + dto.pickupCity()));
+        }
+
+        // Walidacja kompletności adresu odbioru
+        if (!dto.hasCompletePickupAddress()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Adres odbioru jest niekompletny"));
         }
 
         // Walidacja dostępności slotów
@@ -172,7 +184,7 @@ public class TransportOrderServiceImpl implements TransportOrderService {
 
         // Pobierz serwis docelowy
         BikeService targetService = bikeServiceRepository.findById(dto.targetServiceId())
-                .orElseThrow(() -> new RuntimeException("Target service not found"));
+                .orElseThrow(() -> new RuntimeException("Target service not found: " + dto.targetServiceId()));
 
         // Walidacja - dla czystego transportu nie może być serwis własny
         if (targetService.getId().equals(1L)) {
@@ -194,16 +206,38 @@ public class TransportOrderServiceImpl implements TransportOrderService {
             order.setBicycle(bike);
             order.setClient(guestUser);
             order.setPickupDate(dto.pickupDate());
-            order.setPickupAddress(dto.pickupAddress() + ", " + dto.city());
+
+            // Ustaw rozbity adres odbioru
+            order.setPickupAddressFromComponents(
+                    dto.pickupStreet(),
+                    dto.pickupBuilding(),
+                    dto.pickupApartment(),
+                    dto.pickupCity(),
+                    dto.pickupPostalCode()
+            );
+
             order.setPickupLatitude(dto.pickupLatitude());
             order.setPickupLongitude(dto.pickupLongitude());
             order.setPickupTimeFrom(dto.pickupTimeFrom());
             order.setPickupTimeTo(dto.pickupTimeTo());
 
             order.setTargetService(targetService);
-            order.setDeliveryAddress(dto.deliveryAddress() != null ? dto.deliveryAddress() : targetService.getFullAddress());
-            order.setDeliveryLatitude(dto.deliveryLatitude() != null ? dto.deliveryLatitude() : targetService.getLatitude());
-            order.setDeliveryLongitude(dto.deliveryLongitude() != null ? dto.deliveryLongitude() : targetService.getLongitude());
+
+            // Ustaw adres dostawy - z DTO lub z serwisu
+            if (dto.hasDeliveryAddress()) {
+                order.setDeliveryAddressFromComponents(
+                        dto.deliveryStreet(),
+                        dto.deliveryBuilding(),
+                        dto.deliveryApartment(),
+                        dto.deliveryCity(),
+                        dto.deliveryPostalCode()
+                );
+                order.setDeliveryLatitude(dto.deliveryLatitude());
+                order.setDeliveryLongitude(dto.deliveryLongitude());
+            } else {
+                // Użyj adresu z serwisu
+                order.setDeliveryAddressFromService(targetService);
+            }
 
             order.setTransportPrice(dto.transportPrice());
             order.setEstimatedTime(dto.estimatedTime());
@@ -218,10 +252,22 @@ public class TransportOrderServiceImpl implements TransportOrderService {
         // Zapisz zamówienia
         List<TransportOrder> savedOrders = transportOrderRepository.saveAll(orders);
 
+        // Wyślij powiadomienia email
+        for (TransportOrder order : savedOrders) {
+            try {
+                // emailService.sendTransportOrderNotification(order);
+                logger.info("Guest transport order created: " + order.getId() + " for email: " + dto.clientEmail());
+            } catch (Exception e) {
+                logger.warning("Failed to send email notification for guest transport order: " + order.getId());
+            }
+        }
+
         return ResponseEntity.ok(Map.of(
                 "message", "Zamówienia transportowe zostały utworzone pomyślnie",
                 "orderIds", savedOrders.stream().map(TransportOrder::getId).collect(Collectors.toList()),
-                "guestUserId", guestUser.getId()
+                "orderCount", savedOrders.size(),
+                "guestUserId", guestUser.getId(),
+                "targetService", targetService.getName()
         ));
     }
 

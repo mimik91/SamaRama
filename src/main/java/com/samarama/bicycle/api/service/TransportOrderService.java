@@ -22,7 +22,7 @@ public interface TransportOrderService {
     /**
      * Tworzy zamówienie transportowe dla gościa
      */
-    ResponseEntity<?> createGuestTransportOrder(TransportOrderDto dto);
+    ResponseEntity<?> createGuestTransportOrder(ServiceOrTransportOrderDto dto);
 
     // === POBIERANIE ZAMÓWIEŃ ===
 
