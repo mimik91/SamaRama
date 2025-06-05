@@ -228,9 +228,6 @@ public class OrderValidator {
                 if (bike.brand() == null || bike.brand().trim().isEmpty()) {
                     errors.add("Marka roweru #" + (i + 1) + " jest wymagana");
                 }
-                if (bike.model() == null || bike.model().trim().isEmpty()) {
-                    errors.add("Model roweru #" + (i + 1) + " jest wymagany");
-                }
             }
         }
 

@@ -100,7 +100,7 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
             List<IncompleteBike> bikes = validateAndGetBikes(dto.getBicycleIds(), user.getId());
 
             // Utwórz zamówienia serwisowe
-            List<ServiceOrder> orders = createServiceOrdersForUser(bikes, user, dto, servicePackage, ownService);
+            List<ServiceOrder> orders = createServiceOrdersFromDto(bikes, user, dto, servicePackage, ownService);
 
             // Zapisz zamówienia
             List<ServiceOrder> savedOrders = serviceOrderRepository.saveAll(orders);
@@ -130,8 +130,6 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
     @Transactional
     public ResponseEntity<?> createGuestServiceOrder(ServiceOrTransportOrderDto dto) {
         try {
-            // === NORMALIZACJA DTO ===
-            normalizeGuestServiceOrderDto(dto);
 
             if (!dto.isValidForGuest()) {
                 return ResponseEntity.badRequest().body(Map.of("message", "Nieprawidłowe dane zamówienia gościa"));
@@ -169,7 +167,7 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
             List<IncompleteBike> bikes = createIncompleteBikes(dto.getBicycles(), guestUser);
 
             // Utwórz zamówienia serwisowe
-            List<ServiceOrder> orders = createServiceOrdersForGuest(bikes, guestUser, dto, servicePackage, ownService);
+            List<ServiceOrder> orders = createServiceOrdersFromDto(bikes, guestUser, dto, servicePackage, ownService);
 
             // Zapisz zamówienia
             List<ServiceOrder> savedOrders = serviceOrderRepository.saveAll(orders);
@@ -366,29 +364,6 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
         }
     }
 
-    /**
-     * Normalizuje DTO dla zamówienia serwisowego gościa
-     * Ustawia targetServiceId oraz transportPrice na odpowiednie wartości
-     */
-    private void normalizeGuestServiceOrderDto(ServiceOrTransportOrderDto dto) {
-        // 1. Ustaw targetServiceId na serwis własny (goście mogą tylko do naszego serwisu)
-        if (dto.getTargetServiceId() == null) {
-            dto.setTargetServiceId(Long.parseLong(internalServiceIdString));
-            logger.info("Set targetServiceId to " + internalServiceIdString + " (internal service) for guest service order");
-        }
-
-        // 2. Ustaw transportPrice na 0 (dla serwisu transport wliczony w cenę pakietu)
-        if (dto.getTransportPrice() == null) {
-            dto.setTransportPrice(BigDecimal.ZERO);
-            logger.info("Set transportPrice to 0 for guest service order (included in package price)");
-        }
-
-        // 3. Walidacja - goście mogą tylko do serwisu własnego
-        if (!dto.getTargetServiceId().equals(Long.parseLong(internalServiceIdString))) {
-            throw new RuntimeException("Goście mogą składać zamówienia tylko do serwisu własnego (ID: " + internalServiceIdString + ")");
-        }
-    }
-
     // === PRIVATE HELPER METHODS ===
 
     private User getUserByEmail(String email) {
@@ -468,53 +443,7 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
         return bikes;
     }
 
-    private List<ServiceOrder> createServiceOrdersForUser(
-            List<IncompleteBike> bikes, User user, ServiceOrTransportOrderDto dto,
-            ServicePackage servicePackage, BikeService ownService) {
-
-        List<ServiceOrder> orders = new ArrayList<>();
-        BigDecimal transportPrice = dto.getTransportPrice(); // Używamy znormalizowanej ceny (0)
-
-        for (IncompleteBike bike : bikes) {
-            ServiceOrder order = new ServiceOrder();
-
-            // Pola bazowe z TransportOrder
-            order.setBicycle(bike);
-            order.setClient(user);
-            order.setPickupDate(dto.getPickupDate());
-            order.setPickupAddress(getPickupAddress(dto));
-            order.setPickupLatitude(dto.getPickupLatitude());
-            order.setPickupLongitude(dto.getPickupLongitude());
-            order.setPickupTimeFrom(null); // Stały czas 18-22
-            order.setPickupTimeTo(null);
-
-            order.setTargetService(ownService);
-            order.setDeliveryAddress("SERWIS WŁASNY");
-            order.setDeliveryLatitude(ownService.getLatitude());
-            order.setDeliveryLongitude(ownService.getLongitude());
-
-            order.setTransportPrice(transportPrice);
-            order.setEstimatedTime(60);
-            order.setTransportNotes(dto.getTransportNotes());
-            order.setAdditionalNotes(dto.getAdditionalNotes());
-            order.setStatus(TransportOrder.OrderStatus.PENDING);
-            order.setOrderDate(LocalDateTime.now());
-
-            // Pola specyficzne dla ServiceOrder
-            order.setServicePackage(servicePackage);
-            order.setServicePackageCode(servicePackage.getCode());
-            order.setServicePrice(servicePackage.getPrice());
-            order.setServiceNotes(dto.getServiceNotes());
-            order.setServiceStartDate(null);
-            order.setServiceCompletionDate(null);
-
-            orders.add(order);
-        }
-
-        return orders;
-    }
-
-    private List<ServiceOrder> createServiceOrdersForGuest(
+    private List<ServiceOrder> createServiceOrdersFromDto(
             List<IncompleteBike> bikes, IncompleteUser guestUser, ServiceOrTransportOrderDto dto,
             ServicePackage servicePackage, BikeService ownService) {
 
@@ -528,14 +457,27 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
             order.setBicycle(bike);
             order.setClient(guestUser);
             order.setPickupDate(dto.getPickupDate());
-            order.setPickupAddress(getPickupAddress(dto));
+
+            // Nowa struktura adresu odbioru - rozbita na pola
+            order.setPickupStreet(dto.getPickupStreet());
+            order.setPickupBuilding(dto.getPickupBuildingNumber());
+            order.setPickupApartment(dto.getPickupApartmentNumber());
+            order.setPickupCity(dto.getPickupCity());
+            order.setPickupPostalCode(dto.getPickupPostalCode());
             order.setPickupLatitude(dto.getPickupLatitude());
             order.setPickupLongitude(dto.getPickupLongitude());
+
             order.setPickupTimeFrom(null);
             order.setPickupTimeTo(null);
 
             order.setTargetService(ownService);
-            order.setDeliveryAddress("SERWIS WŁASNY");
+
+            // Nowa struktura adresu dostawy - rozbita na pola
+            order.setDeliveryStreet(ownService.getStreet());
+            order.setDeliveryBuilding(ownService.getBuilding());
+            order.setDeliveryApartment(ownService.getFlat());
+            order.setDeliveryCity(ownService.getCity());
+            order.setDeliveryPostalCode(ownService.getPostalCode());
             order.setDeliveryLatitude(ownService.getLatitude());
             order.setDeliveryLongitude(ownService.getLongitude());
 
@@ -558,14 +500,6 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
         }
 
         return orders;
-    }
-
-    private String getPickupAddress(ServiceOrTransportOrderDto dto) {
-        if (dto.usesNewAddress()) {
-            return dto.getPickupAddressString();
-        }
-        // TODO: Pobierz adres z bazy gdy używa pickupAddressId
-        return "Adres odbioru";
     }
 
     private void updateServiceOrderFields(ServiceOrder order, ServiceOrTransportOrderDto dto) {

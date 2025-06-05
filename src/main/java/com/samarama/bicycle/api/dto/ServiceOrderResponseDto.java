@@ -50,7 +50,7 @@ public record ServiceOrderResponseDto(
                 "SERVICE",
                 entity.getBicycle() != null ? entity.getBicycle().getId() : null,
                 entity.getPickupDate(),
-                entity.getPickupAddress(),
+                entity.getFullPickupAddress(),
                 targetServiceName,
                 servicePackageName,
                 totalPrice,
@@ -84,7 +84,7 @@ public record ServiceOrderResponseDto(
                 "TRANSPORT", // orderType
                 entity.getBicycle() != null ? entity.getBicycle().getId() : null,
                 entity.getPickupDate(),
-                entity.getPickupAddress(),
+                entity.getFullPickupAddress(),
                 targetServiceName,
                 servicePackageName, // Dla transportu = "Transport"
                 totalPrice,

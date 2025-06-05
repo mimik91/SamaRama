@@ -27,8 +27,6 @@ public class TransportOrderServiceImpl implements TransportOrderService {
     private final IncompleteBikeRepository incompleteBikeRepository;
     private final BikeServiceRepository bikeServiceRepository;
     private final ServiceSlotService serviceSlotService;
-    private final EmailService emailService;
-    private final CityValidator cityValidator;
 
     public TransportOrderServiceImpl(
             TransportOrderRepository transportOrderRepository,
@@ -36,38 +34,32 @@ public class TransportOrderServiceImpl implements TransportOrderService {
             IncompleteUserRepository incompleteUserRepository,
             IncompleteBikeRepository incompleteBikeRepository,
             BikeServiceRepository bikeServiceRepository,
-            ServiceSlotService serviceSlotService,
-            EmailService emailService,
-            CityValidator cityValidator) {
+            ServiceSlotService serviceSlotService){
         this.transportOrderRepository = transportOrderRepository;
         this.userRepository = userRepository;
         this.incompleteUserRepository = incompleteUserRepository;
         this.incompleteBikeRepository = incompleteBikeRepository;
         this.bikeServiceRepository = bikeServiceRepository;
         this.serviceSlotService = serviceSlotService;
-        this.emailService = emailService;
-        this.cityValidator = cityValidator;
+
     }
 
     @Override
     @Transactional
     public ResponseEntity<?> createTransportOrder(ServiceOrTransportOrderDto dto, String userEmail) {
-
         // Pobierz użytkownika
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
         // Pobierz serwis docelowy
-        BikeService targetService = bikeServiceRepository.findById(dto.targetServiceId())
+        BikeService targetService = bikeServiceRepository.findById(dto.getTargetServiceId())
                 .orElseThrow(() -> new RuntimeException("Target service not found"));
 
-
         // Walidacja rowerów
-        List<IncompleteBike> bikes = validateAndGetBikes(dto.bicycleIds(), user.getId());
+        List<IncompleteBike> bikes = validateAndGetBikes(dto.getBicycleIds(), user.getId());
 
         // Utwórz zamówienia transportowe (jedno na rower)
         List<TransportOrder> orders = createTransportOrderFromDtos(bikes, user, dto, targetService);
-
 
         // Zapisz zamówienia
         List<TransportOrder> savedOrders = transportOrderRepository.saveAll(orders);
@@ -75,7 +67,6 @@ public class TransportOrderServiceImpl implements TransportOrderService {
         // Wyślij powiadomienia email
         for (TransportOrder order : savedOrders) {
             try {
-                // emailService.sendTransportOrderNotification(order);
                 logger.info("Transport order created: " + order.getId());
             } catch (Exception e) {
                 logger.warning("Failed to send email notification for transport order: " + order.getId());
@@ -95,7 +86,7 @@ public class TransportOrderServiceImpl implements TransportOrderService {
         try {
             logger.info("Creating guest transport order for email: " + dto.getEmail());
 
-            // Sprawdź dostępność slotów (ostateczna weryfikacja przed utworzeniem)
+            // Sprawdź dostępność slotów
             int bikesCount = dto.getBicycles().size();
             if (!serviceSlotService.areSlotsAvailable(dto.getPickupDate(), bikesCount)) {
                 return ResponseEntity.badRequest().body(Map.of(
@@ -104,7 +95,7 @@ public class TransportOrderServiceImpl implements TransportOrderService {
                 ));
             }
 
-            // Pobierz serwis docelowy (już zwalidowany w OrderValidator)
+            // Pobierz serwis docelowy
             BikeService targetService = bikeServiceRepository.findById(dto.getTargetServiceId())
                     .orElseThrow(() -> new RuntimeException("Target service not found: " + dto.getTargetServiceId()));
 
@@ -114,21 +105,11 @@ public class TransportOrderServiceImpl implements TransportOrderService {
             // Utwórz rowery gościa
             List<IncompleteBike> bikes = createIncompleteBikes(dto.getBicycles(), guestUser);
 
-            // Utwórz zamówienia transportowe (jedno na rower)
+            // Utwórz zamówienia transportowe
             List<TransportOrder> orders = createTransportOrderFromDtos(bikes, guestUser, dto, targetService);
 
             // Zapisz zamówienia
             List<TransportOrder> savedOrders = transportOrderRepository.saveAll(orders);
-
-            // Wyślij powiadomienia email
-            for (TransportOrder order : savedOrders) {
-                try {
-                    // emailService.sendTransportOrderNotification(order);
-                    logger.info("Guest transport order created: " + order.getId() + " for email: " + dto.getEmail());
-                } catch (Exception e) {
-                    logger.warning("Failed to send email notification for guest transport order: " + order.getId());
-                }
-            }
 
             // Log sukcesu
             savedOrders.forEach(order -> logTransportOrderCreation(order, dto.getEmail()));
@@ -148,69 +129,21 @@ public class TransportOrderServiceImpl implements TransportOrderService {
         }
     }
 
-    private List<TransportOrder> createTransportOrderFromDtos(
-            List<IncompleteBike> bikes, IncompleteUser guestUser, ServiceOrTransportOrderDto dto,
-            BikeService targetService) {
-
-        List<TransportOrder> orders = new ArrayList<>();
-
-        for (IncompleteBike bike : bikes) {
-            TransportOrder order = new TransportOrder();
-
-            order.setBicycle(bike);
-            order.setClient(guestUser);
-            order.setPickupDate(dto.getPickupDate());
-
-            // Ustaw rozbity adres odbioru
-            order.setPickupStreet(dto.getPickupStreet());
-            order.setPickupBuilding(dto.getPickupBuildingNumber());
-            order.setPickupApartment(dto.getPickupApartmentNumber());
-            order.setPickupCity(dto.getPickupCity());
-            order.setPickupPostalCode(dto.getPickupPostalCode());
-            order.setPickupLatitude(dto.getPickupLatitude());
-            order.setPickupLongitude(dto.getPickupLongitude());
-
-            order.setTargetService(targetService);
-
-            // Ustaw rozbity adres dostawy z serwisu
-            order.setDeliveryStreet(targetService.getStreet());
-            order.setDeliveryBuilding(targetService.getBuilding());
-            order.setDeliveryApartment(targetService.getFlat());
-            order.setDeliveryCity(targetService.getCity());
-            order.setDeliveryPostalCode(targetService.getPostalCode());
-            order.setDeliveryLatitude(targetService.getLatitude());
-            order.setDeliveryLongitude(targetService.getLongitude());
-
-            order.setTransportPrice(dto.getTransportPrice());
-            order.setTransportNotes(dto.getTransportNotes());
-            order.setAdditionalNotes(dto.getAdditionalNotes());
-            order.setStatus(TransportOrder.OrderStatus.PENDING);
-            order.setOrderDate(LocalDateTime.now());
-
-            orders.add(order);
-        }
-
-        return orders;
-    }
-
     @Override
     public List<ServiceOrderResponseDto> getAllUserOrders(String userEmail) {
         User user = getUserByEmail(userEmail);
         List<TransportOrder> orders = transportOrderRepository.findByClient(user);
 
-        List<ServiceOrderResponseDto> answer =  orders.stream()
+        return orders.stream()
                 .map(order -> {
                     if (order instanceof ServiceOrder) {
-                        // Jeśli to ServiceOrder, użyj ServiceOrderResponseDto
                         return ServiceOrderResponseDto.fromServiceOrder((ServiceOrder) order);
                     } else {
-                        // Jeśli to zwykły TransportOrder, przekonwertuj na ServiceOrderResponseDto
                         return ServiceOrderResponseDto.fromTransportOrder(order);
                     }
                 })
                 .sorted(Comparator.comparing(ServiceOrderResponseDto::orderDate, Comparator.reverseOrder()))
                 .collect(Collectors.toList());
-        return answer;
     }
 
     @Override
@@ -238,7 +171,7 @@ public class TransportOrderServiceImpl implements TransportOrderService {
 
     @Override
     @Transactional
-    public ResponseEntity<?> updateTransportOrder(Long orderId, TransportOrderDto dto, String userEmail) {
+    public ResponseEntity<?> updateTransportOrder(Long orderId, ServiceOrTransportOrderDto dto, String userEmail) {
         User user = getUserByEmail(userEmail);
 
         Optional<TransportOrder> orderOpt = transportOrderRepository.findById(orderId);
@@ -260,7 +193,7 @@ public class TransportOrderServiceImpl implements TransportOrderService {
             ));
         }
 
-        // Sprawdź czy to nie jest ServiceOrder (nie można konwertować)
+        // Sprawdź czy to nie jest ServiceOrder
         if (order instanceof ServiceOrder) {
             return ResponseEntity.badRequest().body(Map.of(
                     "message", "Użyj endpointu /api/service-orders/{id} dla zamówień serwisowych"
@@ -340,8 +273,6 @@ public class TransportOrderServiceImpl implements TransportOrderService {
         return cancelOrder(orderId, userEmail);
     }
 
-    // === ADMIN METHODS ===
-
     @Override
     public List<UnifiedOrderResponseDto> getAllTransportOrders() {
         List<TransportOrder> orders = transportOrderRepository.findPureTransportOrders();
@@ -374,7 +305,7 @@ public class TransportOrderServiceImpl implements TransportOrderService {
 
     @Override
     @Transactional
-    public ResponseEntity<?> updateTransportOrderByAdmin(Long orderId, TransportOrderDto dto, String adminEmail) {
+    public ResponseEntity<?> updateTransportOrderByAdmin(Long orderId, ServiceOrTransportOrderDto dto, String adminEmail) {
         Optional<TransportOrder> orderOpt = transportOrderRepository.findById(orderId);
         if (orderOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
@@ -458,8 +389,6 @@ public class TransportOrderServiceImpl implements TransportOrderService {
         }
     }
 
-    // === HELPER METHODS ===
-
     @Override
     public int countOrdersForDate(LocalDate date) {
         return transportOrderRepository.countByPickupDate(date);
@@ -469,6 +398,35 @@ public class TransportOrderServiceImpl implements TransportOrderService {
     public boolean areSlotsAvailable(LocalDate date, int ordersCount) {
         return serviceSlotService.areSlotsAvailable(date, ordersCount);
     }
+
+    @Override
+    public List<UnifiedOrderResponseDto> getAllTransportOrdersAsUnified() {
+        List<TransportOrder> orders = transportOrderRepository.findPureTransportOrders();
+        return orders.stream()
+                .map(UnifiedOrderResponseDto::fromTransportOrder)
+                .sorted(Comparator.comparing(UnifiedOrderResponseDto::orderDate, Comparator.reverseOrder()))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public Optional<UnifiedOrderResponseDto> getOrderAsUnified(Long orderId) {
+        Optional<TransportOrder> orderOpt = transportOrderRepository.findById(orderId);
+
+        if (orderOpt.isEmpty()) {
+            return Optional.empty();
+        }
+
+        TransportOrder order = orderOpt.get();
+
+        // Sprawdź czy to nie jest ServiceOrder - jeśli tak, zwróć empty
+        if (order instanceof ServiceOrder) {
+            return Optional.empty();
+        }
+
+        return Optional.of(UnifiedOrderResponseDto.fromTransportOrder(order));
+    }
+
+    // === PRIVATE HELPER METHODS ===
 
     private User getUserByEmail(String email) {
         return userRepository.findByEmail(email)
@@ -527,48 +485,91 @@ public class TransportOrderServiceImpl implements TransportOrderService {
         return bikes;
     }
 
-    private void updateTransportOrderFields(TransportOrder order, TransportOrderDto dto) {
-        if (dto.pickupDate() != null) {
-            order.setPickupDate(dto.pickupDate());
+    private List<TransportOrder> createTransportOrderFromDtos(
+            List<IncompleteBike> bikes, IncompleteUser user, ServiceOrTransportOrderDto dto,
+            BikeService targetService) {
+
+        List<TransportOrder> orders = new ArrayList<>();
+
+        for (IncompleteBike bike : bikes) {
+            TransportOrder order = new TransportOrder();
+
+            order.setBicycle(bike);
+            order.setClient(user);
+            order.setPickupDate(dto.getPickupDate());
+
+            // Ustaw rozbity adres odbioru
+            order.setPickupStreet(dto.getPickupStreet());
+            order.setPickupBuilding(dto.getPickupBuildingNumber());
+            order.setPickupApartment(dto.getPickupApartmentNumber());
+            order.setPickupCity(dto.getPickupCity());
+            order.setPickupPostalCode(dto.getPickupPostalCode());
+            order.setPickupLatitude(dto.getPickupLatitude());
+            order.setPickupLongitude(dto.getPickupLongitude());
+
+            order.setTargetService(targetService);
+
+            // Ustaw rozbity adres dostawy z serwisu
+            order.setDeliveryStreet(targetService.getStreet());
+            order.setDeliveryBuilding(targetService.getBuilding());
+            order.setDeliveryApartment(targetService.getFlat());
+            order.setDeliveryCity(targetService.getCity());
+            order.setDeliveryPostalCode(targetService.getPostalCode());
+            order.setDeliveryLatitude(targetService.getLatitude());
+            order.setDeliveryLongitude(targetService.getLongitude());
+
+            order.setTransportPrice(dto.getTransportPrice());
+            order.setTransportNotes(dto.getTransportNotes());
+            order.setAdditionalNotes(dto.getAdditionalNotes());
+            order.setStatus(TransportOrder.OrderStatus.PENDING);
+            order.setOrderDate(LocalDateTime.now());
+
+            orders.add(order);
         }
-        if (dto.pickupAddress() != null) {
-            order.setPickupAddress(dto.pickupAddress());
+
+        return orders;
+    }
+
+    private void updateTransportOrderFields(TransportOrder order, ServiceOrTransportOrderDto dto) {
+        if (dto.getPickupDate() != null) {
+            order.setPickupDate(dto.getPickupDate());
         }
-        if (dto.pickupLatitude() != null) {
-            order.setPickupLatitude(dto.pickupLatitude());
+
+        // Aktualizuj rozbity adres odbioru
+        if (dto.getPickupStreet() != null) {
+            order.setPickupStreet(dto.getPickupStreet());
         }
-        if (dto.pickupLongitude() != null) {
-            order.setPickupLongitude(dto.pickupLongitude());
+        if (dto.getPickupBuildingNumber() != null) {
+            order.setPickupBuilding(dto.getPickupBuildingNumber());
         }
-        if (dto.pickupTimeFrom() != null) {
-            order.setPickupTimeFrom(dto.pickupTimeFrom());
+        if (dto.getPickupApartmentNumber() != null) {
+            order.setPickupApartment(dto.getPickupApartmentNumber());
         }
-        if (dto.pickupTimeTo() != null) {
-            order.setPickupTimeTo(dto.pickupTimeTo());
+        if (dto.getPickupCity() != null) {
+            order.setPickupCity(dto.getPickupCity());
         }
-        if (dto.deliveryAddress() != null) {
-            order.setDeliveryAddress(dto.deliveryAddress());
+        if (dto.getPickupPostalCode() != null) {
+            order.setPickupPostalCode(dto.getPickupPostalCode());
         }
-        if (dto.deliveryLatitude() != null) {
-            order.setDeliveryLatitude(dto.deliveryLatitude());
+        if (dto.getPickupLatitude() != null) {
+            order.setPickupLatitude(dto.getPickupLatitude());
         }
-        if (dto.deliveryLongitude() != null) {
-            order.setDeliveryLongitude(dto.deliveryLongitude());
+        if (dto.getPickupLongitude() != null) {
+            order.setPickupLongitude(dto.getPickupLongitude());
         }
-        if (dto.transportPrice() != null) {
-            order.setTransportPrice(dto.transportPrice());
+
+        if (dto.getTransportPrice() != null) {
+            order.setTransportPrice(dto.getTransportPrice());
         }
-        if (dto.estimatedTime() != null) {
-            order.setEstimatedTime(dto.estimatedTime());
+        if (dto.getTransportNotes() != null) {
+            order.setTransportNotes(dto.getTransportNotes());
         }
-        if (dto.transportNotes() != null) {
-            order.setTransportNotes(dto.transportNotes());
+        if (dto.getAdditionalNotes() != null) {
+            order.setAdditionalNotes(dto.getAdditionalNotes());
         }
-        if (dto.additionalNotes() != null) {
-            order.setAdditionalNotes(dto.additionalNotes());
-        }
-        if (dto.targetServiceId() != null) {
-            BikeService targetService = bikeServiceRepository.findById(dto.targetServiceId())
+
+        if (dto.getTargetServiceId() != null) {
+            BikeService targetService = bikeServiceRepository.findById(dto.getTargetServiceId())
                     .orElseThrow(() -> new RuntimeException("Target service not found"));
 
             // Walidacja - nie można zmienić na serwis własny w czystym transporcie
@@ -578,17 +579,19 @@ public class TransportOrderServiceImpl implements TransportOrderService {
 
             order.setTargetService(targetService);
 
-            // Aktualizuj adres dostawy jeśli nie został podany
-            if (dto.deliveryAddress() == null) {
-                order.setDeliveryAddress(targetService.getFullAddress());
-                order.setDeliveryLatitude(targetService.getLatitude());
-                order.setDeliveryLongitude(targetService.getLongitude());
-            }
+            // Aktualizuj rozbity adres dostawy z serwisu
+            order.setDeliveryStreet(targetService.getStreet());
+            order.setDeliveryBuilding(targetService.getBuilding());
+            order.setDeliveryApartment(targetService.getFlat());
+            order.setDeliveryCity(targetService.getCity());
+            order.setDeliveryPostalCode(targetService.getPostalCode());
+            order.setDeliveryLatitude(targetService.getLatitude());
+            order.setDeliveryLongitude(targetService.getLongitude());
         }
 
         // Aktualizuj rower - sprawdź czy należy do klienta
-        if (dto.bicycleIds() != null && !dto.bicycleIds().isEmpty()) {
-            Long bicycleId = dto.bicycleIds().get(0); // Weź pierwszy rower
+        if (dto.getBicycleIds() != null && !dto.getBicycleIds().isEmpty()) {
+            Long bicycleId = dto.getBicycleIds().get(0); // Weź pierwszy rower
             Optional<IncompleteBike> bikeOpt = incompleteBikeRepository.findById(bicycleId);
             if (bikeOpt.isPresent()) {
                 IncompleteBike bike = bikeOpt.get();
@@ -605,34 +608,24 @@ public class TransportOrderServiceImpl implements TransportOrderService {
         return Math.max(0, maxSlots - usedSlots);
     }
 
-    /**
-     * Waliduje czy można utworzyć zamówienie transportowe
-     */
-    private void validateTransportOrderCreation(TransportOrderDto dto) {
-        // Dodatkowe walidacje specyficzne dla transportu
-        if (dto.targetServiceId() == null) {
+    private void validateTransportOrderCreation(ServiceOrTransportOrderDto dto) {
+        if (dto.getTargetServiceId() == null) {
             throw new IllegalArgumentException("Target service ID jest wymagany");
         }
 
-        // Sprawdź czy target service istnieje
-        if (!bikeServiceRepository.existsById(dto.targetServiceId())) {
+        if (!bikeServiceRepository.existsById(dto.getTargetServiceId())) {
             throw new IllegalArgumentException("Serwis docelowy nie istnieje");
         }
 
-        // Sprawdź czy to nie jest serwis własny
-        if (dto.targetServiceId().equals(1L)) {
+        if (dto.getTargetServiceId().equals(1L)) {
             throw new IllegalArgumentException("Dla serwisu własnego użyj endpoint /api/service-orders");
         }
 
-        // Walidacja ceny transportu
-        if (dto.transportPrice() == null || dto.transportPrice().compareTo(java.math.BigDecimal.ZERO) < 0) {
+        if (dto.getTransportPrice() == null || dto.getTransportPrice().compareTo(java.math.BigDecimal.ZERO) < 0) {
             throw new IllegalArgumentException("Cena transportu musi być większa lub równa 0");
         }
     }
 
-    /**
-     * Loguje utworzenie zamówienia transportowego
-     */
     private void logTransportOrderCreation(TransportOrder order, String userEmail) {
         logger.info(String.format(
                 "Transport order created: ID=%d, User=%s, Target=%s, Date=%s, Price=%s",
@@ -644,36 +637,24 @@ public class TransportOrderServiceImpl implements TransportOrderService {
         ));
     }
 
-    /**
-     * Waliduje przejście statusu dla zamówienia transportowego
-     */
     private boolean isValidStatusTransition(TransportOrder.OrderStatus current, TransportOrder.OrderStatus target) {
         return switch (current) {
             case PENDING -> target == TransportOrder.OrderStatus.CONFIRMED || target == TransportOrder.OrderStatus.CANCELLED;
             case CONFIRMED -> target == TransportOrder.OrderStatus.PICKED_UP || target == TransportOrder.OrderStatus.CANCELLED;
             case PICKED_UP -> target == TransportOrder.OrderStatus.ON_THE_WAY_BACK || target == TransportOrder.OrderStatus.CANCELLED;
-            case ON_THE_WAY_BACK -> target == TransportOrder.OrderStatus.CANCELLED; // Tylko anulowanie możliwe
-            case CANCELLED -> false; // Nie można zmienić z anulowanego
+            case ON_THE_WAY_BACK -> target == TransportOrder.OrderStatus.CANCELLED;
+            case CANCELLED -> false;
             default -> false;
         };
     }
 
-    /**
-     * Sprawdza czy zamówienie może być modyfikowane przez użytkownika
-     */
     private boolean canUserModifyOrder(TransportOrder order, String userEmail) {
-        // Sprawdź własność
         if (!order.getClient().getEmail().equals(userEmail)) {
             return false;
         }
-
-        // Sprawdź status
         return order.canBeCancelled();
     }
 
-    /**
-     * Pobiera szczegółowe informacje o dostępności slotów
-     */
     public Map<String, Object> getDetailedSlotAvailability(LocalDate date) {
         int maxSlots = serviceSlotService.getMaxBikesPerDay(date);
         int usedSlots = countOrdersForDate(date);
@@ -688,35 +669,4 @@ public class TransportOrderServiceImpl implements TransportOrderService {
                 "utilizationPercentage", maxSlots > 0 ? (usedSlots * 100.0 / maxSlots) : 0
         );
     }
-
-    // Dodaj te metody do TransportOrderServiceImpl
-
-    @Override
-    public List<UnifiedOrderResponseDto> getAllTransportOrdersAsUnified() {
-        List<TransportOrder> orders = transportOrderRepository.findPureTransportOrders();
-        return orders.stream()
-                .map(UnifiedOrderResponseDto::fromTransportOrder)
-                .sorted(Comparator.comparing(UnifiedOrderResponseDto::orderDate, Comparator.reverseOrder()))
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    public Optional<UnifiedOrderResponseDto> getOrderAsUnified(Long orderId) {
-        Optional<TransportOrder> orderOpt = transportOrderRepository.findById(orderId);
-
-        if (orderOpt.isEmpty()) {
-            return Optional.empty();
-        }
-
-        TransportOrder order = orderOpt.get();
-
-        // Sprawdź czy to nie jest ServiceOrder - jeśli tak, zwróć empty
-        if (order instanceof ServiceOrder) {
-            return Optional.empty();
-        }
-
-        return Optional.of(UnifiedOrderResponseDto.fromTransportOrder(order));
-    }
-
-
 }

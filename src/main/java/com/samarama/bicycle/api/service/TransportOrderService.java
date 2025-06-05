@@ -42,7 +42,7 @@ public interface TransportOrderService {
     /**
      * Aktualizuje zamówienie transportowe
      */
-    ResponseEntity<?> updateTransportOrder(Long orderId, TransportOrderDto dto, String userEmail);
+    ResponseEntity<?> updateTransportOrder(Long orderId, ServiceOrTransportOrderDto dto, String userEmail);
 
     /**
      * Anuluje zamówienie
@@ -74,7 +74,7 @@ public interface TransportOrderService {
     /**
      * Aktualizuje zamówienie (admin)
      */
-    ResponseEntity<?> updateTransportOrderByAdmin(Long orderId, TransportOrderDto dto, String adminEmail);
+    ResponseEntity<?> updateTransportOrderByAdmin(Long orderId, ServiceOrTransportOrderDto dto, String adminEmail);
 
     /**
      * Usuwa zamówienie (admin)

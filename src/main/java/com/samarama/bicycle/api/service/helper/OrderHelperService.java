@@ -237,51 +237,6 @@ public class OrderHelperService {
                 .orElseThrow(() -> new RuntimeException("Target service not found: " + targetServiceId));
     }
 
-    // === PRICE CALCULATIONS ===
-
-    /**
-     * Utwórz ServiceOrder z TransportOrder i pakietem serwisowym
-     */
-    public ServiceOrder createServiceOrderFromTransport(TransportOrder transportOrder,
-                                                        ServicePackage servicePackage,
-                                                        String serviceNotes) {
-        ServiceOrder serviceOrder = new ServiceOrder();
-
-        // Kopiuj wszystkie pola z TransportOrder
-        copyTransportOrderFields(serviceOrder, transportOrder);
-
-        // Dodaj pola serwisowe
-        serviceOrder.setServicePackage(servicePackage);
-        serviceOrder.setServicePackageCode(servicePackage.getCode());
-        serviceOrder.setServicePrice(servicePackage.getPrice());
-        serviceOrder.setServiceNotes(serviceNotes);
-
-        return serviceOrder;
-    }
-
-    /**
-     * Kopiuje pola z TransportOrder do ServiceOrder
-     */
-    private void copyTransportOrderFields(ServiceOrder serviceOrder, TransportOrder transportOrder) {
-        serviceOrder.setBicycle(transportOrder.getBicycle());
-        serviceOrder.setClient(transportOrder.getClient());
-        serviceOrder.setPickupDate(transportOrder.getPickupDate());
-        serviceOrder.setPickupAddress(transportOrder.getPickupAddress());
-        serviceOrder.setPickupLatitude(transportOrder.getPickupLatitude());
-        serviceOrder.setPickupLongitude(transportOrder.getPickupLongitude());
-        serviceOrder.setPickupTimeFrom(transportOrder.getPickupTimeFrom());
-        serviceOrder.setPickupTimeTo(transportOrder.getPickupTimeTo());
-        serviceOrder.setDeliveryAddress(transportOrder.getDeliveryAddress());
-        serviceOrder.setDeliveryLatitude(transportOrder.getDeliveryLatitude());
-        serviceOrder.setDeliveryLongitude(transportOrder.getDeliveryLongitude());
-        serviceOrder.setTargetService(transportOrder.getTargetService());
-        serviceOrder.setStatus(transportOrder.getStatus());
-        serviceOrder.setOrderDate(transportOrder.getOrderDate());
-        serviceOrder.setTransportPrice(transportOrder.getTransportPrice());
-        serviceOrder.setEstimatedTime(transportOrder.getEstimatedTime());
-        serviceOrder.setTransportNotes(transportOrder.getTransportNotes());
-        serviceOrder.setAdditionalNotes(transportOrder.getAdditionalNotes());
-    }
 
     // === VALIDATION ===
 

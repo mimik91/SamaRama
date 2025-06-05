@@ -186,8 +186,7 @@ public class ServiceOrder extends TransportOrder {
         this.servicePackageCode = servicePackage != null ? servicePackage.getCode() : null;
         this.servicePrice = servicePackage != null ? servicePackage.getPrice() : BigDecimal.ZERO;
 
-        // Dla ServiceOrder delivery address zawsze do naszego serwisu
-        setDeliveryAddress("SERWIS WŁASNY");
+
     }
 
     public ServiceOrder(IncompleteBike bicycle, IncompleteUser client,
@@ -199,8 +198,6 @@ public class ServiceOrder extends TransportOrder {
 
         this.servicePackageCode = servicePackageCode;
         this.servicePrice = servicePrice != null ? servicePrice : BigDecimal.ZERO;
-
-        setDeliveryAddress("SERWIS WŁASNY");
     }
 
     // TODO: To powinno być pobierane z repository lub dependency injection

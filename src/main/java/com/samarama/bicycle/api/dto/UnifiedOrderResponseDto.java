@@ -64,8 +64,8 @@ public record UnifiedOrderResponseDto(
                 entity.getClient() != null ? entity.getClient().getPhoneNumber() : null,
                 clientName,
                 entity.getPickupDate(),
-                entity.getPickupAddress(),
-                entity.getDeliveryAddress(),
+                entity.getFullPickupAddress(), // Używamy nowej metody z rozbitego adresu
+                entity.getFullDeliveryAddress(), // Używamy nowej metody z rozbitego adresu
                 entity.getTargetService() != null ? entity.getTargetService().getName() : null,
                 entity.getTransportPrice(),
                 // Service fields - null dla czystego transportu
@@ -96,8 +96,8 @@ public record UnifiedOrderResponseDto(
                 entity.getClient() != null ? entity.getClient().getPhoneNumber() : null,
                 clientName,
                 entity.getPickupDate(),
-                entity.getPickupAddress(),
-                entity.getDeliveryAddress(),
+                entity.getFullPickupAddress(), // Używamy nowej metody z rozbitego adresu
+                entity.getFullDeliveryAddress(), // Używamy nowej metody z rozbitego adresu
                 entity.getTargetService() != null ? entity.getTargetService().getName() : "SERWIS WŁASNY",
                 entity.getTransportPrice(),
                 // Service fields

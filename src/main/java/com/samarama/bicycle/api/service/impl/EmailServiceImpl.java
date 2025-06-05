@@ -205,7 +205,7 @@ public class EmailServiceImpl implements EmailService {
             content.append("<h3 style='color: #2c3e50; margin-top: 20px;'>Odbiór</h3>");
             content.append("<div style='background-color: #f0f8f0; padding: 15px; border-radius: 5px; margin-bottom: 20px;'>");
             content.append("<p><strong>Data odbioru:</strong> ").append(serviceOrder.getPickupDate().format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy"))).append("</p>");
-            content.append("<p><strong>Adres odbioru:</strong> ").append(serviceOrder.getPickupAddress()).append("</p>");
+            content.append("<p><strong>Adres odbioru:</strong> ").append(serviceOrder.getFullPickupAddress()).append("</p>");
             content.append("</div>");
 
             // Informacje o kliencie
