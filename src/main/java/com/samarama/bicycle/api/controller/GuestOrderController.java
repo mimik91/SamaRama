@@ -101,36 +101,6 @@ public class GuestOrderController {
         }
     }
 
-    // === HELPER METHODS ===
-
-    /**
-     * Konwertuje TransportOrderDto do ServiceOrTransportOrderDto
-     */
-    private ServiceOrTransportOrderDto convertToUnifiedDto(TransportOrderDto dto) {
-        return new ServiceOrTransportOrderDto(
-                dto.bicycleIds(),           // bicycleIds
-                dto.bicycles(),             // bicycles (guest bikes)
-                null,                       // userId
-                dto.clientEmail(),          // email
-                dto.clientPhone(),          // phone
-                null,                       // pickupAddressId
-                null,                       // pickupStreet - będzie wyciągnięte z address
-                null,                       // pickupBuildingNumber
-                null,                       // pickupApartmentNumber
-                dto.city(),                 // pickupCity
-                null,                       // pickupPostalCode
-                dto.pickupLatitude(),       // pickupLatitude
-                dto.pickupLongitude(),      // pickupLongitude
-                dto.pickupDate(),           // pickupDate
-                dto.transportPrice(),       // transportPrice
-                dto.transportNotes(),       // transportNotes
-                dto.targetServiceId(),      // targetServiceId
-                null,                       // servicePackageId - brak dla transportu
-                null,                       // serviceNotes
-                dto.additionalNotes()       // additionalNotes
-        );
-    }
-
     private ServiceRegisterDto parseServiceData(String data) {
         ServiceRegisterDto dto = new ServiceRegisterDto();
 

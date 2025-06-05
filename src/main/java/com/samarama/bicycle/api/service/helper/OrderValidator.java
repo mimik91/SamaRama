@@ -103,12 +103,22 @@ public class OrderValidator {
         // === ADRES ===
         errors.addAll(validateAddressForGuest(dto));
 
-        // === PAKIET SERWISOWY (wymagany dla gości) ===
-        errors.addAll(validateServicePackageForGuest(dto));
 
         // === SLOTY ===
         if (dto.getPickupDate() != null) {
             errors.addAll(validateSlots(dto));
+        }
+
+        boolean isServiceOrder = dto.getServicePackageId() != null;
+
+        if (isServiceOrder) {
+            // 1. Pakiet serwisowy musi istnieć
+            if (!servicePackageRepository.existsById(dto.getServicePackageId())) {
+                errors.add("Nieprawidłowy pakiet serwisowy");
+            }
+        } else {
+            // ZAMÓWIENIE TRANSPORTOWE - walidacja specyficzna
+            errors.addAll(validateGuestTransportOrderSpecific(dto));
         }
 
         return new ValidationResult(errors.isEmpty(), errors);
@@ -327,17 +337,6 @@ public class OrderValidator {
         return errors;
     }
 
-    private List<String> validateServicePackageForGuest(ServiceOrTransportOrderDto dto) {
-        List<String> errors = new ArrayList<>();
-
-        if (dto.getServicePackageId() == null) {
-            errors.add("Pakiet serwisowy jest wymagany");
-        } else if (!servicePackageRepository.existsById(dto.getServicePackageId())) {
-            errors.add("Nieprawidłowy pakiet serwisowy");
-        }
-
-        return errors;
-    }
 
     // === WALIDACJA SLOTÓW ===
 
@@ -425,4 +424,39 @@ public class OrderValidator {
             return String.format("ValidationResult{valid=%s, errors=%d}", valid, errors.size());
         }
     }
+
+    private List<String> validateGuestTransportOrderSpecific(ServiceOrTransportOrderDto dto) {
+        List<String> errors = new ArrayList<>();
+
+        // 1. TargetServiceId jest wymagany
+        if (dto.getTargetServiceId() == null) {
+            errors.add("Serwis docelowy jest wymagany dla zamówień transportowych");
+            return errors; // Nie ma sensu sprawdzać dalej
+        }
+
+        // 2. Serwis musi istnieć
+        if (!bikeServiceRepository.existsById(dto.getTargetServiceId())) {
+            errors.add("Serwis docelowy nie istnieje (ID: " + dto.getTargetServiceId() + ")");
+        }
+
+        // 3. Nie może być serwis własny
+        if (dto.getTargetServiceId().equals(Long.parseLong(internalServiceIdString))) {
+            errors.add("Dla transportu do serwisu własnego użyj zamówienia serwisowego (dodaj servicePackageId)");
+        }
+
+        // 4. Cena transportu jest wymagana i musi być > 0
+        if (dto.getTransportPrice() == null) {
+            errors.add("Cena transportu jest wymagana dla zamówień transportowych");
+        } else if (dto.getTransportPrice().compareTo(java.math.BigDecimal.ZERO) < 0) {
+            errors.add("Cena transportu musi być większa od 0 dla zamówień transportowych");
+        }
+
+        return errors;
+    }
+
+
+
+
+
+
 }

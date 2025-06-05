@@ -123,19 +123,10 @@ public class UnifiedOrderServiceImpl implements UnifiedOrderService {
         try {
             Long userId = getUserId(userEmail);
 
-            // Ustaw userId w DTO
-            ServiceOrTransportOrderDto dtoWithUserId = new ServiceOrTransportOrderDto(
-                    dto.getBicycleIds(), dto.getBicycles(), userId, dto.getEmail(), dto.getPhone(),
-                    dto.getPickupAddressId(), dto.getPickupStreet(), dto.getPickupBuildingNumber(),
-                    dto.getPickupApartmentNumber(), dto.getPickupCity(), dto.getPickupPostalCode(),
-                    dto.getPickupLatitude(), dto.getPickupLongitude(), dto.getPickupDate(),
-                    dto.getTransportPrice(), dto.getTransportNotes(), dto.getTargetServiceId(),
-                    dto.getServicePackageId(), dto.getServiceNotes(), dto.getAdditionalNotes()
-            );
-
+            dto.setUserId(userId);
 
             // Walidacja
-            OrderValidator.ValidationResult validation = orderValidator.validateUserOrder(dtoWithUserId);
+            OrderValidator.ValidationResult validation = orderValidator.validateUserOrder(dto);
             if (!validation.isValid()) {
                 return ResponseEntity.badRequest().body(Map.of(
                         "message", validation.getFirstError(),
@@ -144,11 +135,11 @@ public class UnifiedOrderServiceImpl implements UnifiedOrderService {
             }
 
             // Przekieruj do odpowiedniego serwisu
-            if (dtoWithUserId.isServiceOrder()) {
-                return serviceOrderService.createServiceOrder(dtoWithUserId, userEmail);
+            if (dto.isServiceOrder()) {
+                return serviceOrderService.createServiceOrder(dto, userEmail);
             } else {
                 // Konwertuj do TransportOrderDto dla backward compatibility
-                return createTransportOrderFromDto(dtoWithUserId, userEmail);
+                return transportOrderService.createTransportOrder(dto, userEmail);
             }
 
         } catch (Exception e) {
@@ -171,21 +162,46 @@ public class UnifiedOrderServiceImpl implements UnifiedOrderService {
 
     @Override
     public ResponseEntity<?> createGuestOrder(ServiceOrTransportOrderDto dto) {
+
+        // Ustaw serwis własny jeśli nie podano
+        if (dto.getTargetServiceId() == null) {
+            dto.setTargetServiceId(2137L); // ID serwisu własnego z application.properties
+        }
+
+        // Dla zamówień serwisowych transport jest wliczony w cenę pakietu
+        if (dto.getTransportPrice() == null) {
+            dto.setTransportPrice(BigDecimal.ZERO);
+        }
         try {
-            // Walidacja
+            // Sprawdź typ zamówienia na podstawie servicePackageId
+            boolean isServiceOrder = dto.getServicePackageId() != null;
+            String orderType = isServiceOrder ? "SERVICE" : "TRANSPORT";
+
+            logger.info("Creating guest " + orderType + " order for email: " + dto.getEmail());
+
             OrderValidator.ValidationResult validation = orderValidator.validateGuestOrder(dto);
             if (!validation.isValid()) {
+                logger.warning("Guest order validation failed: " + validation.getAllErrors());
                 return ResponseEntity.badRequest().body(Map.of(
                         "message", validation.getFirstError(),
                         "errors", validation.getErrors()
                 ));
             }
 
-            // Goście mogą składać tylko zamówienia serwisowe
-            return serviceOrderService.createGuestServiceOrder(dto);
+            // DELEGACJA do odpowiedniego serwisu
+            if (isServiceOrder) {
+                logger.info("Delegating to ServiceOrderService for guest service order");
+                return serviceOrderService.createGuestServiceOrder(dto);
+            } else {
+                logger.info("Delegating to TransportOrderService for guest transport order");
+                return transportOrderService.createGuestTransportOrder(dto);
+            }
+
         } catch (Exception e) {
             logger.severe("Error creating guest order: " + e.getMessage());
-            return ResponseEntity.badRequest().body(Map.of("message", "Błąd podczas tworzenia zamówienia gościa"));
+            return ResponseEntity.badRequest().body(Map.of(
+                    "message", "Błąd podczas tworzenia zamówienia: " + e.getMessage()
+            ));
         }
     }
 
@@ -243,35 +259,5 @@ public class UnifiedOrderServiceImpl implements UnifiedOrderService {
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new RuntimeException("User not found: " + userEmail));
         return user.getId();
-    }
-
-    /**
-     * Konwertuje ServiceOrTransportOrderDto do TransportOrderDto dla backward compatibility
-     */
-    private ResponseEntity<?> createTransportOrderFromDto(ServiceOrTransportOrderDto dto, String userEmail) {
-        TransportOrderDto transportDto = new TransportOrderDto(
-                dto.getBicycleIds(),
-                dto.getBicycles(),
-                dto.getPickupDate(),
-                dto.getPickupAddressString(),
-                dto.getPickupLatitude(),
-                dto.getPickupLongitude(),
-                null, // pickupTimeFrom - stałe 18:00
-                null, // pickupTimeTo - stałe 22:00
-                null, // deliveryAddress - będzie ustawiony automatycznie
-                null, // deliveryLatitude
-                null, // deliveryLongitude
-                dto.getTargetServiceId(),
-                dto.getTransportPrice(),
-                60, // estimatedTime
-                dto.getTransportNotes(),
-                dto.getAdditionalNotes(),
-                dto.getEmail(),
-                dto.getPhone(),
-                null, // clientName - nie używamy
-                dto.getPickupCity()
-        );
-
-        return transportOrderService.createTransportOrder(transportDto, userEmail);
     }
 }

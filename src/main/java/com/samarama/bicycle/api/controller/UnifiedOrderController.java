@@ -95,7 +95,7 @@ public class UnifiedOrderController {
      */
     @PostMapping("/transport")
     @PreAuthorize("hasRole('CLIENT')")
-    public ResponseEntity<?> createTransportOrder(@Valid @RequestBody TransportOrderDto dto) {
+    public ResponseEntity<?> createTransportOrder(@Valid @RequestBody ServiceOrTransportOrderDto dto) {
         String userEmail = getCurrentUserEmail();
         return transportOrderService.createTransportOrder(dto, userEmail);
     }

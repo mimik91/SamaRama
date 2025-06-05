@@ -17,7 +17,7 @@ public interface TransportOrderService {
     /**
      * Tworzy zamówienie transportowe dla zalogowanego użytkownika
      */
-    ResponseEntity<?> createTransportOrder(TransportOrderDto dto, String userEmail);
+    ResponseEntity<?> createTransportOrder(ServiceOrTransportOrderDto dto, String userEmail);
 
     /**
      * Tworzy zamówienie transportowe dla gościa
