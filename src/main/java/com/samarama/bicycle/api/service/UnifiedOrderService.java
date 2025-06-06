@@ -20,12 +20,6 @@ public interface UnifiedOrderService {
     ResponseEntity<?> calculateTransportCost(Map<String, Object> request);
 
 
-
-    /**
-     * Pobiera szczegóły zamówienia użytkownika
-     */
-    ResponseEntity<UnifiedOrderResponseDto> getUserOrderDetails(Long orderId, String userEmail);
-
     /**
      * Tworzy zamówienie dla użytkownika
      */

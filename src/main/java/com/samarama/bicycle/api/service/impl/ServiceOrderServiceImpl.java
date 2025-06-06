@@ -201,7 +201,7 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
     }
 
     @Override
-    public ResponseEntity<UnifiedOrderResponseDto> getServiceOrderDetails(Long orderId, String userEmail) {
+    public ResponseEntity<ServiceOrderDetailsResponseDto> getServiceOrderDetails(Long orderId, String userEmail) {
         User user = getUserByEmail(userEmail);
 
         Optional<ServiceOrder> orderOpt = serviceOrderRepository.findById(orderId);
@@ -216,7 +216,7 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
             return ResponseEntity.status(403).build();
         }
 
-        return ResponseEntity.ok(UnifiedOrderResponseDto.fromServiceOrder(order));
+        return ResponseEntity.ok(ServiceOrderDetailsResponseDto.fromServiceOrder(order));
     }
 
     // === UPDATE METHODS ===

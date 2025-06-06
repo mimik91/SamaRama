@@ -70,15 +70,7 @@ public class UnifiedOrderController {
         return ResponseEntity.ok(orders);
     }
 
-    /**
-     * Szczegóły zamówienia
-     */
-    @GetMapping("/my/{orderId}")
-    @PreAuthorize("hasRole('CLIENT')")
-    public ResponseEntity<UnifiedOrderResponseDto> getOrderDetails(@PathVariable Long orderId) {
-        String userEmail = getCurrentUserEmail();
-        return transportOrderService.getOrderDetails(orderId, userEmail);
-    }
+
 
     /**
      * Nowe zamówienie serwisowe (transport + serwis)
@@ -116,4 +108,13 @@ public class UnifiedOrderController {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         return authentication.getName();
     }
+
+    @GetMapping("/service/{orderId}")
+    @PreAuthorize("hasRole('CLIENT')")
+    public ResponseEntity<ServiceOrderDetailsResponseDto> getOrderDetailsUnified(@PathVariable Long orderId) {
+        String userEmail = getCurrentUserEmail();
+        return transportOrderService.getOrderDetails(orderId, userEmail);
+    }
+
+
 }

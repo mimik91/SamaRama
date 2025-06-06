@@ -35,7 +35,7 @@ public interface TransportOrderService {
     /**
      * Pobiera szczegóły zamówienia
      */
-    ResponseEntity<UnifiedOrderResponseDto> getOrderDetails(Long orderId, String userEmail);
+    ResponseEntity<ServiceOrderDetailsResponseDto> getOrderDetails(Long orderId, String userEmail);
 
     // === AKTUALIZACJA ZAMÓWIEŃ ===
 

@@ -100,25 +100,6 @@ public class UnifiedOrderServiceImpl implements UnifiedOrderService {
     }
 
     @Override
-    public ResponseEntity<UnifiedOrderResponseDto> getUserOrderDetails(Long orderId, String userEmail) {
-        try {
-            // Próbuj najpierw jako transport order
-            ResponseEntity<UnifiedOrderResponseDto> transportResponse =
-                    transportOrderService.getOrderDetails(orderId, userEmail);
-
-            if (transportResponse.getStatusCode().is2xxSuccessful()) {
-                return transportResponse;
-            }
-
-            // Jeśli nie znaleziono, spróbuj jako service order
-            return serviceOrderService.getServiceOrderDetails(orderId, userEmail);
-        } catch (Exception e) {
-            logger.severe("Error getting order details: " + e.getMessage());
-            return ResponseEntity.internalServerError().build();
-        }
-    }
-
-    @Override
     public ResponseEntity<?> createUserOrder(ServiceOrTransportOrderDto dto, String userEmail) {
         try {
             Long userId = getUserId(userEmail);

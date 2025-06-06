@@ -33,7 +33,7 @@ public interface ServiceOrderService {
     /**
      * Pobiera szczegóły zamówienia serwisowego
      */
-    ResponseEntity<UnifiedOrderResponseDto> getServiceOrderDetails(Long orderId, String userEmail);
+    ResponseEntity<ServiceOrderDetailsResponseDto> getServiceOrderDetails(Long orderId, String userEmail);
 
     // === AKTUALIZACJA ZAMÓWIEŃ ===
 

@@ -4,6 +4,7 @@ import com.samarama.bicycle.api.dto.*;
 import com.samarama.bicycle.api.model.*;
 import com.samarama.bicycle.api.service.*;
 import com.samarama.bicycle.api.repository.*;
+import com.samarama.bicycle.api.service.helper.OrderValidator;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -260,6 +261,16 @@ public class AdminController {
         if (!hasAdminRole()) {
             return ResponseEntity.status(403)
                     .body(Map.of("message", "Tylko administrator może usuwać serwisy"));
+        }
+
+        if (Long.parseLong(OrderValidator.internalServiceIdString) == id) {
+            logAdminAction("DELETE_BIKE_SERVICE_DENIED",
+                    "id=" + id + ", reason=default_service", adminEmail);
+
+            return ResponseEntity.badRequest().body(Map.of(
+                    "message", "Nie można usunąć serwisu domyślnego",
+                    "reason", "Serwis domyślny jest wymagany do działania systemu"
+            ));
         }
 
         logAdminAction("DELETE_BIKE_SERVICE", "id=" + id, adminEmail);

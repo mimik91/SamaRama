@@ -147,7 +147,7 @@ public class TransportOrderServiceImpl implements TransportOrderService {
     }
 
     @Override
-    public ResponseEntity<UnifiedOrderResponseDto> getOrderDetails(Long orderId, String userEmail) {
+    public ResponseEntity<ServiceOrderDetailsResponseDto> getOrderDetails(Long orderId, String userEmail) {
         User user = getUserByEmail(userEmail);
 
         Optional<TransportOrder> orderOpt = transportOrderRepository.findById(orderId);
@@ -162,9 +162,9 @@ public class TransportOrderServiceImpl implements TransportOrderService {
             return ResponseEntity.status(403).build();
         }
 
-        UnifiedOrderResponseDto dto = order instanceof ServiceOrder ?
-                UnifiedOrderResponseDto.fromServiceOrder((ServiceOrder) order) :
-                UnifiedOrderResponseDto.fromTransportOrder(order);
+        ServiceOrderDetailsResponseDto dto = order instanceof ServiceOrder ?
+                ServiceOrderDetailsResponseDto.fromServiceOrder((ServiceOrder) order) :
+                ServiceOrderDetailsResponseDto.fromTransportOrder(order);
 
         return ResponseEntity.ok(dto);
     }

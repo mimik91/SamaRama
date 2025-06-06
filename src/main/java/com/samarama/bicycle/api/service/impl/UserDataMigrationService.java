@@ -3,6 +3,8 @@ package com.samarama.bicycle.api.service.impl;
 import com.samarama.bicycle.api.dto.UserRegistrationDto;
 import com.samarama.bicycle.api.model.*;
 import com.samarama.bicycle.api.repository.*;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +29,9 @@ public class UserDataMigrationService {
     private final IncompleteBikeRepository incompleteBikeRepository;
     private final TransportOrderRepository transportOrderRepository;
     private final PasswordEncoder passwordEncoder;
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     public UserDataMigrationService(
             UserRepository userRepository,
@@ -81,41 +86,50 @@ public class UserDataMigrationService {
         }
     }
 
-    /**
-     * Migruje dane z IncompleteUser na User
-     */
     @Transactional
     private User migrateFromIncompleteUser(IncompleteUser incompleteUser, UserRegistrationDto registrationDto) {
-        logger.info("Migrating IncompleteUser to User: " + incompleteUser.getEmail());
+        logger.info("Migrating IncompleteUser to User using JPA: " + incompleteUser.getEmail());
 
         try {
-            // 1. UTWÓRZ NOWEGO USER z danymi z rejestracji
-            User newUser = createUserFromRegistration(registrationDto);
+            Long userId = incompleteUser.getId();
 
-            // 2. SKOPIUJ METADANE z IncompleteUser
-            copyMetadataFromIncompleteUser(newUser, incompleteUser);
+            // 1. NATIVE SQL PRZEZ EntityManager
+            String insertUserSql = """
+            INSERT INTO users (id, first_name, last_name, password, verified) 
+            VALUES (?1, ?2, ?3, ?4, ?5)
+            """;
 
-            // 3. ZAPISZ USER (dziedziczy ID od IncompleteUser)
-            newUser.setId(incompleteUser.getId());
-            User savedUser = userRepository.save(newUser);
+            entityManager.createNativeQuery(insertUserSql)
+                    .setParameter(1, userId)
+                    .setParameter(2, registrationDto.firstName())
+                    .setParameter(3, registrationDto.lastName())
+                    .setParameter(4, passwordEncoder.encode(registrationDto.password()))
+                    .setParameter(5, false)
+                    .executeUpdate();
 
-            // 4. MIGRUJ ROWERY - zmień właściciela na nowego User
-            migrateBicycles(incompleteUser, savedUser);
+            // 2. ZAKTUALIZUJ ROLE
+            entityManager.createNativeQuery("DELETE FROM user_roles WHERE user_id = ?1")
+                    .setParameter(1, userId)
+                    .executeUpdate();
 
-            // 5. MIGRUJ ZAMÓWIENIA - zmień klienta na nowego User
-            migrateOrders(incompleteUser, savedUser);
+            entityManager.createNativeQuery("INSERT INTO user_roles (user_id, role) VALUES (?1, 'ROLE_CLIENT')")
+                    .setParameter(1, userId)
+                    .executeUpdate();
 
-            // 6. USUŃ STARY IncompleteUser (kaskadowo przez dziedziczenie)
-            // Nie usuwamy ręcznie - User dziedziczy po IncompleteUser
+            // 3. FLUSH I CLEAR CACHE
+            entityManager.flush();
+            entityManager.clear();
 
-            logger.info("Successfully migrated user: " + savedUser.getEmail() +
-                    " with " + getBicycleCount(savedUser) + " bicycles and " +
-                    getOrderCount(savedUser) + " orders");
+            // 4. POBIERZ JAKO USER
+            User migratedUser = userRepository.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("Failed to retrieve migrated user"));
 
-            return savedUser;
+            logger.info("Successfully migrated user using JPA: " + migratedUser.getEmail());
+
+            return migratedUser;
 
         } catch (Exception e) {
-            logger.severe("Failed to migrate user " + incompleteUser.getEmail() + ": " + e.getMessage());
+            logger.severe("Failed to migrate user with JPA " + incompleteUser.getEmail() + ": " + e.getMessage());
             throw new RuntimeException("Błąd podczas migracji danych użytkownika: " + e.getMessage(), e);
         }
     }

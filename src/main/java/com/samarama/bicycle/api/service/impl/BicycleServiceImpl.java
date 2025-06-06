@@ -16,10 +16,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 @Service
@@ -30,12 +28,16 @@ public class BicycleServiceImpl implements BicycleService {
     private final IncompleteBikeRepository incompleteBikeRepository;
     private final BicyclePhotoRepository bicyclePhotoRepository;
     private final UserRepository userRepository;
+    private final TransportOrderRepository transportOrderRepository;
+
+    private static final Logger logger = Logger.getLogger(BicycleServiceImpl.class.getName());
+
 
     public BicycleServiceImpl(
             ServiceOrderRepository serviceOrderRepository, IncompleteUserRepository incompleteUserRepository, BicycleRepository bicycleRepository,
             IncompleteBikeRepository incompleteBikeRepository,
             BicyclePhotoRepository bicyclePhotoRepository,
-            UserRepository userRepository
+            UserRepository userRepository, TransportOrderRepository transportOrderRepository
     ) {
         this.serviceOrderRepository = serviceOrderRepository;
         this.incompleteUserRepository = incompleteUserRepository;
@@ -43,6 +45,7 @@ public class BicycleServiceImpl implements BicycleService {
         this.incompleteBikeRepository = incompleteBikeRepository;
         this.bicyclePhotoRepository = bicyclePhotoRepository;
         this.userRepository = userRepository;
+        this.transportOrderRepository = transportOrderRepository;
     }
 
 
@@ -519,16 +522,59 @@ public class BicycleServiceImpl implements BicycleService {
             return ResponseEntity.status(403).body(Map.of("message", "You do not have permission to delete this bike"));
         }
 
-        // Find and delete all related service orders
-        List<ServiceOrder> relatedOrders = serviceOrderRepository.findByBicycle(bike);
-        if (!relatedOrders.isEmpty()) {
-            serviceOrderRepository.deleteAll(relatedOrders);
+        try {
+            // 1. Znajdź i usuń wszystkie powiązane zamówienia transportowe/serwisowe
+            List<ServiceOrder> relatedServiceOrders = serviceOrderRepository.findByBicycle(bike);
+            List<TransportOrder> relatedTransportOrders = transportOrderRepository.findByBicycle(bike);
+
+            // Zlicz zamówienia do usunięcia
+            int serviceOrdersCount = relatedServiceOrders.size();
+            int transportOrdersCount = relatedTransportOrders.size();
+            int totalOrdersCount = serviceOrdersCount + transportOrdersCount;
+
+            logger.info("Usuwanie roweru ID=" + id + ": znaleziono " + totalOrdersCount +
+                    " powiązanych zamówień (" + serviceOrdersCount + " serwisowych, " +
+                    transportOrdersCount + " transportowych)");
+
+            // 2. Usuń wszystkie powiązane zamówienia serwisowe
+            if (!relatedServiceOrders.isEmpty()) {
+                serviceOrderRepository.deleteAll(relatedServiceOrders);
+                logger.info("Usunięto " + serviceOrdersCount + " zamówień serwisowych");
+            }
+
+            // 3. Usuń wszystkie powiązane zamówienia transportowe (które nie są ServiceOrder)
+            if (!relatedTransportOrders.isEmpty()) {
+                transportOrderRepository.deleteAll(relatedTransportOrders);
+                logger.info("Usunięto " + transportOrdersCount + " zamówień transportowych");
+            }
+
+            // 4. Usuń zdjęcie roweru jeśli istnieje
+            if (bike.getPhoto() != null) {
+                bicyclePhotoRepository.delete(bike.getPhoto());
+                logger.info("Usunięto zdjęcie roweru");
+            }
+
+            // 5. Usuń rower z bazy danych
+            incompleteBikeRepository.delete(bike);
+
+            logger.info("Pomyślnie usunięto rower ID=" + id + " wraz z " + totalOrdersCount + " powiązanymi zamówieniami");
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Rower został usunięty pomyślnie wraz z wszystkimi powiązanymi zamówieniami");
+            response.put("deletedBicycleId", id);
+            response.put("deletedOrdersCount", totalOrdersCount);
+            response.put("deletedServiceOrdersCount", serviceOrdersCount);
+            response.put("deletedTransportOrdersCount", transportOrdersCount);
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            logger.severe("Błąd podczas usuwania roweru ID=" + id + ": " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(Map.of(
+                    "message", "Wystąpił błąd podczas usuwania roweru: " + e.getMessage()
+            ));
         }
-
-        // For incomplete bikes, we actually delete them from the database
-        incompleteBikeRepository.delete(bike);
-
-        return ResponseEntity.ok(Map.of("message", "Incomplete bike deleted successfully"));
     }
 
     @Override
