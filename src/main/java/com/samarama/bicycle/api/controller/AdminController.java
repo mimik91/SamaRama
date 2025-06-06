@@ -38,7 +38,6 @@ public class AdminController {
     // Services
     private final TransportOrderService transportOrderService;
     private final ServiceOrderService serviceOrderService;
-    private final BicycleService bicycleService;
     private final BikeServiceService bikeServiceService;
     private final ServicePackageService servicePackageService;
     private final ServiceSlotService serviceSlotService;
@@ -68,7 +67,6 @@ public class AdminController {
             ServicePackageRepository servicePackageRepository) {
         this.transportOrderService = transportOrderService;
         this.serviceOrderService = serviceOrderService;
-        this.bicycleService = bicycleService;
         this.bikeServiceService = bikeServiceService;
         this.servicePackageService = servicePackageService;
         this.serviceSlotService = serviceSlotService;

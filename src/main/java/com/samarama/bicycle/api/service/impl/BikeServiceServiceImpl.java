@@ -5,17 +5,14 @@ import com.samarama.bicycle.api.dto.BikeServicePinDto;
 import com.samarama.bicycle.api.model.BikeService;
 import com.samarama.bicycle.api.repository.BikeServiceRepository;
 import com.samarama.bicycle.api.service.BikeServiceService;
+import com.samarama.bicycle.api.service.helper.CsvReader;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.PushbackInputStream;
-import java.nio.charset.StandardCharsets;
+import java.nio.charset.Charset;
 import java.util.*;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
@@ -28,10 +25,12 @@ public class BikeServiceServiceImpl implements BikeServiceService {
     private static final Logger logger = Logger.getLogger(BikeServiceServiceImpl.class.getName());
 
     private final BikeServiceRepository bikeServiceRepository;
+    private final CsvReader csvReader;
 
     @Autowired
-    public BikeServiceServiceImpl(BikeServiceRepository bikeServiceRepository) {
+    public BikeServiceServiceImpl(BikeServiceRepository bikeServiceRepository, CsvReader csvReader) {
         this.bikeServiceRepository = bikeServiceRepository;
+        this.csvReader = csvReader;
     }
 
     // === PUBLICZNE METODY ===
@@ -182,89 +181,95 @@ public class BikeServiceServiceImpl implements BikeServiceService {
     @Override
     @Transactional
     public ResponseEntity<?> importBikeServicesFromCsv(MultipartFile file, String adminEmail) {
-        if (file.isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Plik CSV jest pusty"));
-        }
-
-        String filename = file.getOriginalFilename();
-        if (filename == null || !filename.toLowerCase().endsWith(".csv")) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Plik musi mieć rozszerzenie .csv"));
-        }
-
         try {
+            // Walidacja pliku
+            if (!csvReader.isValidCsvFile(file)) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "message", "Nieprawidłowy plik CSV. Sprawdź czy plik ma rozszerzenie .csv i nie jest większy niż 10MB"
+                ));
+            }
+
+            logger.info("Rozpoczęcie importu serwisów z pliku: " + file.getOriginalFilename() + " przez " + adminEmail);
+
+            // WYMUSZAM kodowanie Windows-1250
+            Charset forcedCharset = Charset.forName("Windows-1250");
+            logger.info("Używam kodowania: " + forcedCharset.name());
+
+            // Czytaj plik CSV z wymuszonym kodowaniem Windows-1250
+            CsvReader.CsvReadResult csvResult = csvReader.readCsvFile(file, forcedCharset);
+
+            if (csvResult.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "message", "Plik CSV jest pusty lub nie zawiera danych"
+                ));
+            }
+
+            logger.info("Przeczytano " + csvResult.getRowCount() + " wierszy");
+
+            // Przetwórz dane
             List<BikeService> servicesToSave = new ArrayList<>();
-            List<String> errors = new ArrayList<>();
+            List<String> processingErrors = new ArrayList<>();
             int successCount = 0;
             int errorCount = 0;
 
-            // PROSTE ROZWIĄZANIE: Przeczytaj plik jako bytes, a potem jako string
-            byte[] fileBytes = file.getBytes();
-            String csvContent = new String(fileBytes, StandardCharsets.UTF_8);
+            // Pomiń pierwszy wiersz (nagłówek) jeśli istnieje
+            List<String[]> dataRows = csvResult.getDataRows();
 
-            // Usuń BOM jeśli istnieje
-            if (csvContent.startsWith("\uFEFF")) {
-                csvContent = csvContent.substring(1);
+            // Jeśli nie ma nagłówka, użyj wszystkich wierszy
+            if (dataRows.isEmpty() && !csvResult.getRows().isEmpty()) {
+                dataRows = csvResult.getRows();
             }
 
-            logger.info("CSV file size: " + csvContent.length() + " characters");
-
-            String[] lines = csvContent.split("\\r?\\n");
-            logger.info("CSV lines count: " + lines.length);
-
-            boolean isFirstLine = true;
-            int lineNumber = 0;
-
-            for (String line : lines) {
-                lineNumber++;
-
-                // Pomijamy nagłówek
-                if (isFirstLine) {
-                    isFirstLine = false;
-                    logger.info("CSV Header: " + line);
-                    continue;
-                }
-
-                // Pomijamy puste linie
-                if (line.trim().isEmpty()) {
-                    continue;
-                }
+            for (int i = 0; i < dataRows.size(); i++) {
+                String[] row = dataRows.get(i);
+                int lineNumber = i + 2; // +2 bo pominęliśmy nagłówek i liczymy od 1
 
                 try {
-                    logger.info("Processing line " + lineNumber + ": " + line);
-
-                    BikeService service = parseCsvLine(line, lineNumber);
+                    BikeService service = parseCsvRow(row, lineNumber);
                     if (service != null) {
                         servicesToSave.add(service);
                         successCount++;
-
-                        logger.info("Parsed service: " + service.getName() + " at " + service.getStreet() + " " + service.getBuilding());
+                        logger.info("Sparsowano serwis: " + service.getName() + " (" + service.getCity() + ")");
                     }
                 } catch (Exception e) {
                     errorCount++;
-                    errors.add("Linia " + lineNumber + ": " + e.getMessage());
-                    logger.warning("Błąd parsowania linii " + lineNumber + ": " + e.getMessage());
+                    String errorMsg = "Linia " + lineNumber + ": " + e.getMessage();
+                    processingErrors.add(errorMsg);
+                    logger.warning("Błąd parsowania: " + errorMsg);
                 }
             }
+
+            // Dodaj błędy z czytania CSV
+            processingErrors.addAll(csvResult.getErrors());
 
             // Zapisz wszystkie prawidłowe serwisy
             if (!servicesToSave.isEmpty()) {
-                bikeServiceRepository.saveAll(servicesToSave);
-                logger.info("Zaimportowano " + servicesToSave.size() + " serwisów przez " + adminEmail);
+                List<BikeService> savedServices = bikeServiceRepository.saveAll(servicesToSave);
+                logger.info("Zapisano " + savedServices.size() + " serwisów do bazy danych");
             }
 
+            // Przygotuj odpowiedź
             Map<String, Object> result = new HashMap<>();
-            result.put("message", "Import zakończony");
+            result.put("message", "Import CSV zakończony");
             result.put("successCount", successCount);
-            result.put("errorCount", errorCount);
+            result.put("errorCount", errorCount + csvResult.getErrorCount());
             result.put("totalProcessed", successCount + errorCount);
+            result.put("usedEncoding", "Windows-1250");
 
-            if (!errors.isEmpty()) {
-                result.put("errors", errors.size() > 10 ? errors.subList(0, 10) : errors);
-                if (errors.size() > 10) {
+            if (!processingErrors.isEmpty()) {
+                // Ogranicz liczbę błędów w odpowiedzi
+                List<String> limitedErrors = processingErrors.size() > 10 ?
+                        processingErrors.subList(0, 10) : processingErrors;
+
+                result.put("errors", limitedErrors);
+
+                if (processingErrors.size() > 10) {
                     result.put("hasMoreErrors", true);
-                    result.put("totalErrors", errors.size());
+                    result.put("totalErrors", processingErrors.size());
                 }
             }
+
+            logger.info("Import zakończony: " + successCount + " sukces, " + (errorCount + csvResult.getErrorCount()) + " błędów");
 
             return ResponseEntity.ok(result);
 
@@ -299,19 +304,20 @@ public class BikeServiceServiceImpl implements BikeServiceService {
 
     // === METODY POMOCNICZE DO PARSOWANIA CSV ===
 
-    private BikeService parseCsvLine(String line, int lineNumber) throws Exception {
-        // Parsowanie linii CSV: nazwa,adres,numer telefonu,latitude,longitude
-        String[] fields = parseCsvFields(line);
-
-        if (fields.length < 5) {
-            throw new Exception("Nieprawidłowa liczba kolumn (oczekiwano 5, otrzymano " + fields.length + ")");
+    /**
+     * Parsuje wiersz CSV do obiektu BikeService
+     * Oczekiwany format: nazwa,adres,telefon,latitude,longitude
+     */
+    private BikeService parseCsvRow(String[] fields, int lineNumber) throws Exception {
+        if (fields.length < 3) {
+            throw new Exception("Nieprawidłowa liczba kolumn (minimum 3: nazwa, adres, telefon)");
         }
 
         String name = fields[0].trim();
         String address = fields[1].trim();
-        String phoneStr = fields[2].trim();
-        String latStr = fields[3].trim();
-        String lngStr = fields[4].trim();
+        String phoneStr = fields.length > 2 ? fields[2].trim() : "";
+        String latStr = fields.length > 3 ? fields[3].trim() : "";
+        String lngStr = fields.length > 4 ? fields[4].trim() : "";
 
         // Walidacja obowiązkowych pól
         if (name.isEmpty()) {
@@ -346,99 +352,53 @@ public class BikeServiceServiceImpl implements BikeServiceService {
         return service;
     }
 
+    /**
+     * Parsuje adres w różnych formatach
+     */
     private void parseAddress(BikeService service, String address) {
-        // Wzorce dla różnych formatów adresów
-        // Format 1: "Ulica Numer, Miasto"
-        // Format 2: "Ulica Numer Mieszkanie, Miasto"
-        // Format 3: "Ulica, Miasto" (bez numeru)
+        try {
+            logger.info("Parsowanie adresu: " + address);
 
-        String[] addressParts = address.split(",");
+            // Wzorce dla różnych formatów adresów
+            String[] addressParts = address.split(",");
 
-        if (addressParts.length >= 2) {
-            // Mamy przecinek - ostatnia część to miasto
-            String streetPart = addressParts[0].trim();
-            String cityPart = addressParts[addressParts.length - 1].trim();
+            if (addressParts.length >= 2) {
+                // Format: "Ulica Numer, Miasto"
+                String streetPart = addressParts[0].trim();
+                String cityPart = addressParts[addressParts.length - 1].trim();
 
-            // Parsuj część z ulicą i numerem
-            parseStreetAndNumber(service, streetPart);
-
-            // Ustaw miasto
-            service.setCity(extractCityName(cityPart));
-
-        } else if (addressParts.length == 1) {
-            // Brak przecinka - spróbuj wykryć format
-            String fullAddress = address.trim();
-
-            // Sprawdź czy kończy się znanym miastem
-            String detectedCity = detectCityFromAddress(fullAddress);
-            if (detectedCity != null) {
-                service.setCity(detectedCity);
-                // Usuń miasto z adresu i parsuj resztę
-                String streetPart = fullAddress.replace(detectedCity, "").trim();
                 parseStreetAndNumber(service, streetPart);
-            } else {
-                // Nie udało się wykryć miasta - parsuj całość jako ulicę
-                parseStreetAndNumber(service, fullAddress);
-                service.setCity("Kraków"); // Domyślnie
-            }
-        }
-    }
+                service.setCity(extractCityName(cityPart));
 
-    private String parsePhoneNumber(String phoneStr) {
-        try {
-            // Usuń wszelkie białe znaki i znaki specjalne
-            String cleanPhone = phoneStr.replaceAll("[\\s\\-\\(\\)\\+]", "");
-
-            // Spróbuj sparsować jako liczbę
-            if (cleanPhone.matches("\\d+")) {
-                return cleanPhone;
             } else {
-                return phoneStr; // Zwróć oryginalną wartość jeśli nie da się oczyścić
+                // Brak przecinka - spróbuj wykryć miasto
+                String detectedCity = detectCityFromAddress(address);
+                if (detectedCity != null) {
+                    service.setCity(detectedCity);
+                    String streetPart = address.replace(detectedCity, "").trim();
+                    parseStreetAndNumber(service, streetPart);
+                } else {
+                    // Nie udało się wykryć miasta
+                    parseStreetAndNumber(service, address);
+                    service.setCity("Kraków"); // Domyślnie
+                }
             }
+
+            logger.info("Sparsowany adres - Ulica: " + service.getStreet() +
+                    ", Numer: " + service.getBuilding() +
+                    ", Miasto: " + service.getCity());
+
         } catch (Exception e) {
-            return phoneStr; // Zwróć oryginalną wartość w przypadku błędu
+            logger.warning("Błąd parsowania adresu '" + address + "': " + e.getMessage());
+            // W przypadku błędu, ustaw przynajmniej podstawowe dane
+            service.setStreet(address);
+            service.setCity("Kraków");
         }
     }
 
-    private void parseCoordinates(BikeService service, String latStr, String lngStr) throws Exception {
-        try {
-            Double latitude = Double.parseDouble(latStr.trim());
-            Double longitude = Double.parseDouble(lngStr.trim());
-
-            // Walidacja zakresu współrzędnych
-            if (latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180) {
-                service.setLatitude(latitude);
-                service.setLongitude(longitude);
-            } else {
-                throw new Exception("Współrzędne poza dozwolonym zakresem");
-            }
-        } catch (NumberFormatException e) {
-            throw new Exception("Nieprawidłowy format współrzędnych geograficznych");
-        }
-    }
-
-    private String[] parseCsvFields(String line) {
-        List<String> fields = new ArrayList<>();
-        StringBuilder currentField = new StringBuilder();
-        boolean inQuotes = false;
-
-        for (int i = 0; i < line.length(); i++) {
-            char c = line.charAt(i);
-
-            if (c == '"') {
-                inQuotes = !inQuotes;
-            } else if (c == ',' && !inQuotes) {
-                fields.add(currentField.toString());
-                currentField = new StringBuilder();
-            } else {
-                currentField.append(c);
-            }
-        }
-
-        fields.add(currentField.toString());
-        return fields.toArray(new String[0]);
-    }
-
+    /**
+     * Parsuje ulicę i numer budynku
+     */
     private void parseStreetAndNumber(BikeService service, String streetPart) {
         if (streetPart == null || streetPart.trim().isEmpty()) {
             return;
@@ -446,8 +406,7 @@ public class BikeServiceServiceImpl implements BikeServiceService {
 
         streetPart = streetPart.trim();
 
-        // Wzorzec: wszystko do ostatniej spacji to ulica, po spacji to numer
-        // Przykłady: "Wielkotyrnowska 12", "Aleja Mickiewicza 24A", "ul. Floriańska 15"
+        // Wzorzec: ulica + numer (może zawierać literę)
         Pattern pattern = Pattern.compile("^(.+?)\\s+([0-9]+[A-Za-z]?(?:/[0-9]+[A-Za-z]?)?)$");
         Matcher matcher = pattern.matcher(streetPart);
 
@@ -455,9 +414,12 @@ public class BikeServiceServiceImpl implements BikeServiceService {
             String street = matcher.group(1).trim();
             String buildingNumber = matcher.group(2).trim();
 
+            // Usuń przedrostki jak "ul.", "al."
+            street = street.replaceAll("^(ul\\.|ulica|al\\.|aleja)\\s+", "");
+
             service.setStreet(street);
 
-            // Sprawdź czy numer zawiera mieszkanie (format: "12/4")
+            // Obsługa numeru z mieszkaniem (12/4)
             if (buildingNumber.contains("/")) {
                 String[] parts = buildingNumber.split("/");
                 service.setBuilding(parts[0]);
@@ -468,8 +430,48 @@ public class BikeServiceServiceImpl implements BikeServiceService {
                 service.setBuilding(buildingNumber);
             }
         } else {
-            // Nie udało się wyodrębnić numeru - cała część to ulica
+            // Nie udało się wyodrębnić numeru
             service.setStreet(streetPart);
+        }
+    }
+
+    /**
+     * Czyści numer telefonu
+     */
+    private String parsePhoneNumber(String phoneStr) {
+        if (phoneStr == null || phoneStr.trim().isEmpty()) {
+            return null;
+        }
+
+        // Usuń białe znaki i znaki specjalne oprócz cyfr i +
+        String cleaned = phoneStr.replaceAll("[\\s\\-\\(\\)]", "");
+
+        // Sprawdź czy to sensowny numer telefonu
+        if (cleaned.matches("^\\+?[0-9]{9,15}$")) {
+            return cleaned;
+        }
+
+        return phoneStr; // Zwróć oryginalną wartość jeśli nie pasuje do wzorca
+    }
+
+    /**
+     * Parsuje współrzędne geograficzne
+     */
+    private void parseCoordinates(BikeService service, String latStr, String lngStr) throws Exception {
+        try {
+            Double latitude = Double.parseDouble(latStr.trim());
+            Double longitude = Double.parseDouble(lngStr.trim());
+
+            // Walidacja zakresu współrzędnych
+            if (latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180) {
+                service.setLatitude(latitude);
+                service.setLongitude(longitude);
+                logger.info("Ustawiono współrzędne: " + latitude + ", " + longitude);
+            } else {
+                throw new Exception("Współrzędne poza dozwolonym zakresem (lat: " + latitude + ", lng: " + longitude + ")");
+            }
+        } catch (NumberFormatException e) {
+            throw new Exception("Nieprawidłowy format współrzędnych geograficznych: lat='" + latStr + "', lng='" + lngStr + "'");
         }
     }
 
@@ -495,96 +497,30 @@ public class BikeServiceServiceImpl implements BikeServiceService {
      * Próbuje wykryć miasto na końcu adresu
      */
     private String detectCityFromAddress(String address) {
+        if (address == null || address.trim().isEmpty()) {
+            return null;
+        }
+
         String lowerAddress = address.toLowerCase();
 
-        // Lista znanych miast
+        // Lista znanych miast w województwie małopolskim i okolicznych
         String[] cities = {
-                "kraków", "krakow", "wieliczka", "skawina",
-                "niepołomice", "niepolomice", "warszawa",
-                "gdańsk", "gdansk", "wrocław", "wroclaw",
-                "poznań", "poznan", "łódź", "lodz"
+                "kraków", "krakow", "wieliczka", "skawina", "niepołomice", "niepolomice",
+                "myślenice", "myslenice", "chrzastowice", "zabierzów", "zabierzow",
+                "zielonki", "michałowice", "michalowice", "liszki", "czernichów", "czernichow",
+                "mogilany", "świątniki górne", "swiatniki gorne", "krzeszowice",
+                "warszawa", "gdańsk", "gdansk", "wrocław", "wroclaw", "poznań", "poznan",
+                "łódź", "lodz", "katowice", "lublin", "białystok", "bialystok",
+                "bydgoszcz", "toruń", "torun", "rzeszów", "rzeszow"
         };
 
         for (String city : cities) {
             if (lowerAddress.endsWith(" " + city) || lowerAddress.equals(city)) {
-                // Zwróć z poprawną wielkością liter
-                return city;
+                // Zwróć z poprawną wielkością liter (pierwsza wielka)
+                return city.substring(0, 1).toUpperCase() + city.substring(1);
             }
         }
 
         return null;
-    }
-
-    private BufferedReader createBufferedReaderWithProperEncoding(MultipartFile file) throws Exception {
-        InputStream inputStream = file.getInputStream();
-
-        // Najpierw spróbuj wykryć kodowanie przez sprawdzenie BOM
-        PushbackInputStream pushbackInputStream = new PushbackInputStream(inputStream, 3);
-        byte[] bom = new byte[3];
-        int bytesRead = pushbackInputStream.read(bom);
-
-        String encoding = "UTF-8"; // Domyślnie UTF-8
-
-        if (bytesRead >= 3) {
-            if (bom[0] == (byte) 0xEF && bom[1] == (byte) 0xBB && bom[2] == (byte) 0xBF) {
-                // UTF-8 BOM - zostaw UTF-8
-                encoding = "UTF-8";
-            } else {
-                // Brak BOM - sprawdź inne kodowania
-                pushbackInputStream.unread(bom, 0, bytesRead);
-
-                // Dla polskich znaków często używane kodowania
-                encoding = detectPolishEncoding(pushbackInputStream);
-            }
-        } else {
-            // Przywróć przeczytane bajty
-            pushbackInputStream.unread(bom, 0, bytesRead);
-        }
-
-        logger.info("Wykryte kodowanie CSV: " + encoding);
-
-        return new BufferedReader(new InputStreamReader(pushbackInputStream, encoding));
-    }
-
-    /**
-     * Próbuje wykryć polskie kodowanie na podstawie zawartości
-     */
-    private String detectPolishEncoding(PushbackInputStream inputStream) throws Exception {
-        // Przeczytaj próbkę danych
-        byte[] sample = new byte[1024];
-        int sampleSize = inputStream.read(sample);
-        inputStream.unread(sample, 0, sampleSize);
-
-        // Testuj różne kodowania z polskimi znakami
-        String[] encodings = {"UTF-8", "ISO-8859-2", "Windows-1250", "CP852"};
-
-        for (String encoding : encodings) {
-            try {
-                String testString = new String(sample, 0, sampleSize, encoding);
-
-                // Sprawdź czy zawiera sensowne polskie znaki
-                if (containsValidPolishCharacters(testString)) {
-                    logger.info("Wykryto kodowanie na podstawie polskich znaków: " + encoding);
-                    return encoding;
-                }
-            } catch (Exception e) {
-                // Ignoruj błędy kodowania
-            }
-        }
-
-        // Jeśli nic nie pasuje, użyj UTF-8
-        return "UTF-8";
-    }
-
-    /**
-     * Sprawdza czy string zawiera prawidłowe polskie znaki
-     */
-    private boolean containsValidPolishCharacters(String text) {
-        // Sprawdź czy zawiera polskie litery i czy nie ma "romba ze znakiem zapytania"
-        boolean hasPolishChars = text.matches(".*[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ].*");
-        boolean hasReplacementChars = text.contains("�") || text.contains("?");
-
-        // Dobry kandydat jeśli ma polskie znaki i nie ma znaków zastępczych
-        return hasPolishChars && !hasReplacementChars;
     }
 }
