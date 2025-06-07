@@ -6,6 +6,7 @@ import com.samarama.bicycle.api.repository.*;
 import com.samarama.bicycle.api.service.ServiceOrderService;
 import com.samarama.bicycle.api.service.EmailService;
 import com.samarama.bicycle.api.service.ServiceSlotService;
+import com.samarama.bicycle.api.service.helper.OrderValidator;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -31,9 +32,6 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
     private final BikeServiceRepository bikeServiceRepository;
     private final ServiceSlotService serviceSlotService;
     private final EmailService emailService;
-
-    @Value("${app.internal.service.id}")
-    private String internalServiceIdString;
 
     public ServiceOrderServiceImpl(
             ServiceOrderRepository serviceOrderRepository,
@@ -353,8 +351,8 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
 
         // 2. Ustaw targetServiceId na serwis własny (zamówienia serwisowe zawsze do nas)
         if (dto.getTargetServiceId() == null) {
-            dto.setTargetServiceId(Long.parseLong(internalServiceIdString));
-            logger.info("Set targetServiceId to " + internalServiceIdString + " (internal service) for service order");
+            dto.setTargetServiceId(Long.parseLong(OrderValidator.internalServiceIdString));
+            logger.info("Set targetServiceId to " + OrderValidator.internalServiceIdString + " (internal service) for service order");
         }
 
         // 3. Ustaw transportPrice na 0 (dla serwisu transport wliczony w cenę pakietu)
@@ -387,8 +385,8 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
     }
 
     private BikeService getOwnService() {
-        return bikeServiceRepository.findById(Long.parseLong(internalServiceIdString))
-                .orElseThrow(() -> new RuntimeException("Internal service not found: " + internalServiceIdString));
+        return bikeServiceRepository.findById(Long.parseLong(OrderValidator.internalServiceIdString))
+                .orElseThrow(() -> new RuntimeException("Internal service not found: " + OrderValidator.internalServiceIdString));
     }
 
     private List<IncompleteBike> validateAndGetBikes(List<Long> bicycleIds, Long userId) {

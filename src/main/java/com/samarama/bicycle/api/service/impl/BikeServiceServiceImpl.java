@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.math.BigDecimal;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
@@ -318,6 +319,7 @@ public class BikeServiceServiceImpl implements BikeServiceService {
         String phoneStr = fields.length > 2 ? fields[2].trim() : "";
         String latStr = fields.length > 3 ? fields[3].trim() : "";
         String lngStr = fields.length > 4 ? fields[4].trim() : "";
+        String cena = fields.length > 4 ? fields[5].trim() : "";
 
         // Walidacja obowiązkowych pól
         if (name.isEmpty()) {
@@ -347,6 +349,12 @@ public class BikeServiceServiceImpl implements BikeServiceService {
         // Parsowanie współrzędnych
         if (!latStr.isEmpty() && !lngStr.isEmpty()) {
             parseCoordinates(service, latStr, lngStr);
+        }
+
+        if(cena.isEmpty()){
+            service.setTransportCost(BigDecimal.ZERO);
+        } else {
+            service.setTransportCost(new BigDecimal(cena));
         }
 
         return service;

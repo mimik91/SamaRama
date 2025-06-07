@@ -25,7 +25,7 @@ public class OrderValidator {
     private final CityValidator cityValidator;
 
     @Value("${app.internal.service.id}")
-    public static String internalServiceIdString;
+    public static String internalServiceIdString = "2137";
 
     public OrderValidator(
             ServicePackageRepository servicePackageRepository,
