@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
@@ -191,8 +192,7 @@ public class BikeServiceServiceImpl implements BikeServiceService {
 
             logger.info("Rozpoczęcie importu serwisów z pliku: " + file.getOriginalFilename() + " przez " + adminEmail);
 
-            // WYMUSZAM kodowanie Windows-1250
-            Charset forcedCharset = Charset.forName("Windows-1250");
+            Charset forcedCharset = StandardCharsets.UTF_8;
             logger.info("Używam kodowania: " + forcedCharset.name());
 
             // Czytaj plik CSV z wymuszonym kodowaniem Windows-1250

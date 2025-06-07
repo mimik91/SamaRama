@@ -215,7 +215,7 @@ public class CsvReader {
                 content.contains("?");
 
         // Sprawdź czy zawiera sensowne słowa polskie
-        boolean hasSensibleWords = content.toLowerCase().matches(".*\\b(kraków|krakow|warszawa|ulica|miasto|telefon|adres)\\b.*");
+        boolean hasSensibleWords = content.toLowerCase().matches(".*\\b(kraków|krakow|warszawa|ulica|miasto|telefon|adres|cena)\\b.*");
 
         // Dobry kandydat jeśli:
         // - Ma polskie znaki ALBO sensowne słowa polskie
