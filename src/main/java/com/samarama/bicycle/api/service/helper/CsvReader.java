@@ -66,9 +66,6 @@ public class CsvReader {
         return readCsvFile(file, null);
     }
 
-    /**
-     * Czyta plik CSV z możliwością wymuszenia konkretnego kodowania
-     */
     public CsvReadResult readCsvFile(MultipartFile file, Charset forcedCharset) {
         try {
             logger.info("Rozpoczęcie czytania pliku CSV: " + file.getOriginalFilename());
@@ -76,7 +73,7 @@ public class CsvReader {
             // Pobierz zawartość pliku
             byte[] fileBytes = file.getBytes();
 
-            // Wykryj lub użyj wymuszonego/domyślnego kodowania
+            // Wykryj kodowanie
             Charset charsetToUse;
             String source;
 
@@ -98,37 +95,102 @@ public class CsvReader {
 
             // Log pierwszych 200 znaków do debugowania
             String debugSample = csvContent.length() > 200 ? csvContent.substring(0, 200) + "..." : csvContent;
-            logger.info("Próbka zawartości: " + debugSample.replaceAll("\\n", "\\\\n"));
+            logger.info("Próbka zawartości: " + debugSample.replaceAll("\\n", "\\\\n").replaceAll("\\r", "\\\\r"));
 
             // Usuń BOM jeśli istnieje
             csvContent = removeBOM(csvContent);
 
-            // Podziel na linie
-            String[] lines = csvContent.split("\\r?\\n");
-            logger.info("Znaleziono " + lines.length + " linii");
+            // NOWE: Wykryj separator
+            char separator = detectCsvSeparator(csvContent);
 
             List<String[]> rows = new ArrayList<>();
             List<String> errors = new ArrayList<>();
 
-            for (int i = 0; i < lines.length; i++) {
-                String line = lines[i].trim();
+            // SPECJALNA OBSŁUGA: Jeśli separator to \r, prawdopodobnie cały plik to jedna linia
+            if (separator == '\r') {
+                logger.info("Wykryto \\r jako separator - przetwarzanie jako jedna linia z wieloma polami");
 
-                // Pomijaj puste linie
-                if (line.isEmpty()) {
-                    continue;
-                }
+                // Usuń wszystkie \n z zawartości (zostawiamy tylko \r jako separatory)
+                String cleanContent = csvContent.replaceAll("\\n", "");
 
                 try {
-                    String[] fields = parseCsvLine(line);
-                    rows.add(fields);
+                    String[] fields = parseCsvLineWithSeparator(cleanContent, separator);
+                    logger.info("Podzielono na " + fields.length + " pól używając \\r jako separatora");
 
-                    // Log pierwszego wiersza danych dla debugowania
-                    if (rows.size() == 1) {
-                        logger.info("Pierwszy wiersz danych: " + Arrays.toString(fields));
+                    // Sprawdź czy mamy sensowną liczbę pól (powinna być wielokrotnością liczby kolumn)
+                    // Dla Twojego przypadku: nazwa, adres, telefon, latitude, longitude, cena = 6 kolumn
+                    int expectedColumns = 6;
+                    if (fields.length % expectedColumns == 0) {
+                        int recordCount = fields.length / expectedColumns;
+                        logger.info("Wykryto " + recordCount + " rekordów po " + expectedColumns + " kolumn każdy");
+
+                        // Podziel pola na rekordy
+                        for (int i = 0; i < recordCount; i++) {
+                            String[] record = new String[expectedColumns];
+                            System.arraycopy(fields, i * expectedColumns, record, 0, expectedColumns);
+                            rows.add(record);
+
+                            // Log pierwszego rekordu
+                            if (i == 0) {
+                                logger.info("Pierwszy rekord: " + Arrays.toString(record));
+                            }
+                        }
+                    } else {
+                        logger.warning("Liczba pól (" + fields.length + ") nie jest wielokrotnością " + expectedColumns +
+                                ". Próbuję podzielić automatycznie...");
+
+                        // Spróbuj różnych liczb kolumn
+                        for (int cols = 3; cols <= 10; cols++) {
+                            if (fields.length % cols == 0) {
+                                int recordCount = fields.length / cols;
+                                logger.info("Alternatywnie: " + recordCount + " rekordów po " + cols + " kolumn");
+
+                                for (int i = 0; i < recordCount; i++) {
+                                    String[] record = new String[cols];
+                                    System.arraycopy(fields, i * cols, record, 0, cols);
+                                    rows.add(record);
+                                }
+                                break;
+                            }
+                        }
+
+                        if (rows.isEmpty()) {
+                            // Ostatnia próba - dodaj wszystko jako jeden rekord
+                            rows.add(fields);
+                            errors.add("Nie udało się automatycznie podzielić pól na rekordy");
+                        }
                     }
+
                 } catch (Exception e) {
-                    errors.add("Błąd w linii " + (i + 1) + ": " + e.getMessage());
-                    logger.warning("Błąd parsowania linii " + (i + 1) + ": " + e.getMessage());
+                    errors.add("Błąd parsowania pliku z \\r jako separatorem: " + e.getMessage());
+                    logger.severe("Błąd parsowania: " + e.getMessage());
+                }
+
+            } else {
+                // STANDARDOWE PRZETWARZANIE: separator to przecinek/średnik/tab
+                String[] lines = csvContent.split("\\r?\\n");
+                logger.info("Znaleziono " + lines.length + " linii");
+
+                for (int i = 0; i < lines.length; i++) {
+                    String line = lines[i].trim();
+
+                    // Pomijaj puste linie
+                    if (line.isEmpty()) {
+                        continue;
+                    }
+
+                    try {
+                        String[] fields = parseCsvLineWithSeparator(line, separator);
+                        rows.add(fields);
+
+                        // Log pierwszego wiersza danych dla debugowania
+                        if (rows.size() == 1) {
+                            logger.info("Pierwszy wiersz danych (" + fields.length + " kolumn): " + Arrays.toString(fields));
+                        }
+                    } catch (Exception e) {
+                        errors.add("Błąd w linii " + (i + 1) + ": " + e.getMessage());
+                        logger.warning("Błąd parsowania linii " + (i + 1) + ": " + e.getMessage());
+                    }
                 }
             }
 
@@ -142,6 +204,93 @@ public class CsvReader {
             errors.add("Błąd podczas czytania pliku: " + e.getMessage());
             return new CsvReadResult(new ArrayList<>(), errors, "UNKNOWN");
         }
+    }
+
+    private char detectCsvSeparator(String csvContent) {
+        String[] lines = csvContent.split("\\r?\\n");
+
+        if (lines.length == 0) {
+            return ','; // domyślny
+        }
+
+        String firstLine = lines[0];
+
+        // Policz występowanie różnych separatorów
+        int commaCount = (int) firstLine.chars().filter(ch -> ch == ',').count();
+        int semicolonCount = (int) firstLine.chars().filter(ch -> ch == ';').count();
+        int tabCount = (int) firstLine.chars().filter(ch -> ch == '\t').count();
+        int crCount = (int) firstLine.chars().filter(ch -> ch == '\r').count(); // NOWE: carriage return
+
+        logger.info("Wykrywanie separatora - przecinki: " + commaCount +
+                ", średniki: " + semicolonCount +
+                ", tabulatory: " + tabCount +
+                ", \\r (carriage return): " + crCount);
+
+        // Sprawdź czy pierwsza linia ma znacznie więcej znaków niż oczekiwanych pól
+        // To może oznaczać że cały CSV jest w jednej linii z \r jako separatorem
+        if (crCount > 5 && crCount > commaCount && crCount > semicolonCount && crCount > tabCount) {
+            logger.info("Wykryto separator: carriage return (\\r) - prawdopodobnie cały CSV w jednej linii");
+            return '\r';
+        }
+
+        // Wybierz najczęściej występujący separator (oryginalna logika)
+        if (semicolonCount > commaCount && semicolonCount > tabCount) {
+            logger.info("Wykryto separator: średnik (;)");
+            return ';';
+        } else if (tabCount > commaCount && tabCount > semicolonCount) {
+            logger.info("Wykryto separator: tabulator");
+            return '\t';
+        } else if (commaCount > 0) {
+            logger.info("Wykryto separator: przecinek (,)");
+            return ',';
+        } else {
+            // Fallback - jeśli nie ma typowych separatorów, sprawdź \r
+            if (crCount > 0) {
+                logger.info("Wykryto separator: carriage return (\\r) - fallback");
+                return '\r';
+            }
+            logger.info("Nie wykryto separatora, używam domyślnego: przecinek (,)");
+            return ',';
+        }
+    }
+
+    /**
+     * Parsuje linię CSV z konkretnym separatorem
+     */
+    private String[] parseCsvLineWithSeparator(String line, char separator) {
+        List<String> fields = new ArrayList<>();
+        StringBuilder currentField = new StringBuilder();
+        boolean inQuotes = false;
+        boolean escapeNext = false;
+
+        for (int i = 0; i < line.length(); i++) {
+            char c = line.charAt(i);
+
+            if (escapeNext) {
+                currentField.append(c);
+                escapeNext = false;
+            } else if (c == '\\') {
+                escapeNext = true;
+            } else if (c == '"') {
+                if (inQuotes && i + 1 < line.length() && line.charAt(i + 1) == '"') {
+                    // Podwójny cudzysłów - to escape
+                    currentField.append('"');
+                    i++; // Pomiń następny cudzysłów
+                } else {
+                    inQuotes = !inQuotes;
+                }
+            } else if (c == separator && !inQuotes) {
+                fields.add(currentField.toString().trim());
+                currentField = new StringBuilder();
+            } else {
+                currentField.append(c);
+            }
+        }
+
+        // Dodaj ostatnie pole
+        fields.add(currentField.toString().trim());
+
+        return fields.toArray(new String[0]);
     }
 
     /**
@@ -236,6 +385,7 @@ public class CsvReader {
 
     /**
      * Parsuje linię CSV obsługując cudzysłowy i przecinki wewnątrz pól
+     * STARA METODA - zachowana dla kompatybilności
      */
     private String[] parseCsvLine(String line) {
         List<String> fields = new ArrayList<>();

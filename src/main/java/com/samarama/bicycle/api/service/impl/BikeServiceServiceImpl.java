@@ -310,16 +310,19 @@ public class BikeServiceServiceImpl implements BikeServiceService {
      * Oczekiwany format: nazwa,adres,telefon,latitude,longitude
      */
     private BikeService parseCsvRow(String[] fields, int lineNumber) throws Exception {
-        if (fields.length < 3) {
-            throw new Exception("Nieprawidłowa liczba kolumn (minimum 3: nazwa, adres, telefon)");
+        // Loguj zawartość wiersza dla debugowania
+        logger.info("Parsowanie wiersza " + lineNumber + ": " + Arrays.toString(fields));
+
+        if (fields.length < 6) {
+            throw new Exception("Nieprawidłowa liczba kolumn (oczekiwano 6: nazwa, adres, numer telefonu, latitude, longitude, cena), otrzymano: " + fields.length);
         }
 
         String name = fields[0].trim();
         String address = fields[1].trim();
-        String phoneStr = fields.length > 2 ? fields[2].trim() : "";
-        String latStr = fields.length > 3 ? fields[3].trim() : "";
-        String lngStr = fields.length > 4 ? fields[4].trim() : "";
-        String cena = fields.length > 4 ? fields[5].trim() : "";
+        String phoneStr = fields[2].trim();
+        String latStr = fields[3].trim();
+        String lngStr = fields[4].trim();
+        String cenaStr = fields[5].trim();
 
         // Walidacja obowiązkowych pól
         if (name.isEmpty()) {
@@ -341,21 +344,71 @@ public class BikeServiceServiceImpl implements BikeServiceService {
         // Parsowanie adresu
         parseAddress(service, address);
 
-        // Parsowanie telefonu
+        // Parsowanie telefonu - obsługa różnych formatów
         if (!phoneStr.isEmpty()) {
-            service.setPhoneNumber(parsePhoneNumber(phoneStr));
+            try {
+                // Sprawdź czy to liczba (może być w formacie naukowym)
+                if (phoneStr.matches("^[0-9]+$")) {
+                    // Zwykła liczba
+                    service.setPhoneNumber(phoneStr);
+                } else if (phoneStr.matches("^[0-9.]+E[0-9]+$")) {
+                    // Format naukowy (np. 1.22961885E8)
+                    double phoneNum = Double.parseDouble(phoneStr);
+                    service.setPhoneNumber(String.format("%.0f", phoneNum));
+                } else {
+                    service.setPhoneNumber(parsePhoneNumber(phoneStr));
+                }
+            } catch (NumberFormatException e) {
+                logger.warning("Nie udało się sparsować telefonu: " + phoneStr);
+                service.setPhoneNumber(phoneStr); // Zapisz oryginalną wartość
+            }
         }
 
         // Parsowanie współrzędnych
         if (!latStr.isEmpty() && !lngStr.isEmpty()) {
-            parseCoordinates(service, latStr, lngStr);
+            try {
+                parseCoordinates(service, latStr, lngStr);
+            } catch (Exception e) {
+                logger.warning("Błąd parsowania współrzędnych: " + e.getMessage());
+                // Nie przerywaj parsowania z powodu błędnych współrzędnych
+            }
         }
 
-        if(cena.isEmpty()){
-            service.setTransportCost(BigDecimal.ZERO);
+        // Parsowanie ceny transportu
+        if (!cenaStr.isEmpty()) {
+            try {
+                // Obsługa różnych formatów liczb
+                if (cenaStr.matches("^[0-9]+$")) {
+                    // Zwykła liczba całkowita
+                    service.setTransportCost(new BigDecimal(cenaStr));
+                } else if (cenaStr.matches("^[0-9]+\\.[0-9]+$")) {
+                    // Liczba dziesiętna
+                    service.setTransportCost(new BigDecimal(cenaStr));
+                } else if (cenaStr.matches("^[0-9]+,[0-9]+$")) {
+                    // Liczba z przecinkiem jako separatorem dziesiętnym
+                    String normalizedPrice = cenaStr.replace(",", ".");
+                    service.setTransportCost(new BigDecimal(normalizedPrice));
+                } else {
+                    // Spróbuj usunąć znaki niebędące cyframi
+                    String cleanPrice = cenaStr.replaceAll("[^0-9.,]", "").replace(",", ".");
+                    if (!cleanPrice.isEmpty()) {
+                        service.setTransportCost(new BigDecimal(cleanPrice));
+                    } else {
+                        service.setTransportCost(BigDecimal.ZERO);
+                    }
+                }
+            } catch (NumberFormatException e) {
+                logger.warning("Nie udało się sparsować ceny: " + cenaStr + ", ustawiam 0");
+                service.setTransportCost(BigDecimal.ZERO);
+            }
         } else {
-            service.setTransportCost(new BigDecimal(cena));
+            service.setTransportCost(BigDecimal.ZERO);
         }
+
+        logger.info("Pomyślnie sparsowano serwis: " + service.getName() +
+                " - tel: " + service.getPhoneNumber() +
+                " - cena: " + service.getTransportCost() +
+                " - koordynaty: " + service.getLatitude() + "," + service.getLongitude());
 
         return service;
     }
