@@ -13,11 +13,15 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Logger;
 
 @CrossOrigin(origins = "*", maxAge = 3600)
 @RestController
 @RequestMapping("/api/service-slots")
 public class ServiceSlotController {
+
+    private static final Logger logger = Logger.getLogger(AdminController.class.getName());
+
 
     private final ServiceSlotService serviceSlotService;
     private final ServiceOrderRepository serviceOrderRepository;
@@ -154,6 +158,21 @@ public class ServiceSlotController {
     public ResponseEntity<List<ServiceSlotConfigDto>> getActiveSlotConfigs() {
         List<ServiceSlotConfigDto> configs = serviceSlotService.getCurrentlyActiveSlotConfigs();
         return ResponseEntity.ok(configs);
+    }
+
+    @GetMapping("/config/future")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MODERATOR')")
+    public ResponseEntity<List<ServiceSlotConfigDto>> getFutureSlotConfigs() {
+        logger.info("Getting future slot configs - admin endpoint");
+        try {
+            List<ServiceSlotConfigDto> configs = serviceSlotService.getFutureSlotConfigs();
+            logger.info("Found " + configs.size() + " future configs");
+            return ResponseEntity.ok(configs);
+        } catch (Exception e) {
+            logger.severe("Error getting future slot configs: " + e.getMessage());
+            e.printStackTrace();
+            throw e;
+        }
     }
 
     /**

@@ -75,7 +75,7 @@ public class ServiceSlotServiceImpl implements ServiceSlotService {
             validateSlotConfig(configDto);
 
             // Check for overlapping configurations
-            List<ServiceSlotConfig> overlapping = configRepository.findOverlappingConfigs(
+            List<ServiceSlotConfig> overlapping = configRepository.findOverlappingConfigsWithEndDate(
                     configDto.startDate(), configDto.endDate());
 
             if (!overlapping.isEmpty()) {
@@ -124,12 +124,9 @@ public class ServiceSlotServiceImpl implements ServiceSlotService {
             // Validation
             validateSlotConfig(configDto);
 
-            // Check for overlapping configurations (excluding current one)
-            List<ServiceSlotConfig> overlapping = configRepository.findOverlappingConfigs(
-                            configDto.startDate(), configDto.endDate())
-                    .stream()
-                    .filter(c -> !c.getId().equals(id))
-                    .collect(Collectors.toList());
+            // Check for overlapping configurations (excluding current one) using safer method
+            List<ServiceSlotConfig> overlapping = findOverlappingConfigsSafely(
+                    configDto.startDate(), configDto.endDate(), id);
 
             if (!overlapping.isEmpty()) {
                 return ResponseEntity.badRequest().body(Map.of(
@@ -156,6 +153,29 @@ public class ServiceSlotServiceImpl implements ServiceSlotService {
             logger.severe("Error updating slot configuration " + id + ": " + e.getMessage());
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         }
+    }
+
+    private List<ServiceSlotConfig> findOverlappingConfigsSafely(
+            LocalDate startDate, LocalDate endDate, Long excludeConfigId) {
+
+        List<ServiceSlotConfig> overlapping;
+
+        if (endDate != null) {
+            // Użyj standardowej metody gdy endDate nie jest null
+            overlapping = configRepository.findOverlappingConfigsWithEndDate(startDate, endDate);
+        } else {
+            // Gdy endDate jest null (konfiguracja bezterminowa), sprawdź wszystkie konflikty
+            overlapping = configRepository.findOverlappingConfigsWithoutEndDate(startDate);
+        }
+
+        // Wyklucz aktualną konfigurację jeśli podano ID
+        if (excludeConfigId != null) {
+            overlapping = overlapping.stream()
+                    .filter(config -> !config.getId().equals(excludeConfigId))
+                    .collect(Collectors.toList());
+        }
+
+        return overlapping;
     }
 
     @Override
@@ -352,7 +372,7 @@ public class ServiceSlotServiceImpl implements ServiceSlotService {
      * Checks if a date range overlaps with existing configurations
      */
     private boolean hasOverlappingConfigs(LocalDate startDate, LocalDate endDate, Long excludeConfigId) {
-        List<ServiceSlotConfig> overlapping = configRepository.findOverlappingConfigs(startDate, endDate);
+        List<ServiceSlotConfig> overlapping = configRepository.findOverlappingConfigsWithEndDate(startDate, endDate);
 
         if (excludeConfigId != null) {
             overlapping = overlapping.stream()

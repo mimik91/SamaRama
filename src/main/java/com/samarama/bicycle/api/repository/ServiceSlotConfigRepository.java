@@ -46,11 +46,17 @@ public interface ServiceSlotConfigRepository extends JpaRepository<ServiceSlotCo
      * @return lista nakładających się konfiguracji
      */
     @Query("SELECT c FROM ServiceSlotConfig c WHERE " +
-            "((c.startDate <= :endDate OR :endDate IS NULL) AND " +
-            "(c.endDate IS NULL OR c.endDate >= :startDate))")
-    List<ServiceSlotConfig> findOverlappingConfigs(
+            "c.startDate <= :endDate AND (c.endDate IS NULL OR c.endDate >= :startDate)")
+    List<ServiceSlotConfig> findOverlappingConfigsWithEndDate(
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate);
+
+    @Query("SELECT c FROM ServiceSlotConfig c WHERE " +
+            "c.endDate IS NULL OR c.endDate >= :startDate")
+    List<ServiceSlotConfig> findOverlappingConfigsWithoutEndDate(
+            @Param("startDate") LocalDate startDate);
+
+
 
     /**
      * Znajduje konfiguracje z datą startu po podanej dacie

@@ -40,7 +40,6 @@ public class JwtTokenFilter extends OncePerRequestFilter {
             "/api/enumerations/**",  // Dodajemy tu
             "/api/service-orders/package-price/**",
             "/api/service-slots/availability/**",  // Dodajemy tu
-            "/api/service-slots/**",
             "/api/service-slots/check-availability",
             "/api/guest-orders/**"
     );
