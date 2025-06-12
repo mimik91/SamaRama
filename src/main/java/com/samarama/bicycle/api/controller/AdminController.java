@@ -669,20 +669,6 @@ public class AdminController {
         }
     }
 
-    @GetMapping("courier/orders")
-    public ResponseEntity<List<CourierOrderDto>> getCourierOrders() {
-        String adminEmail = getCurrentUserEmail();
-        logger.info("Fetching courier orders for admin: " + adminEmail);
-
-        try {
-            List<CourierOrderDto> orders = transportOrderService.getCourierOrders();
-            return ResponseEntity.ok(orders);
-        } catch (Exception e) {
-            logger.severe("Error fetching courier orders: " + e.getMessage());
-            return ResponseEntity.internalServerError().build();
-        }
-    }
-
 
 
 

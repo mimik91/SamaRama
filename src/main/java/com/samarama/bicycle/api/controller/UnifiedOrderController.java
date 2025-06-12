@@ -116,5 +116,17 @@ public class UnifiedOrderController {
         return transportOrderService.getOrderDetails(orderId, userEmail);
     }
 
+    @GetMapping("courier/orders")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<CourierOrderDto>> getCourierOrders() {
+        String adminEmail = getCurrentUserEmail();
+        try {
+            List<CourierOrderDto> orders = transportOrderService.getCourierOrders();
+            return ResponseEntity.ok(orders);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
 
 }
