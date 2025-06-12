@@ -85,6 +85,8 @@ public interface TransportOrderRepository extends JpaRepository<TransportOrder, 
      */
     List<TransportOrder> findByTargetServiceAndStatus(BikeService targetService, TransportOrder.OrderStatus status);
 
+    List<TransportOrder> findByStatusAndPickupDate(TransportOrder.OrderStatus status, LocalDate day);
+
     /**
      * Znajdź zamówienia oczekujące na dostawę do serwisu
      */

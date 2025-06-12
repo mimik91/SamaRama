@@ -72,4 +72,5 @@ public interface ServiceOrderService {
     Optional<UnifiedOrderResponseDto> getOrderAsUnified(Long orderId);
 
     ResponseEntity<?> updateServiceNotes(Long orderId, String notes, String userEmail);
+
 }

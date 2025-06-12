@@ -32,6 +32,7 @@ public class TransportOrder {
         PICKED_UP,       // Odebrano od klienta
         IN_SERVICE,      // W serwisie (tylko dla ServiceOrder)
         ON_THE_WAY_BACK, // W drodze powrotnej do klienta
+        FINISHED,
         CANCELLED        // Anulowane
     }
 
@@ -236,6 +237,7 @@ public class TransportOrder {
             case PICKED_UP -> "Odebrane";
             case IN_SERVICE -> "W serwisie";
             case ON_THE_WAY_BACK -> "W drodze powrotnej";
+            case FINISHED ->  "Rower oddany właścicielowi";
             case CANCELLED -> "Anulowane";
         };
     }

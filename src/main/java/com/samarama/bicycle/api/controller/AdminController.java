@@ -44,6 +44,7 @@ public class AdminController {
     private final ServiceSlotService serviceSlotService;
     private final BicycleEnumerationService enumerationService;
     private final EmailService emailService;
+    private final IncompleteUserRepository incompleteUserRepository;
 
     // Repositories for advanced queries
     private final UserRepository userRepository;
@@ -60,7 +61,7 @@ public class AdminController {
             ServicePackageService servicePackageService,
             ServiceSlotService serviceSlotService,
             BicycleEnumerationService enumerationService,
-            EmailService emailService,
+            EmailService emailService, IncompleteUserRepository incompleteUserRepository,
             UserRepository userRepository,
             TransportOrderRepository transportOrderRepository,
             ServiceOrderRepository serviceOrderRepository,
@@ -73,6 +74,7 @@ public class AdminController {
         this.serviceSlotService = serviceSlotService;
         this.enumerationService = enumerationService;
         this.emailService = emailService;
+        this.incompleteUserRepository = incompleteUserRepository;
         this.userRepository = userRepository;
         this.transportOrderRepository = transportOrderRepository;
         this.serviceOrderRepository = serviceOrderRepository;
@@ -120,40 +122,6 @@ public class AdminController {
         }
     }
 
-    /**
-     * Szczegółowe statystyki systemowe
-     */
-    @GetMapping("/statistics")
-    public ResponseEntity<Map<String, Object>> getSystemStatistics(
-            @RequestParam(defaultValue = "30") int days) {
-
-        String adminEmail = getCurrentUserEmail();
-        logAdminAction("VIEW_STATISTICS", "days=" + days, adminEmail);
-
-        try {
-            LocalDate endDate = LocalDate.now();
-            LocalDate startDate = endDate.minusDays(days);
-
-            Map<String, Object> stats = new HashMap<>();
-
-            // Statystyki zamówień w czasie
-            stats.put("orderTrends", getOrderTrends(startDate, endDate));
-
-            // Statystyki przychodów
-            stats.put("revenue", getRevenueStatistics(startDate, endDate));
-
-
-            // Statystyki użytkowników
-            stats.put("userGrowth", getUserGrowthStatistics(startDate, endDate));
-
-            return ResponseEntity.ok(stats);
-        } catch (Exception e) {
-            logger.severe("Error loading statistics: " + e.getMessage());
-            return ResponseEntity.internalServerError().body(Map.of("message", "Błąd ładowania statystyk"));
-        }
-    }
-
-    // =================== ORDER MANAGEMENT ===================
 
     /**
      * Endpoint dla wszystkich zamówień (serwisowe + transportowe)
@@ -517,7 +485,7 @@ public class AdminController {
             Pageable pageable = PageRequest.of(page, size, Sort.by(direction, validatedSortBy));
 
             // Użyj repository z paginacją
-            Page<User> userPage = getUsersWithFilters(pageable, searchTerm, role, verified);
+            Page<IncompleteUser> userPage = getUsersWithFilters(pageable, searchTerm, role, verified);
 
             Map<String, Object> response = new HashMap<>();
             response.put("content", userPage.getContent().stream()
@@ -677,29 +645,46 @@ public class AdminController {
         }
     }
 
-    // =================== AUDIT LOG ===================
+    @PatchMapping("/orders/service/{orderId}/status")
+    public ResponseEntity<?> updateServiceOrderStatus(
+            @PathVariable Long orderId,
+            @Valid @RequestBody Map<String, String> request) {
 
-    /**
-     * Log akcji administracyjnych
-     */
-    @GetMapping("/audit-log")
-    public ResponseEntity<?> getAuditLog(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "50") int size,
-            @RequestParam(required = false) String action,
-            @RequestParam(required = false) String adminEmail,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to) {
+        String adminEmail = getCurrentUserEmail();
+        String newStatus = request.get("status");
 
-        String currentAdmin = getCurrentUserEmail();
-        logAdminAction("VIEW_AUDIT_LOG", "filters applied", currentAdmin);
+        // Walidacja danych wejściowych
+        if (newStatus == null || newStatus.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Status jest wymagany"));
+        }
 
-        // TODO: Implementacja audit log - wymagałaby nowej tabeli audit_log
-        return ResponseEntity.ok(Map.of(
-                "message", "Audit log nie jest jeszcze zaimplementowany",
-                "suggestion", "Należy utworzyć tabelę audit_log i odpowiedni serwis"
-        ));
+        logAdminAction("UPDATE_SERVICE_ORDER_STATUS", "orderId=" + orderId + ", status=" + newStatus, adminEmail);
+
+        try {
+            // Deleguj do serwisu
+            return transportOrderService.updateOrderStatus(orderId, newStatus, adminEmail);
+        } catch (Exception e) {
+            logger.severe("Error updating service order status: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(Map.of("message", "Błąd aktualizacji statusu"));
+        }
     }
+
+    @GetMapping("courier/orders")
+    public ResponseEntity<List<CourierOrderDto>> getCourierOrders() {
+        String adminEmail = getCurrentUserEmail();
+        logger.info("Fetching courier orders for admin: " + adminEmail);
+
+        try {
+            List<CourierOrderDto> orders = transportOrderService.getCourierOrders();
+            return ResponseEntity.ok(orders);
+        } catch (Exception e) {
+            logger.severe("Error fetching courier orders: " + e.getMessage());
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+
+
 
     // =================== HELPER METHODS ===================
 
@@ -781,21 +766,33 @@ public class AdminController {
         return true;
     }
 
-    private Page<User> getUsersWithFilters(Pageable pageable, String searchTerm, String role, Boolean verified) {
+    private Page<IncompleteUser> getUsersWithFilters(Pageable pageable, String searchTerm, String role, Boolean verified) {
         // TODO: Implementacja filtrowanego wyszukiwania użytkowników
-        return userRepository.findAll(pageable);
+        return incompleteUserRepository.findAll(pageable);
     }
 
-    private Map<String, Object> mapUserToDto(User user) {
-        return Map.of(
-                "id", user.getId(),
-                "email", user.getEmail(),
-                "firstName", user.getFirstName() != null ? user.getFirstName() : "",
-                "lastName", user.getLastName() != null ? user.getLastName() : "",
-                "verified", user.isVerified(),
-                "roles", user.getRoles(),
-                "createdAt", user.getCreatedAt()
-        );
+    private Map<String, Object> mapUserToDto(IncompleteUser user) {
+        if(user instanceof User fullUser) {
+            return Map.of(
+                    "id", user.getId(),
+                    "email", user.getEmail(),
+                    "firstName", fullUser.getFirstName() != null ? fullUser.getFirstName() : "",
+                    "lastName", fullUser.getLastName() != null ? fullUser.getLastName() : "",
+                    "verified", fullUser.isVerified(),
+                    "roles", user.getRoles(),
+                    "createdAt", user.getCreatedAt()
+            );
+        } else {
+            return Map.of(
+                    "id", user.getId(),
+                    "email", user.getEmail(),
+                    "firstName",  "",
+                    "lastName",  "",
+                    "verified", false,
+                    "roles", user.getRoles(),
+                    "createdAt", user.getCreatedAt()
+            );
+        }
     }
 
     private boolean areValidRoles(Set<String> roles) {

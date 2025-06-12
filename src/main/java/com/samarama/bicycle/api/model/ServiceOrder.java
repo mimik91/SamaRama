@@ -169,6 +169,7 @@ public class ServiceOrder extends TransportOrder {
             case IN_SERVICE -> "Rower w serwisie" + (serviceStartDate != null ?
                     " od " + serviceStartDate.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM HH:mm")) : "");
             case ON_THE_WAY_BACK -> "Serwis zakończony, rower w drodze powrotnej";
+            case FINISHED -> "Rower dostarczony z powrotem do klienta";
             case CANCELLED -> "Zamówienie anulowane";
         };
     }

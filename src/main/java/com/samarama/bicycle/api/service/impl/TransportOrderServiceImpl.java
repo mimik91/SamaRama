@@ -4,7 +4,6 @@ import com.samarama.bicycle.api.dto.*;
 import com.samarama.bicycle.api.model.*;
 import com.samarama.bicycle.api.repository.*;
 import com.samarama.bicycle.api.service.TransportOrderService;
-import com.samarama.bicycle.api.service.EmailService;
 import com.samarama.bicycle.api.service.ServiceSlotService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -246,31 +245,50 @@ public class TransportOrderServiceImpl implements TransportOrderService {
         return ResponseEntity.ok(Map.of("message", "Zamówienie zostało anulowane"));
     }
 
+    // W TransportOrderServiceImpl sprawdź czy metoda updateOrderStatus wygląda tak:
+
     @Override
     @Transactional
     public ResponseEntity<?> updateOrderStatus(Long orderId, String newStatus, String userEmail) {
-        User user = getUserByEmail(userEmail);
+        try {
+            // WAŻNE: Sprawdź najpierw w ServiceOrder (dziedziczą po TransportOrder)
+            Optional<TransportOrder> transportOrderOpt = transportOrderRepository.findById(orderId);
+            if (transportOrderOpt.isPresent()) {
+                TransportOrder transportOrder = transportOrderOpt.get();
 
-        Optional<TransportOrder> orderOpt = transportOrderRepository.findById(orderId);
-        if (orderOpt.isEmpty()) {
+                // Walidacja statusu
+                TransportOrder.OrderStatus targetStatus;
+                try {
+                    targetStatus = TransportOrder.OrderStatus.valueOf(newStatus);
+                } catch (IllegalArgumentException e) {
+                    return ResponseEntity.badRequest().body(Map.of(
+                            "message", "Nieprawidłowy status: " + newStatus
+                    ));
+                }
+
+                // Aktualizuj status
+                transportOrder.setStatus(targetStatus);
+                transportOrder.setLastModifiedBy(userEmail);
+                transportOrder.setLastModifiedDate(LocalDateTime.now());
+
+                transportOrderRepository.save(transportOrder);
+
+                return ResponseEntity.ok(Map.of(
+                        "message", "Status zamówienia serwisowego został zaktualizowany",
+                        "orderId", orderId,
+                        "newStatus", newStatus
+                ));
+            }
+
             return ResponseEntity.notFound().build();
-        }
 
-        TransportOrder order = orderOpt.get();
-
-        // Sprawdź własność
-        if (!order.getClient().getId().equals(user.getId())) {
-            return ResponseEntity.status(403).body(Map.of("message", "Brak uprawnień"));
-        }
-
-        // Klient może tylko anulować
-        if (!"CANCELLED".equals(newStatus)) {
-            return ResponseEntity.status(403).body(Map.of(
-                    "message", "Klient może tylko anulować zamówienie"
+        } catch (Exception e) {
+            logger.severe("Error updating order status: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().body(Map.of(
+                    "message", "Błąd podczas aktualizacji statusu: " + e.getMessage()
             ));
         }
-
-        return cancelOrder(orderId, userEmail);
     }
 
     @Override
@@ -424,6 +442,42 @@ public class TransportOrderServiceImpl implements TransportOrderService {
         }
 
         return Optional.of(UnifiedOrderResponseDto.fromTransportOrder(order));
+    }
+
+    @Override
+    public List<CourierOrderDto> getCourierOrders() {
+        logger.info("Fetching courier orders for today and ON_THE_WAY_BACK status");
+
+        try {
+            LocalDate today = LocalDate.now();
+
+            // Pobierz zamówienia CONFIRMED z dzisiejszą datą odbioru
+            List<TransportOrder> confirmedToday = transportOrderRepository
+                    .findByStatusAndPickupDate(TransportOrder.OrderStatus.CONFIRMED, today);
+
+            // Pobierz wszystkie zamówienia ON_THE_WAY_BACK
+            List<TransportOrder> onTheWayBack = transportOrderRepository
+                    .findByStatus(TransportOrder.OrderStatus.ON_THE_WAY_BACK);
+
+            // Połącz listy i przekształć na DTO
+            List<CourierOrderDto> result = confirmedToday.stream()
+                    .map(this::mapToDto)
+                    .collect(Collectors.toList());
+
+            result.addAll(onTheWayBack.stream()
+                    .map(this::mapToDto)
+                    .collect(Collectors.toList()));
+
+            logger.info("Found " + result.size() + " orders for courier (" +
+                    confirmedToday.size() + " confirmed today, " +
+                    onTheWayBack.size() + " on the way back)");
+
+            return result;
+
+        } catch (Exception e) {
+            logger.severe("Error fetching courier orders: " + e.getMessage());
+            throw new RuntimeException("Błąd podczas pobierania zamówień kuriera", e);
+        }
     }
 
     // === PRIVATE HELPER METHODS ===
@@ -608,24 +662,6 @@ public class TransportOrderServiceImpl implements TransportOrderService {
         return Math.max(0, maxSlots - usedSlots);
     }
 
-    private void validateTransportOrderCreation(ServiceOrTransportOrderDto dto) {
-        if (dto.getTargetServiceId() == null) {
-            throw new IllegalArgumentException("Target service ID jest wymagany");
-        }
-
-        if (!bikeServiceRepository.existsById(dto.getTargetServiceId())) {
-            throw new IllegalArgumentException("Serwis docelowy nie istnieje");
-        }
-
-        if (dto.getTargetServiceId().equals(1L)) {
-            throw new IllegalArgumentException("Dla serwisu własnego użyj endpoint /api/service-orders");
-        }
-
-        if (dto.getTransportPrice() == null || dto.getTransportPrice().compareTo(java.math.BigDecimal.ZERO) < 0) {
-            throw new IllegalArgumentException("Cena transportu musi być większa lub równa 0");
-        }
-    }
-
     private void logTransportOrderCreation(TransportOrder order, String userEmail) {
         logger.info(String.format(
                 "Transport order created: ID=%d, User=%s, Target=%s, Date=%s, Price=%s",
@@ -635,24 +671,6 @@ public class TransportOrderServiceImpl implements TransportOrderService {
                 order.getPickupDate(),
                 order.getTransportPrice()
         ));
-    }
-
-    private boolean isValidStatusTransition(TransportOrder.OrderStatus current, TransportOrder.OrderStatus target) {
-        return switch (current) {
-            case PENDING -> target == TransportOrder.OrderStatus.CONFIRMED || target == TransportOrder.OrderStatus.CANCELLED;
-            case CONFIRMED -> target == TransportOrder.OrderStatus.PICKED_UP || target == TransportOrder.OrderStatus.CANCELLED;
-            case PICKED_UP -> target == TransportOrder.OrderStatus.ON_THE_WAY_BACK || target == TransportOrder.OrderStatus.CANCELLED;
-            case ON_THE_WAY_BACK -> target == TransportOrder.OrderStatus.CANCELLED;
-            case CANCELLED -> false;
-            default -> false;
-        };
-    }
-
-    private boolean canUserModifyOrder(TransportOrder order, String userEmail) {
-        if (!order.getClient().getEmail().equals(userEmail)) {
-            return false;
-        }
-        return order.canBeCancelled();
     }
 
     public Map<String, Object> getDetailedSlotAvailability(LocalDate date) {
@@ -668,5 +686,44 @@ public class TransportOrderServiceImpl implements TransportOrderService {
                 "isAvailable", availableSlots > 0,
                 "utilizationPercentage", maxSlots > 0 ? (usedSlots * 100.0 / maxSlots) : 0
         );
+    }
+
+    private CourierOrderDto mapToDto(TransportOrder order) {
+        CourierOrderDto dto = new CourierOrderDto();
+
+        dto.setId(order.getId());
+        dto.setStatus(order.getStatus().toString());
+        dto.setOrderDate(order.getOrderDate().toString());
+        dto.setPickupDate(order.getPickupDate().toString());
+
+        // Ustaw okno czasowe odbioru jeśli istnieje
+        if (order.hasPickupTimeWindow()) {
+            dto.setPickupTimeWindow(order.getPickupTimeWindow());
+        }
+
+        // Dla zamówień ON_THE_WAY_BACK zamień miejscami adresy
+        if (order.getStatus() == TransportOrder.OrderStatus.ON_THE_WAY_BACK) {
+            // W drodze powrotnej: deliveryAddress to teraz pickup, pickupAddress to delivery
+            dto.setPickupAddress(order.getFullDeliveryAddress());
+            dto.setDeliveryAddress(order.getFullPickupAddress());
+        } else {
+            // Normalnie: pickup to pickup, delivery to delivery
+            dto.setPickupAddress(order.getFullPickupAddress());
+            dto.setDeliveryAddress(order.getFullDeliveryAddress());
+        }
+
+        // Informacje o rowerze
+        if (order.getBicycle() != null) {
+            dto.setBikeBrand(order.getBicycle().getBrand());
+            dto.setBikeModel(order.getBicycle().getModel());
+        }
+
+        // Informacje o kliencie
+        if (order.getClient() != null) {
+            dto.setClientEmail(order.getClient().getEmail());
+            dto.setClientPhone(order.getClient().getPhoneNumber());
+        }
+
+        return dto;
     }
 }

@@ -1,6 +1,7 @@
 package com.samarama.bicycle.api.service;
 
 import com.samarama.bicycle.api.dto.*;
+import com.samarama.bicycle.api.model.TransportOrder;
 import org.springframework.http.ResponseEntity;
 
 import java.time.LocalDate;
@@ -109,4 +110,6 @@ public interface TransportOrderService {
      * Pobiera zamówienie jako UnifiedOrderResponseDto (admin)
      */
     Optional<UnifiedOrderResponseDto> getOrderAsUnified(Long orderId);
+
+    List<CourierOrderDto> getCourierOrders();
 }
