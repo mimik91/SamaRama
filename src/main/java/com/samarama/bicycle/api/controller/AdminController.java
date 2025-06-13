@@ -645,7 +645,7 @@ public class AdminController {
         }
     }
 
-    @PatchMapping("/orders/service/{orderId}/status")
+    @PatchMapping({"/orders/service/{orderId}/status", "/orders/transport/{orderId}/status"})
     public ResponseEntity<?> updateServiceOrderStatus(
             @PathVariable Long orderId,
             @Valid @RequestBody Map<String, String> request) {
