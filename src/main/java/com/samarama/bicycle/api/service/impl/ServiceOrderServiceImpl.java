@@ -7,7 +7,6 @@ import com.samarama.bicycle.api.service.ServiceOrderService;
 import com.samarama.bicycle.api.service.EmailService;
 import com.samarama.bicycle.api.service.ServiceSlotService;
 import com.samarama.bicycle.api.service.helper.OrderValidator;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

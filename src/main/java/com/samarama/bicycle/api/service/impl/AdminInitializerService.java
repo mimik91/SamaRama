@@ -1,8 +1,6 @@
 package com.samarama.bicycle.api.service.impl;
 
-import com.samarama.bicycle.api.model.BikeService;
 import com.samarama.bicycle.api.model.User;
-import com.samarama.bicycle.api.repository.BikeServiceRepository;
 import com.samarama.bicycle.api.repository.UserRepository;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
@@ -10,7 +8,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.Set;

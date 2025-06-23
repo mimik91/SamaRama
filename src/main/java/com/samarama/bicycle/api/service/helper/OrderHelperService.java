@@ -4,7 +4,6 @@ import com.samarama.bicycle.api.dto.GuestBicycleDto;
 import com.samarama.bicycle.api.dto.ServiceOrTransportOrderDto;
 import com.samarama.bicycle.api.model.*;
 import com.samarama.bicycle.api.repository.*;
-import com.samarama.bicycle.api.service.AddressService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 

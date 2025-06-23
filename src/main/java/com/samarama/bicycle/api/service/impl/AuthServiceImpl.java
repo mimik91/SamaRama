@@ -19,11 +19,9 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.*;
 import java.util.logging.Logger;
 
@@ -33,7 +31,6 @@ public class AuthServiceImpl implements AuthService {
 
     private final AuthenticationManager authenticationManager;
     private final UserRepository userRepository;
-    private final PasswordEncoder encoder;
     private final JwtUtils jwtUtils;
     private final VerificationService verificationService;
     private final EmailService emailService;
@@ -41,13 +38,11 @@ public class AuthServiceImpl implements AuthService {
 
     public AuthServiceImpl(AuthenticationManager authenticationManager,
                            UserRepository userRepository,
-                           PasswordEncoder encoder,
                            JwtUtils jwtUtils,
                            VerificationService verificationService,
                            EmailService emailService, IncompleteUserRepository incompleteUserRepository, IncompleteBikeRepository incompleteBikeRepository, ServiceOrderRepository serviceOrderRepository, UserDataMigrationService userDataMigrationService) {
         this.authenticationManager = authenticationManager;
         this.userRepository = userRepository;
-        this.encoder = encoder;
         this.jwtUtils = jwtUtils;
         this.verificationService = verificationService;
         this.emailService = emailService;

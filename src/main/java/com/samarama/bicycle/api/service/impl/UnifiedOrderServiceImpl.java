@@ -9,7 +9,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
@@ -21,31 +20,19 @@ public class UnifiedOrderServiceImpl implements UnifiedOrderService {
 
     private final TransportOrderService transportOrderService;
     private final ServiceOrderService serviceOrderService;
-    private final BikeServiceService bikeServiceService;
-    private final ServicePackageService servicePackageService;
-    private final AddressService addressService;
     private final UserRepository userRepository;
     private final OrderValidator orderValidator;
 
     public UnifiedOrderServiceImpl(
             TransportOrderService transportOrderService,
             ServiceOrderService serviceOrderService,
-            BikeServiceService bikeServiceService,
-            ServicePackageService servicePackageService,
-            AddressService addressService,
             UserRepository userRepository,
             OrderValidator orderValidator) {
         this.transportOrderService = transportOrderService;
         this.serviceOrderService = serviceOrderService;
-        this.bikeServiceService = bikeServiceService;
-        this.servicePackageService = servicePackageService;
-        this.addressService = addressService;
         this.userRepository = userRepository;
         this.orderValidator = orderValidator;
     }
-
-    // === PUBLICZNE METODY ===
-
 
 
     @Override

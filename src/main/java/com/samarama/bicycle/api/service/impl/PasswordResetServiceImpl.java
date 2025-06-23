@@ -2,7 +2,6 @@ package com.samarama.bicycle.api.service.impl;
 
 import com.samarama.bicycle.api.dto.PasswordResetDto;
 import com.samarama.bicycle.api.dto.PasswordResetRequestDto;
-import com.samarama.bicycle.api.model.IncompleteUser;
 import com.samarama.bicycle.api.model.User;
 import com.samarama.bicycle.api.model.VerificationToken;
 import com.samarama.bicycle.api.repository.IncompleteUserRepository;
