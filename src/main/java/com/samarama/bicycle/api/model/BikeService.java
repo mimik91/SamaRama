@@ -49,7 +49,7 @@ public class BikeService {
      */
     @Email
     @Size(max = 100)
-    @Column(name = "email", unique = true)
+    @Column(name = "email")
     private String email;
 
     /**
