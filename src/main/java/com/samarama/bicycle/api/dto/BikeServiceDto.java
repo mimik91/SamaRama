@@ -95,7 +95,7 @@ public record BikeServiceDto(
                 com.samarama.bicycle.api.model.BikeService entity = new com.samarama.bicycle.api.model.BikeService();
                 entity.setName(this.name);
                 entity.setDescription(this.description);
-                entity.setEmail(this.email);
+                entity.setEmail(this.email.isBlank() ? null : this.email);
                 entity.setWebsite(this.website);
                 entity.setStreet(this.street);
                 entity.setBuilding(this.building);
