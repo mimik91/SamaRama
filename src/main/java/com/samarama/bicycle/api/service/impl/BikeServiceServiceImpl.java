@@ -2,6 +2,7 @@ package com.samarama.bicycle.api.service.impl;
 
 import com.samarama.bicycle.api.dto.BikeServiceDto;
 import com.samarama.bicycle.api.dto.BikeServicePinDto;
+import com.samarama.bicycle.api.model.BicycleEnumeration;
 import com.samarama.bicycle.api.model.BikeService;
 import com.samarama.bicycle.api.repository.BikeServiceRepository;
 import com.samarama.bicycle.api.service.BikeServiceService;
@@ -301,6 +302,13 @@ public class BikeServiceServiceImpl implements BikeServiceService {
             return ResponseEntity.badRequest()
                     .body(Map.of("message", "Błąd podczas pobierania statystyk: " + e.getMessage()));
         }
+    }
+
+    @Override
+    public void updateTransportPrices(String previous, String newPrice) {
+        List<BikeService> bikeServices = bikeServiceRepository.findAllByTransportCost(new BigDecimal(previous));
+        BigDecimal newTransportCost = new BigDecimal(newPrice);
+        bikeServices.forEach(service -> service.setTransportCost(newTransportCost));
     }
 
     // === METODY POMOCNICZE DO PARSOWANIA CSV ===

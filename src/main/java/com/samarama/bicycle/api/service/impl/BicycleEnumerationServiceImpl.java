@@ -3,6 +3,7 @@ package com.samarama.bicycle.api.service.impl;
 import com.samarama.bicycle.api.model.BicycleEnumeration;
 import com.samarama.bicycle.api.repository.BicycleEnumerationRepository;
 import com.samarama.bicycle.api.service.BicycleEnumerationService;
+import com.samarama.bicycle.api.service.BikeServiceService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -13,6 +14,7 @@ import java.util.stream.Collectors;
 public class BicycleEnumerationServiceImpl implements BicycleEnumerationService {
 
     private final BicycleEnumerationRepository enumerationRepository;
+    private final BikeServiceService bikeServiceService;
 
     // Stałe dla standardowych typów
     public static final String BRAND = "BRAND";
@@ -22,8 +24,9 @@ public class BicycleEnumerationServiceImpl implements BicycleEnumerationService 
     // Stałe dla statusów zamówień
     public static final String ORDER_STATUS = "ORDER_STATUS";
 
-    public BicycleEnumerationServiceImpl(BicycleEnumerationRepository enumerationRepository) {
+    public BicycleEnumerationServiceImpl(BicycleEnumerationRepository enumerationRepository, BikeServiceService bikeServiceService) {
         this.enumerationRepository = enumerationRepository;
+        this.bikeServiceService = bikeServiceService;
     }
 
     @Override
@@ -58,6 +61,9 @@ public class BicycleEnumerationServiceImpl implements BicycleEnumerationService 
     public BicycleEnumeration saveEnumeration(String type, List<String> values) {
         BicycleEnumeration enumeration = enumerationRepository.findByType(type)
                 .orElse(new BicycleEnumeration(type, new ArrayList<>()));
+        if(type.equals("DEFAULT_TRANSPORT_PRICE")){
+            bikeServiceService.updateTransportPrices(enumeration.getValues().getFirst(), values.getFirst());
+        }
 
         enumeration.setValues(values);
         return enumerationRepository.save(enumeration);

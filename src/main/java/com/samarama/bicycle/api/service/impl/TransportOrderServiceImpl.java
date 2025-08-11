@@ -9,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -26,6 +27,7 @@ public class TransportOrderServiceImpl implements TransportOrderService {
     private final IncompleteBikeRepository incompleteBikeRepository;
     private final BikeServiceRepository bikeServiceRepository;
     private final ServiceSlotService serviceSlotService;
+    private final CouponRepository couponRepository;
 
     public TransportOrderServiceImpl(
             TransportOrderRepository transportOrderRepository,
@@ -33,14 +35,14 @@ public class TransportOrderServiceImpl implements TransportOrderService {
             IncompleteUserRepository incompleteUserRepository,
             IncompleteBikeRepository incompleteBikeRepository,
             BikeServiceRepository bikeServiceRepository,
-            ServiceSlotService serviceSlotService){
+            ServiceSlotService serviceSlotService, CouponRepository couponRepository){
         this.transportOrderRepository = transportOrderRepository;
         this.userRepository = userRepository;
         this.incompleteUserRepository = incompleteUserRepository;
         this.incompleteBikeRepository = incompleteBikeRepository;
         this.bikeServiceRepository = bikeServiceRepository;
         this.serviceSlotService = serviceSlotService;
-
+        this.couponRepository = couponRepository;
     }
 
     @Override
@@ -360,12 +362,6 @@ public class TransportOrderServiceImpl implements TransportOrderService {
 
         TransportOrder order = orderOpt.get();
 
-        // Nie można usunąć ServiceOrder przez ten endpoint
-        if (order instanceof ServiceOrder) {
-            return ResponseEntity.badRequest().body(Map.of(
-                    "message", "Użyj endpointu /api/service-orders/admin/{id} dla zamówień serwisowych"
-            ));
-        }
 
         transportOrderRepository.deleteById(orderId);
         logger.info("Admin " + adminEmail + " deleted transport order " + orderId);
@@ -477,6 +473,36 @@ public class TransportOrderServiceImpl implements TransportOrderService {
         } catch (Exception e) {
             logger.severe("Error fetching courier orders: " + e.getMessage());
             throw new RuntimeException("Błąd podczas pobierania zamówień kuriera", e);
+        }
+    }
+
+    @Override
+    public BigDecimal checkDiscount(String couponCode, BigDecimal currentPrice, LocalDate orderDate) {
+
+        // Krok 1: Oczyszczenie kodu z białych znaków na początku i końcu, aby być bardziej "łaskawym".
+        String sanitizedCode = couponCode.trim();
+
+        // Krok 2: Wyszukanie kuponu w bazie danych z ignorowaniem wielkości liter.
+        Optional<Coupon> couponOptional = couponRepository.findByCouponCodeIgnoreCase(sanitizedCode);
+
+        // Jeśli kupon o podanym kodzie nie istnieje, zwróć oryginalną cenę.
+        if (couponOptional.isEmpty()) {
+            return currentPrice;
+        }
+
+        Coupon coupon = couponOptional.get();
+
+        // Krok 3: Sprawdzenie daty ważności.
+        // Data zamówienia musi być taka sama lub wcześniejsza niż data wygaśnięcia kuponu.
+        // Warunek !orderDate.isAfter(coupon.getExpirationDate()) jest równoważny z orderDate <= expirationDate
+        boolean isDateValid = !orderDate.isAfter(coupon.getExpirationDate());
+
+        if (isDateValid) {
+            // Kupon jest poprawny i aktywny, zwróć cenę zniżkową przypisaną do kuponu.
+            return coupon.getPriceAfterDiscount();
+        } else {
+            // Kupon istnieje, ale jest przeterminowany, zwróć oryginalną cenę.
+            return currentPrice;
         }
     }
 

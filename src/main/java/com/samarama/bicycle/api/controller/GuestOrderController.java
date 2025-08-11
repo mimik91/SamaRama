@@ -8,6 +8,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
@@ -120,5 +121,25 @@ public class GuestOrderController {
         }
 
         return dto;
+    }
+
+    @PostMapping("/discounts")
+    public ResponseEntity<Map<String, BigDecimal>> applyDiscount(@RequestBody DiscountRequest request) {
+
+        if (request.coupon() == null || request.currentTransportPrice() == null || request.orderDate() == null) {
+            // Return 400 Bad Request if essential data is missing
+            return ResponseEntity.badRequest().build();
+        }
+
+        // Delegate the business logic to the service layer as requested
+        BigDecimal newPrice = transportOrderService.checkDiscount(
+                request.coupon(),
+                request.currentTransportPrice(),
+                request.orderDate()
+        );
+
+        // Return 200 OK with the new price in the response body.
+        // The frontend will compare this new price with the original one.
+        return ResponseEntity.ok(Map.of("newPrice", newPrice));
     }
 }

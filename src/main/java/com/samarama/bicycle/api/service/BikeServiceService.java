@@ -2,6 +2,7 @@ package com.samarama.bicycle.api.service;
 
 import com.samarama.bicycle.api.dto.BikeServiceDto;
 import com.samarama.bicycle.api.dto.BikeServicePinDto;
+import com.samarama.bicycle.api.model.BicycleEnumeration;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -71,4 +72,6 @@ public interface BikeServiceService {
      * @return mapa ze statystykami
      */
     ResponseEntity<?> getBikeServiceStatistics();
+
+    void updateTransportPrices(String previous, String newPrice);
 }

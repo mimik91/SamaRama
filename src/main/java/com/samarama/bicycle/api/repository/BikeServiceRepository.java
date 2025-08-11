@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
@@ -35,6 +36,8 @@ public interface BikeServiceRepository extends JpaRepository<BikeService, Long> 
      */
     List<BikeService> findByCity(String city);
 
+    List<BikeService> findAllByTransportCost(BigDecimal transportPrice);
+
     /**
      * Znajdź serwisy po nazwie (zawierającej podany tekst, case-insensitive)
      */
@@ -46,4 +49,6 @@ public interface BikeServiceRepository extends JpaRepository<BikeService, Long> 
      */
     @Query("SELECT CASE WHEN COUNT(s) > 0 THEN true ELSE false END FROM BikeService s WHERE LOWER(s.name) = LOWER(:name)")
     boolean existsByNameIgnoreCase(@Param("name") String name);
+
+
 }

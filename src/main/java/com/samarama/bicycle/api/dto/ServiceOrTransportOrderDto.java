@@ -1,5 +1,7 @@
 package com.samarama.bicycle.api.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.Future;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
@@ -15,6 +17,7 @@ import java.util.List;
  * Obsługuje zarówno użytkowników zalogowanych jak i gości
  */
 @Data
+@JsonIgnoreProperties(value = { "discountCoupon" })
 public class ServiceOrTransportOrderDto {
 
     // === ROWERY ===

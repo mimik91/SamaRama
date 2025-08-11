@@ -4,6 +4,7 @@ import com.samarama.bicycle.api.dto.*;
 import com.samarama.bicycle.api.model.TransportOrder;
 import org.springframework.http.ResponseEntity;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -112,4 +113,6 @@ public interface TransportOrderService {
     Optional<UnifiedOrderResponseDto> getOrderAsUnified(Long orderId);
 
     List<CourierOrderDto> getCourierOrders();
+
+    BigDecimal checkDiscount(String coupon, BigDecimal bigDecimal, LocalDate localDate);
 }
