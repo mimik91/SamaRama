@@ -1,6 +1,7 @@
 package com.samarama.bicycle.api.service.impl;
 
 import com.samarama.bicycle.api.dto.ServiceRegisterDto;
+import com.samarama.bicycle.api.dto.TransportOrderDto;
 import com.samarama.bicycle.api.model.ServiceOrder;
 import com.samarama.bicycle.api.model.User;
 import com.samarama.bicycle.api.service.EmailService;
@@ -14,6 +15,8 @@ import org.springframework.stereotype.Service;
 import jakarta.mail.internet.InternetAddress;
 
 import java.io.UnsupportedEncodingException;
+import java.text.DecimalFormat;
+import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -270,6 +273,103 @@ public class EmailServiceImpl implements EmailService {
             // Nie rzucamy wyjątku, żeby nie przerwać procesu tworzenia zamówienia
         }
     }
+
+    @Async
+    @Override
+    public void sendTransportOrderNotificationEmail(String toEmail, List<TransportOrderDto> orders) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setFrom(new InternetAddress(fromEmail, "cyclopick.pl"));
+            String[] adresses = {toEmail, "lachdominik@gmail.com"};
+            helper.setTo(toEmail);
+            helper.setSubject("Potwierdzenie zamówienia transportu");
+
+            StringBuilder htmlContent = new StringBuilder();
+            DecimalFormat df = new DecimalFormat("0.00");
+
+            htmlContent.append("<!DOCTYPE html>")
+                    .append("<html lang=\"pl\">")
+                    .append("<head>")
+                    .append("<style>")
+                    // Style CSS
+                    .append("body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif; background-color: #f4f4f4; color: #333; margin: 0; padding: 0; }")
+                    .append(".container { max-width: 600px; margin: 20px auto; background-color: #ffffff; padding: 20px 30px; border-radius: 12px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05); }")
+                    .append(".header { text-align: center; padding-bottom: 20px; border-bottom: 1px solid #eeeeee; }")
+                    .append(".header h1 { color: #2a694a; margin: 0; font-size: 28px; }")
+                    .append(".content { padding: 20px 0; }")
+                    .append(".content p { font-size: 16px; line-height: 1.6; margin: 0 0 15px; }")
+                    .append(".summary-table { width: 100%; border-collapse: collapse; margin-top: 20px; }")
+                    .append(".summary-table th, .summary-table td { padding: 12px; border: 1px solid #dddddd; text-align: left; }")
+                    .append(".summary-table th { background-color: #e9ecef; font-weight: 600; color: #555; }")
+                    .append(".summary-table tr:nth-child(even) { background-color: #f9f9f9; }")
+                    .append(".footer { text-align: center; padding-top: 20px; border-top: 1px solid #eeeeee; font-size: 12px; color: #888; margin-top: 20px; }")
+                    .append(".total-price { font-size: 18px; font-weight: bold; text-align: right; padding-top: 10px; }")
+                    .append(".logo { max-width: 150px; height: auto; margin-bottom: 10px; }")
+                    .append(".important-note { background-color: #fff3cd; border-left: 5px solid #ffc107; padding: 15px; margin-top: 20px; border-radius: 4px; font-size: 14px; }")
+                    .append("</style>")
+                    .append("</head>")
+                    .append("<body>")
+                    .append("<div class=\"container\">")
+                    .append("<div class=\"header\">")
+                    .append("<h1>Potwierdzenie zamówienia</h1>")
+                    .append("<p>Dziękujemy za złożenie zamówienia w serwisie Cyclopick.pl!</p>")
+                    .append("</div>")
+                    .append("<div class=\"content\">")
+                    .append("<p>Poniżej znajdziesz podsumowanie złożonych zamówień:</p>");
+
+            double totalTransportPrice = 0.0;
+            int orderNumber = 1;
+            for (TransportOrderDto order : orders) {
+                // Generuj podsumowanie dla każdego zamówienia
+                htmlContent.append("<table class=\"summary-table\">")
+                        .append("<thead>")
+                        .append("<tr><th colspan=\"2\">Szczegóły Zamówienia nr ").append(orderNumber++).append("</th></tr>")
+                        .append("</thead>")
+                        .append("<tbody>")
+                        .append("<tr><td><strong>Data transportu:</strong></td><td>").append(order.pickupDate()).append("</td></tr>")
+                        .append("<tr><td><strong>Adres odbioru:</strong></td><td>").append(order.pickupAddress()).append("</td></tr>");
+
+                // Dodaj adres dostawy jeśli istnieje
+                if (order.deliveryAddress() != null && !order.deliveryAddress().isEmpty()) {
+                    htmlContent.append("<tr><td><strong>Adres dostawy:</strong></td><td>").append(order.deliveryAddress()).append("</td></tr>");
+                }
+
+                // Dodaj listę rowerów jeśli są
+                if (order.bicycle() != null) {
+                    htmlContent.append("<tr><td><strong>Marka roweru:</strong></td><td>").append(order.bicycle().getBrand()).append("</td></tr>");
+                    htmlContent.append("<tr><td><strong>Model roweru:</strong></td><td>").append(order.bicycle().getModel()).append("</td></tr>");
+                    htmlContent.append("<tr><td><strong>Typ roweru:</strong></td><td>").append(order.bicycle().getType()).append("</td></tr>");
+                }
+
+                htmlContent.append("<tr><td><strong>Szacowana cena:</strong></td><td>").append(df.format(order.transportPrice())).append(" PLN</td></tr>")
+                        .append("</tbody>")
+                        .append("</table>");
+
+                totalTransportPrice += order.transportPrice().doubleValue();
+            }
+
+            htmlContent.append("<p class=\"total-price\"><strong>Całkowita cena: </strong>").append(df.format(totalTransportPrice)).append(" PLN</p>");
+
+            htmlContent.append("</div>")
+                    .append("<div class=\"footer\">")
+                    .append("<p>Ten e-mail został wygenerowany automatycznie, prosimy na niego nie odpowiadać.</p>")
+                    .append("<p>&copy; 2024 Cyclopick.pl. Wszelkie prawa zastrzeżone.</p>")
+                    .append("</div>")
+                    .append("</div>")
+                    .append("</body>")
+                    .append("</html>");
+
+            helper.setText(htmlContent.toString(), true);
+            mailSender.send(message);
+
+        } catch (MessagingException | UnsupportedEncodingException e) {
+            logger.log(Level.SEVERE, "Nie udało się wysłać e-maila potwierdzającego zamówienie.", e);
+            throw new RuntimeException("Nie udało się wysłać e-maila potwierdzającego zamówienie.", e);
+        }
+    }
+
 
     private void sendHtmlEmail(String to, String subject, String htmlContent) throws MessagingException, UnsupportedEncodingException {
         MimeMessage message = mailSender.createMimeMessage();

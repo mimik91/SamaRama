@@ -2,6 +2,7 @@ package com.samarama.bicycle.api.service;
 
 import com.samarama.bicycle.api.dto.*;
 import com.samarama.bicycle.api.model.TransportOrder;
+import jakarta.validation.constraints.NotEmpty;
 import org.springframework.http.ResponseEntity;
 
 import java.math.BigDecimal;
@@ -115,4 +116,6 @@ public interface TransportOrderService {
     List<CourierOrderDto> getCourierOrders();
 
     BigDecimal checkDiscount(String coupon, BigDecimal bigDecimal, LocalDate localDate);
+
+    List<TransportOrderDto> getOrdersByIds(@NotEmpty(message = "Order IDs list cannot be empty") List<Long> longs);
 }

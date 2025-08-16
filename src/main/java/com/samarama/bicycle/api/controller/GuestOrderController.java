@@ -127,19 +127,27 @@ public class GuestOrderController {
     public ResponseEntity<Map<String, BigDecimal>> applyDiscount(@RequestBody DiscountRequest request) {
 
         if (request.coupon() == null || request.currentTransportPrice() == null || request.orderDate() == null) {
-            // Return 400 Bad Request if essential data is missing
             return ResponseEntity.badRequest().build();
         }
 
-        // Delegate the business logic to the service layer as requested
         BigDecimal newPrice = transportOrderService.checkDiscount(
                 request.coupon(),
                 request.currentTransportPrice(),
                 request.orderDate()
         );
-
-        // Return 200 OK with the new price in the response body.
-        // The frontend will compare this new price with the original one.
         return ResponseEntity.ok(Map.of("newPrice", newPrice));
     }
+
+    @PostMapping("/transport/summary")
+    public ResponseEntity<List<TransportOrderDto>> getOrderSummary(@Valid @RequestBody OrderSummaryRequest request) {
+        List<TransportOrderDto> orders = transportOrderService.getOrdersByIds(request.orderIds());
+        String recipientEmail = orders.getFirst().clientEmail();
+
+        // Wyślij e-mail, jeśli adres istnieje
+        if (recipientEmail != null) {
+            emailService.sendTransportOrderNotificationEmail(recipientEmail, orders);
+        }
+        return ResponseEntity.ok(orders);
+    }
+
 }

@@ -1,8 +1,11 @@
 package com.samarama.bicycle.api.service;
 
 import com.samarama.bicycle.api.dto.ServiceRegisterDto;
+import com.samarama.bicycle.api.dto.TransportOrderDto;
 import com.samarama.bicycle.api.model.ServiceOrder;
 import com.samarama.bicycle.api.model.User;
+
+import java.util.List;
 
 public interface EmailService {
     /**
@@ -21,5 +24,6 @@ public interface EmailService {
     void sendPasswordResetEmail(User user, String token);
     void sendServiceRegistrationNotification(ServiceRegisterDto serviceRegisterDto);
     void sendOrderNotificationEmail(ServiceOrder serviceOrder);
+    void sendTransportOrderNotificationEmail(String recipientEmail, List<TransportOrderDto> orders);
 
 }

@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -28,6 +29,7 @@ public class TransportOrderServiceImpl implements TransportOrderService {
     private final BikeServiceRepository bikeServiceRepository;
     private final ServiceSlotService serviceSlotService;
     private final CouponRepository couponRepository;
+    private final BicycleEnumerationRepository bicycleEnumerationRepository;
 
     public TransportOrderServiceImpl(
             TransportOrderRepository transportOrderRepository,
@@ -35,7 +37,7 @@ public class TransportOrderServiceImpl implements TransportOrderService {
             IncompleteUserRepository incompleteUserRepository,
             IncompleteBikeRepository incompleteBikeRepository,
             BikeServiceRepository bikeServiceRepository,
-            ServiceSlotService serviceSlotService, CouponRepository couponRepository){
+            ServiceSlotService serviceSlotService, CouponRepository couponRepository, BicycleEnumerationRepository bicycleEnumerationRepository){
         this.transportOrderRepository = transportOrderRepository;
         this.userRepository = userRepository;
         this.incompleteUserRepository = incompleteUserRepository;
@@ -43,6 +45,7 @@ public class TransportOrderServiceImpl implements TransportOrderService {
         this.bikeServiceRepository = bikeServiceRepository;
         this.serviceSlotService = serviceSlotService;
         this.couponRepository = couponRepository;
+        this.bicycleEnumerationRepository = bicycleEnumerationRepository;
     }
 
     @Override
@@ -499,11 +502,22 @@ public class TransportOrderServiceImpl implements TransportOrderService {
 
         if (isDateValid) {
             // Kupon jest poprawny i aktywny, zwróć cenę zniżkową przypisaną do kuponu.
-            return coupon.getPriceAfterDiscount();
+            return currentPrice
+                    .divide(BigDecimal.valueOf(100), 10, RoundingMode.HALF_UP) // precyzyjne dzielenie
+                    .multiply(BigDecimal.valueOf(100).subtract(coupon.getPriceAfterDiscount()))       // mnożenie
+                    .setScale(0, RoundingMode.HALF_UP);             // zaokrąglenie do pełnej liczby
         } else {
             // Kupon istnieje, ale jest przeterminowany, zwróć oryginalną cenę.
             return currentPrice;
         }
+    }
+
+    @Override
+    public List<TransportOrderDto> getOrdersByIds(List<Long> orderIds) {
+        return transportOrderRepository.findAllById(orderIds)
+                .stream()
+                .map(this::mapToTransportDto)
+                .toList();
     }
 
     // === PRIVATE HELPER METHODS ===
@@ -598,7 +612,7 @@ public class TransportOrderServiceImpl implements TransportOrderService {
             order.setDeliveryLatitude(targetService.getLatitude());
             order.setDeliveryLongitude(targetService.getLongitude());
 
-            order.setTransportPrice(dto.getTransportPrice());
+            order.setTransportPrice(calculateTransportPrice(dto.getBicycles().size(), dto.getTransportPrice()));
             order.setTransportNotes(dto.getTransportNotes());
             order.setAdditionalNotes(dto.getAdditionalNotes());
             order.setStatus(TransportOrder.OrderStatus.PENDING);
@@ -609,6 +623,18 @@ public class TransportOrderServiceImpl implements TransportOrderService {
 
         return orders;
     }
+
+    private BigDecimal calculateTransportPrice(int numberOfBicycles, BigDecimal transportPrice) {
+        if (numberOfBicycles <= 0) {
+            throw new IllegalArgumentException("Liczba rowerów musi być większa niż 0.");
+        }
+        return transportPrice
+                .multiply(BigDecimal.valueOf(2))
+                .divide(BigDecimal.valueOf(numberOfBicycles), 0, RoundingMode.HALF_UP)
+                .divide(BigDecimal.valueOf(2));
+    }
+
+
 
     private void updateTransportOrderFields(TransportOrder order, ServiceOrTransportOrderDto dto) {
         if (dto.getPickupDate() != null) {
@@ -751,5 +777,29 @@ public class TransportOrderServiceImpl implements TransportOrderService {
         }
 
         return dto;
+    }
+
+    private TransportOrderDto mapToTransportDto(TransportOrder entity) {
+        // ... (przykładowa implementacja mapowania)
+        return new TransportOrderDto(
+                entity.getId(),
+                entity.getBicycle(),
+                entity.getPickupDate(),
+                entity.getFullPickupAddress(),
+                entity.getPickupLatitude(),
+                entity.getPickupLongitude(),
+                entity.getPickupTimeFrom(),
+                entity.getPickupTimeTo(),
+                entity.getFullDeliveryAddress(),
+                entity.getDeliveryLatitude(),
+                entity.getDeliveryLongitude(),
+                entity.getTargetService().getId(),
+                entity.getTransportPrice(),
+                entity.getEstimatedTime(),
+                entity.getTransportNotes(),
+                entity.getAdditionalNotes(),
+                entity.getClient().getEmail(),
+                entity.getClient().getPhoneNumber()
+        );
     }
 }

@@ -1,5 +1,6 @@
 package com.samarama.bicycle.api.dto;
 
+import com.samarama.bicycle.api.model.IncompleteBike;
 import jakarta.validation.constraints.Future;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -7,7 +8,6 @@ import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.util.List;
 
 /**
  * DTO dla zamówienia transportu (bazowego)
@@ -15,8 +15,8 @@ import java.util.List;
  */
 public record TransportOrderDto(
         // === ROWERY ===
-        List<Long> bicycleIds, // dla zalogowanych użytkowników
-        List<GuestBicycleDto> bicycles, // dla gości
+        Long bicycleId, // dla zalogowanych użytkowników
+        IncompleteBike bicycle, // dla gości
 
         // === TRANSPORT - ODBIÓR ===
         @NotNull @Future LocalDate pickupDate,
@@ -40,9 +40,7 @@ public record TransportOrderDto(
 
         // === DANE GOŚCI (gdy brak bicycleIds) ===
         String clientEmail,
-        String clientPhone,
-        String clientName,
-        String city
+        String clientPhone
 ) {
     /**
      * Sprawdza czy to zamówienie gościa
@@ -55,7 +53,7 @@ public record TransportOrderDto(
      * Walidacja dla zalogowanego użytkownika
      */
     public boolean isValidForLoggedUser() {
-        return bicycleIds != null && !bicycleIds.isEmpty() &&
+        return bicycleId != null &&
                 pickupDate != null &&
                 pickupAddress != null && !pickupAddress.trim().isEmpty() &&
                 targetServiceId != null &&
@@ -68,7 +66,7 @@ public record TransportOrderDto(
     public boolean isValidForGuest() {
         return clientEmail != null && !clientEmail.trim().isEmpty() &&
                 clientPhone != null && !clientPhone.trim().isEmpty() &&
-                bicycles != null && !bicycles.isEmpty() &&
+                bicycle != null &&
                 pickupDate != null &&
                 pickupAddress != null && !pickupAddress.trim().isEmpty() &&
                 targetServiceId != null &&
