@@ -42,8 +42,6 @@ public class AdminController {
     private final BikeServiceService bikeServiceService;
     private final ServicePackageService servicePackageService;
     private final ServiceSlotService serviceSlotService;
-    private final BicycleEnumerationService enumerationService;
-    private final EmailService emailService;
     private final IncompleteUserRepository incompleteUserRepository;
 
     // Repositories for advanced queries
@@ -56,12 +54,10 @@ public class AdminController {
     public AdminController(
             TransportOrderService transportOrderService,
             ServiceOrderService serviceOrderService,
-            BicycleService bicycleService,
             BikeServiceService bikeServiceService,
             ServicePackageService servicePackageService,
             ServiceSlotService serviceSlotService,
-            BicycleEnumerationService enumerationService,
-            EmailService emailService, IncompleteUserRepository incompleteUserRepository,
+            IncompleteUserRepository incompleteUserRepository,
             UserRepository userRepository,
             TransportOrderRepository transportOrderRepository,
             ServiceOrderRepository serviceOrderRepository,
@@ -72,8 +68,6 @@ public class AdminController {
         this.bikeServiceService = bikeServiceService;
         this.servicePackageService = servicePackageService;
         this.serviceSlotService = serviceSlotService;
-        this.enumerationService = enumerationService;
-        this.emailService = emailService;
         this.incompleteUserRepository = incompleteUserRepository;
         this.userRepository = userRepository;
         this.transportOrderRepository = transportOrderRepository;
@@ -389,7 +383,7 @@ public class AdminController {
     /**
      * Bezpieczna aktualizacja statusu z walidacją
      */
-    @PatchMapping("/orders/{orderId}/status")
+    @PatchMapping("/orders/{orderId}")
     public ResponseEntity<?> updateOrderStatus(
             @PathVariable Long orderId,
             @Valid @RequestBody Map<String, String> request) {
