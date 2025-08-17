@@ -479,6 +479,7 @@ public class TransportOrderServiceImpl implements TransportOrderService {
         }
     }
 
+    @Transactional
     @Override
     public BigDecimal checkDiscount(String couponCode, BigDecimal currentPrice, LocalDate orderDate) {
 
@@ -493,14 +494,15 @@ public class TransportOrderServiceImpl implements TransportOrderService {
             return currentPrice;
         }
 
+
+
         Coupon coupon = couponOptional.get();
 
         // Krok 3: Sprawdzenie daty ważności.
-        // Data zamówienia musi być taka sama lub wcześniejsza niż data wygaśnięcia kuponu.
-        // Warunek !orderDate.isAfter(coupon.getExpirationDate()) jest równoważny z orderDate <= expirationDate
         boolean isDateValid = !orderDate.isAfter(coupon.getExpirationDate());
 
         if (isDateValid) {
+            coupon.setUsageCount(coupon.getUsageCount() + 1);
             // Kupon jest poprawny i aktywny, zwróć cenę zniżkową przypisaną do kuponu.
             return currentPrice
                     .divide(BigDecimal.valueOf(100), 10, RoundingMode.HALF_UP) // precyzyjne dzielenie

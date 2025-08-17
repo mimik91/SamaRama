@@ -38,12 +38,13 @@ public class AccountController {
         }
 
         User user = userOpt.get();
+        String phoneNumber = user.getPhoneNumber() != null ? user.getPhoneNumber() : "" ;
         return ResponseEntity.ok(Map.of(
                 "id", user.getId(),
                 "email", user.getEmail(),
                 "firstName", user.getFirstName(),
                 "lastName", user.getLastName(),
-                "phoneNumber", user.getPhoneNumber()
+                "phoneNumber", phoneNumber
         ));
     }
 

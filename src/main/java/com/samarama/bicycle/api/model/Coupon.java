@@ -22,6 +22,10 @@ public class Coupon {
     @Column(name = "expiration_date", nullable = false)
     private LocalDate expirationDate;
 
+    @Column(name = "usage_count", nullable = false)
+    private int usageCount = 0;
+
+
     // Konstruktory
 
     public Coupon() {
@@ -59,7 +63,10 @@ public class Coupon {
         this.expirationDate = expirationDate;
     }
 
-    // equals() i hashCode() dla poprawności działania
+    public int getUsageCount() {return usageCount;}
+
+    public void setUsageCount(int usageCount) {this.usageCount = usageCount;}
+
 
     @Override
     public boolean equals(Object o) {
