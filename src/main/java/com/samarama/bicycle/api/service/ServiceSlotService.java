@@ -110,4 +110,6 @@ public interface ServiceSlotService {
      * Inicjalizuje domyślną konfigurację slotów, jeśli żadna nie istnieje
      */
     void initializeDefaultSlotConfig();
+
+    int countOrderOnDate(LocalDate date);
 }

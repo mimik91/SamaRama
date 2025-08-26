@@ -5,6 +5,7 @@ package com.samarama.bicycle.api.dto;
  */
 public record BikeServicePinDto(
         Long id,
+        String ServiceName,
         Double latitude,
         Double longitude
 ) {
@@ -14,6 +15,7 @@ public record BikeServicePinDto(
     public static BikeServicePinDto fromEntity(com.samarama.bicycle.api.model.BikeService entity) {
         return new BikeServicePinDto(
                 entity.getId(),
+                entity.getName(),
                 entity.getLatitude(),
                 entity.getLongitude()
         );

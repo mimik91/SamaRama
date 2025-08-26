@@ -296,6 +296,12 @@ public class ServiceSlotServiceImpl implements ServiceSlotService {
         }
     }
 
+    @Override
+    public int countOrderOnDate(LocalDate date) {
+        int ans = transportOrderRepository.countByPickupDate(date);
+        return ans;
+    }
+
     // === PRIVATE HELPER METHODS ===
 
     /**

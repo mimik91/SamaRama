@@ -2,7 +2,6 @@ package com.samarama.bicycle.api.controller;
 
 import com.samarama.bicycle.api.dto.ServiceSlotAvailabilityDto;
 import com.samarama.bicycle.api.dto.ServiceSlotConfigDto;
-import com.samarama.bicycle.api.repository.ServiceOrderRepository;
 import com.samarama.bicycle.api.service.ServiceSlotService;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -24,12 +23,8 @@ public class ServiceSlotController {
 
 
     private final ServiceSlotService serviceSlotService;
-    private final ServiceOrderRepository serviceOrderRepository;
-
-    public ServiceSlotController(ServiceSlotService serviceSlotService,
-                                 ServiceOrderRepository serviceOrderRepository) {
+    public ServiceSlotController(ServiceSlotService serviceSlotService) {
         this.serviceSlotService = serviceSlotService;
-        this.serviceOrderRepository = serviceOrderRepository;
     }
 
     /**
@@ -100,7 +95,7 @@ public class ServiceSlotController {
         boolean available = serviceSlotService.areSlotsAvailable(date, bikesCount);
         int maxBikesPerDay = serviceSlotService.getMaxBikesPerDay(date);
         int maxBikesPerOrder = serviceSlotService.getMaxBikesPerOrder(date);
-        int availableBikes = maxBikesPerDay - serviceOrderRepository.countByPickupDate(date);
+        int availableBikes = maxBikesPerDay - serviceSlotService.countOrderOnDate(date);
 
         return ResponseEntity.ok(Map.of(
                 "date", date,
@@ -124,7 +119,7 @@ public class ServiceSlotController {
 
         int maxBikesPerDay = serviceSlotService.getMaxBikesPerDay(date);
         int maxBikesPerOrder = serviceSlotService.getMaxBikesPerOrder(date);
-        int bookedBikes = serviceOrderRepository.countByPickupDate(date);
+        int bookedBikes = serviceSlotService.countOrderOnDate(date);
         int availableBikes = Math.max(0, maxBikesPerDay - bookedBikes);
 
         return ResponseEntity.ok(Map.of(
