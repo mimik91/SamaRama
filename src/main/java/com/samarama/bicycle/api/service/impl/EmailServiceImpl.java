@@ -283,7 +283,7 @@ public class EmailServiceImpl implements EmailService {
 
             helper.setFrom(new InternetAddress(fromEmail, "cyclopick.pl"));
             String[] adresses = {toEmail, "lachdominik@gmail.com"};
-            helper.setTo(toEmail);
+            helper.setTo(adresses);
             helper.setSubject("Potwierdzenie zamówienia transportu");
 
             StringBuilder htmlContent = new StringBuilder();
