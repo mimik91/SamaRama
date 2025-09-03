@@ -7,7 +7,8 @@ public record BikeServicePinDto(
         Long id,
         String ServiceName,
         Double latitude,
-        Double longitude
+        Double longitude,
+        boolean transportAvailable
 ) {
     /**
      * Tworzy DTO z encji BikeService - tylko dla serwisów z współrzędnymi
@@ -17,7 +18,8 @@ public record BikeServicePinDto(
                 entity.getId(),
                 entity.getName(),
                 entity.getLatitude(),
-                entity.getLongitude()
+                entity.getLongitude(),
+                entity.isTransportAvailable()
         );
     }
 
