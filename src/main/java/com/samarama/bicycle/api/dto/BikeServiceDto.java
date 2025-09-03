@@ -61,7 +61,9 @@ public record BikeServiceDto(
 
         // Metadane (tylko do odczytu)
         LocalDateTime createdAt,
-        LocalDateTime updatedAt
+        LocalDateTime updatedAt,
+
+        boolean transportAvailable
 ) {
         /**
          * Tworzy DTO z encji BikeService
@@ -84,7 +86,8 @@ public record BikeServiceDto(
                         entity.getBusinessPhone(),
                         entity.getTransportCost(),
                         entity.getCreatedAt(),
-                        entity.getUpdatedAt()
+                        entity.getUpdatedAt(),
+                        entity.isTransportAvailable()
                 );
         }
 
@@ -107,6 +110,7 @@ public record BikeServiceDto(
                 entity.setPhoneNumber(this.phoneNumber);
                 entity.setBusinessPhone(this.businessPhone);
                 entity.setTransportCost(this.transportCost);
+                entity.setTransportAvailable(this.transportAvailable);
                 return entity;
         }
 
