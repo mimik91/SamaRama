@@ -130,6 +130,12 @@ public class BikeService {
     @Column(name = "transport_cost", nullable = false)
     private BigDecimal transportCost = BigDecimal.ZERO;
 
+    /**
+     * Czy serwis oferuje transport/dojazd do klienta
+     */
+    @Column(name = "transport_available", nullable = false)
+    private boolean transportAvailable = false;
+
     // === METADANE ===
 
     /**
@@ -209,5 +215,12 @@ public class BikeService {
      */
     public boolean hasCoordinates() {
         return latitude != null && longitude != null;
+    }
+
+    /**
+     * Sprawdza czy serwis oferuje transport
+     */
+    public boolean isTransportAvailable() {
+        return transportAvailable;
     }
 }

@@ -1,0 +1,2 @@
+ALTER TABLE bike_services
+ADD COLUMN transport_available BOOLEAN NOT NULL DEFAULT FALSE;
