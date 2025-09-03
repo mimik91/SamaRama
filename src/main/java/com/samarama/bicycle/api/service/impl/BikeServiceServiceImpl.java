@@ -144,6 +144,7 @@ public class BikeServiceServiceImpl implements BikeServiceService {
             existingService.setPhoneNumber(bikeServiceDto.phoneNumber());
             existingService.setBusinessPhone(bikeServiceDto.businessPhone());
             existingService.setTransportCost(bikeServiceDto.transportCost());
+            existingService.setTransportAvailable(bikeServiceDto.transportAvailable());
 
             BikeService updatedService = bikeServiceRepository.save(existingService);
 
