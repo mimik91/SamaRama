@@ -18,15 +18,9 @@ public record BikeServiceDto(
         @Size(min = 2, max = 100)
         String name,
 
-        @Size(max = 1000)
-        String description,
-
         @Email
         @Size(max = 100)
         String email,
-
-        @Size(max = 255)
-        String website,
 
         // Adres
         @Size(max = 255)
@@ -52,9 +46,6 @@ public record BikeServiceDto(
         @Size(max = 15)
         String phoneNumber,
 
-        @Size(max = 15)
-        String businessPhone,
-
         // Koszt transportu
         @DecimalMin(value = "0.0", message = "Koszt transportu nie może być ujemny")
         BigDecimal transportCost,
@@ -72,9 +63,7 @@ public record BikeServiceDto(
                 return new BikeServiceDto(
                         entity.getId(),
                         entity.getName(),
-                        entity.getDescription(),
                         entity.getEmail(),
-                        entity.getWebsite(),
                         entity.getStreet(),
                         entity.getBuilding(),
                         entity.getFlat(),
@@ -83,7 +72,6 @@ public record BikeServiceDto(
                         entity.getLatitude(),
                         entity.getLongitude(),
                         entity.getPhoneNumber(),
-                        entity.getBusinessPhone(),
                         entity.getTransportCost(),
                         entity.getCreatedAt(),
                         entity.getUpdatedAt(),
@@ -97,9 +85,7 @@ public record BikeServiceDto(
         public com.samarama.bicycle.api.model.BikeService toEntity() {
                 com.samarama.bicycle.api.model.BikeService entity = new com.samarama.bicycle.api.model.BikeService();
                 entity.setName(this.name);
-                entity.setDescription(this.description);
                 entity.setEmail(this.email.isBlank() ? null : this.email);
-                entity.setWebsite(this.website);
                 entity.setStreet(this.street);
                 entity.setBuilding(this.building);
                 entity.setFlat(this.flat);
@@ -108,7 +94,6 @@ public record BikeServiceDto(
                 entity.setLatitude(this.latitude);
                 entity.setLongitude(this.longitude);
                 entity.setPhoneNumber(this.phoneNumber);
-                entity.setBusinessPhone(this.businessPhone);
                 entity.setTransportCost(this.transportCost);
                 entity.setTransportAvailable(this.transportAvailable);
                 return entity;

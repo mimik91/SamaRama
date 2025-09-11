@@ -22,6 +22,7 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "bike_services")
 @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+@Inheritance(strategy = InheritanceType.JOINED)
 public class BikeService {
 
     @Id
@@ -33,16 +34,9 @@ public class BikeService {
      * Nazwa serwisu rowerowego
      */
     @NotBlank
-    @Size(max = 100)
+    @Size(max = 50)
     @Column(name = "name", nullable = false)
     private String name;
-
-    /**
-     * Opis serwisu
-     */
-    @Size(max = 1000)
-    @Column(name = "description")
-    private String description;
 
     /**
      * Adres email kontaktowy
@@ -52,12 +46,6 @@ public class BikeService {
     @Column(name = "email", unique = true)
     private String email;
 
-    /**
-     * Strona internetowa
-     */
-    @Size(max = 255)
-    @Column(name = "website")
-    private String website;
 
     // === ADRES ===
 
@@ -110,7 +98,6 @@ public class BikeService {
     @Column(name = "longitude")
     private Double longitude;
 
-    // === KONTAKT ===
 
     /**
      * Numer telefonu główny
@@ -119,12 +106,6 @@ public class BikeService {
     @Column(name = "phone_number")
     private String phoneNumber;
 
-    /**
-     * Numer telefonu służbowy
-     */
-    @Size(max = 15)
-    @Column(name = "business_phone")
-    private String businessPhone;
 
     @PositiveOrZero
     @Column(name = "transport_cost", nullable = false)
@@ -217,9 +198,6 @@ public class BikeService {
         return latitude != null && longitude != null;
     }
 
-    /**
-     * Sprawdza czy serwis oferuje transport
-     */
     public boolean isTransportAvailable() {
         return transportAvailable;
     }

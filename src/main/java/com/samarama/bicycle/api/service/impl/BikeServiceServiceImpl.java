@@ -131,9 +131,7 @@ public class BikeServiceServiceImpl implements BikeServiceService {
 
             // Aktualizacja danych serwisu
             existingService.setName(bikeServiceDto.name());
-            existingService.setDescription(bikeServiceDto.description());
             existingService.setEmail(bikeServiceDto.email());
-            existingService.setWebsite(bikeServiceDto.website());
             existingService.setStreet(bikeServiceDto.street());
             existingService.setBuilding(bikeServiceDto.building());
             existingService.setFlat(bikeServiceDto.flat());
@@ -142,7 +140,6 @@ public class BikeServiceServiceImpl implements BikeServiceService {
             existingService.setLatitude(bikeServiceDto.latitude());
             existingService.setLongitude(bikeServiceDto.longitude());
             existingService.setPhoneNumber(bikeServiceDto.phoneNumber());
-            existingService.setBusinessPhone(bikeServiceDto.businessPhone());
             existingService.setTransportCost(bikeServiceDto.transportCost());
             existingService.setTransportAvailable(bikeServiceDto.transportAvailable());
 
