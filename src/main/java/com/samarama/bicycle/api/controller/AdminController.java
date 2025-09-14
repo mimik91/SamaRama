@@ -5,12 +5,14 @@ import com.samarama.bicycle.api.model.*;
 import com.samarama.bicycle.api.service.*;
 import com.samarama.bicycle.api.repository.*;
 import com.samarama.bicycle.api.service.helper.OrderValidator;
+import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -793,5 +795,30 @@ public class AdminController {
                                      LocalDate dateFrom, LocalDate dateTo) {
         return String.format("status=%s, type=%s, search=%s, from=%s, to=%s",
                 status, orderType, searchTerm, dateFrom, dateTo);
+    }
+
+    @PutMapping("/orders/transport/{orderId}")
+    public ResponseEntity<?> updateTransportOrder(
+            @PathVariable Long orderId,
+            @Valid @RequestBody ServiceOrTransportOrderDto dto) {
+
+        try {
+            return transportOrderService.updateTransportOrder(orderId, dto);
+
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Błąd walidacji", "message", e.getMessage()));
+
+        } catch (SecurityException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "Brak uprawnień", "message", e.getMessage()));
+
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Błąd serwera", "message", "Nie udało się zaktualizować zamówienia"));
+        }
     }
 }

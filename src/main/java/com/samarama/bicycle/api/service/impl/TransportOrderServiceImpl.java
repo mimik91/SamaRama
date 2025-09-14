@@ -135,7 +135,7 @@ public class TransportOrderServiceImpl implements TransportOrderService {
 
     @Override
     public List<ServiceOrderResponseDto> getAllUserOrders(String userEmail) {
-        User user = getUserByEmail(userEmail);
+        IncompleteUser user = getUserByEmail(userEmail);
         List<TransportOrder> orders = transportOrderRepository.findByClient(user);
 
         return orders.stream()
@@ -152,7 +152,7 @@ public class TransportOrderServiceImpl implements TransportOrderService {
 
     @Override
     public ResponseEntity<ServiceOrderDetailsResponseDto> getOrderDetails(Long orderId, String userEmail) {
-        User user = getUserByEmail(userEmail);
+        IncompleteUser user = getUserByEmail(userEmail);
 
         Optional<TransportOrder> orderOpt = transportOrderRepository.findById(orderId);
         if (orderOpt.isEmpty()) {
@@ -175,8 +175,8 @@ public class TransportOrderServiceImpl implements TransportOrderService {
 
     @Override
     @Transactional
-    public ResponseEntity<?> updateTransportOrder(Long orderId, ServiceOrTransportOrderDto dto, String userEmail) {
-        User user = getUserByEmail(userEmail);
+    public ResponseEntity<?> updateTransportOrder(Long orderId, ServiceOrTransportOrderDto dto) {
+        IncompleteUser user = getUserByEmail(dto.getEmail());
 
         Optional<TransportOrder> orderOpt = transportOrderRepository.findById(orderId);
         if (orderOpt.isEmpty()) {
@@ -206,7 +206,6 @@ public class TransportOrderServiceImpl implements TransportOrderService {
 
         // Aktualizuj pola
         updateTransportOrderFields(order, dto);
-        order.setLastModifiedBy(userEmail);
         order.setLastModifiedDate(LocalDateTime.now());
 
         transportOrderRepository.save(order);
@@ -220,7 +219,7 @@ public class TransportOrderServiceImpl implements TransportOrderService {
     @Override
     @Transactional
     public ResponseEntity<?> cancelOrder(Long orderId, String userEmail) {
-        User user = getUserByEmail(userEmail);
+        IncompleteUser user = getUserByEmail(userEmail);
 
         Optional<TransportOrder> orderOpt = transportOrderRepository.findById(orderId);
         if (orderOpt.isEmpty()) {
@@ -524,8 +523,8 @@ public class TransportOrderServiceImpl implements TransportOrderService {
 
     // === PRIVATE HELPER METHODS ===
 
-    private User getUserByEmail(String email) {
-        return userRepository.findByEmail(email)
+    private IncompleteUser getUserByEmail(String email) {
+        return incompleteUserRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found: " + email));
     }
 
@@ -652,6 +651,10 @@ public class TransportOrderServiceImpl implements TransportOrderService {
         }
         if (dto.getPickupApartmentNumber() != null) {
             order.setPickupApartment(dto.getPickupApartmentNumber());
+        }
+        if (dto.getBicycles() != null){
+            order.getBicycle().setBrand(dto.getBicycles().getFirst().brand());
+            order.getBicycle().setModel(dto.getBicycles().getFirst().model());
         }
         if (dto.getPickupCity() != null) {
             order.setPickupCity(dto.getPickupCity());

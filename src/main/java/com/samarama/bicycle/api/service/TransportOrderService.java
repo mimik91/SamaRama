@@ -45,7 +45,7 @@ public interface TransportOrderService {
     /**
      * Aktualizuje zamówienie transportowe
      */
-    ResponseEntity<?> updateTransportOrder(Long orderId, ServiceOrTransportOrderDto dto, String userEmail);
+    ResponseEntity<?> updateTransportOrder(Long orderId, ServiceOrTransportOrderDto dto);
 
     /**
      * Anuluje zamówienie
