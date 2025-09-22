@@ -2,7 +2,9 @@ package com.samarama.bicycle.api.service.impl;
 
 import com.samarama.bicycle.api.dto.ServiceRegisterDto;
 import com.samarama.bicycle.api.dto.TransportOrderDto;
+import com.samarama.bicycle.api.model.IndividualUser;
 import com.samarama.bicycle.api.model.ServiceOrder;
+import com.samarama.bicycle.api.model.ServiceUser;
 import com.samarama.bicycle.api.model.User;
 import com.samarama.bicycle.api.service.EmailService;
 import jakarta.mail.MessagingException;
@@ -56,7 +58,7 @@ public class EmailServiceImpl implements EmailService {
                             "<h1 style='color: #3498db; margin-bottom: 5px;'>cyclopick.pl</h1>" +
                             "<p style='color: #7f8c8d; font-size: 16px;'>Twoja aplikacja do zarządzania rowerami</p>" +
                             "</div>" +
-                            "<p style='font-size: 16px; color: #333; margin-bottom: 20px;'>Cześć " + user.getFirstName() + ",</p>" +
+                            "<p style='font-size: 16px; color: #333; margin-bottom: 20px;'>Cześć " + user.getEmail() + ",</p>" +
                             "<p style='font-size: 16px; color: #333; margin-bottom: 20px;'>Dziękujemy za rejestrację w aplikacji cyclopick.pl. Aby dokończyć proces rejestracji, prosimy o potwierdzenie swojego adresu email.</p>" +
                             "<div style='text-align: center; margin: 30px 0;'>" +
                             "<a href='" + verificationUrl + "' style='display: inline-block; padding: 12px 24px; background-color: #3498db; color: #ffffff; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px;'>Potwierdź swój email</a>" +
@@ -83,7 +85,7 @@ public class EmailServiceImpl implements EmailService {
 
             String subject = "Twoje konto w aplikacji cyclopick.pl zostało aktywowane";
             String content = "<div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>"
-                    + "<h2 style='color: #3498db;'>Witaj " + user.getFirstName() + "!</h2>"
+                    + "<h2 style='color: #3498db;'>Witaj " + user.getEmail() + "!</h2>"
                     + "<p>Twoje konto w aplikacji cyclopick.pl zostało pomyślnie aktywowane.</p>"
                     + "<p>Możesz teraz w pełni korzystać z naszej aplikacji.</p>"
                     + "<p><a href='" + loginUrl + "' style='display: inline-block; padding: 10px 20px; background-color: #3498db; color: #ffffff; text-decoration: none; border-radius: 5px;'>Zaloguj się</a></p>"
@@ -111,7 +113,7 @@ public class EmailServiceImpl implements EmailService {
                             "<h1 style='color: #3498db; margin-bottom: 5px;'>cyclopick.pl</h1>" +
                             "<p style='color: #7f8c8d; font-size: 16px;'>Twoja aplikacja do zarządzania rowerami</p>" +
                             "</div>" +
-                            "<p style='font-size: 16px; color: #333; margin-bottom: 20px;'>Cześć " + user.getFirstName() + ",</p>" +
+                            "<p style='font-size: 16px; color: #333; margin-bottom: 20px;'>Cześć " + user.getEmail() + ",</p>" +
                             "<p style='font-size: 16px; color: #333; margin-bottom: 20px;'>Otrzymaliśmy prośbę o zresetowanie hasła do Twojego konta. Aby ustawić nowe hasło, kliknij w poniższy przycisk:</p>" +
                             "<div style='text-align: center; margin: 30px 0;'>" +
                             "<a href='" + resetUrl + "' style='display: inline-block; padding: 12px 24px; background-color: #3498db; color: #ffffff; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px;'>Resetuj hasło</a>" +
@@ -219,8 +221,7 @@ public class EmailServiceImpl implements EmailService {
                 content.append("<p><strong>Telefon:</strong> ").append(serviceOrder.getClient().getPhoneNumber()).append("</p>");
             }
             // Jeśli klient to User (zarejestrowany), pokaż imię i nazwisko
-            if (serviceOrder.getClient() instanceof com.samarama.bicycle.api.model.User) {
-                com.samarama.bicycle.api.model.User user = (com.samarama.bicycle.api.model.User) serviceOrder.getClient();
+            if (serviceOrder.getClient() instanceof IndividualUser user) {
                 if (user.getFirstName() != null || user.getLastName() != null) {
                     content.append("<p><strong>Imię i nazwisko:</strong> ")
                             .append(user.getFirstName() != null ? user.getFirstName() : "")
@@ -234,7 +235,6 @@ public class EmailServiceImpl implements EmailService {
             // Informacje o pakiecie serwisowym
             content.append("<h3 style='color: #2c3e50; margin-top: 20px;'>Pakiet serwisowy</h3>");
             content.append("<div style='background-color: #f5f0ff; padding: 15px; border-radius: 5px; margin-bottom: 20px;'>");
-            content.append("<p><strong>Nazwa pakietu:</strong> ").append(serviceOrder.getServicePackage() != null ? serviceOrder.getServicePackage().getName() : serviceOrder.getServicePackageCode()).append("</p>");
             content.append("<p><strong>Kod pakietu:</strong> ").append(serviceOrder.getServicePackageCode()).append("</p>");
             content.append("<p><strong>Cena:</strong> ").append(serviceOrder.getServicePrice()).append(" zł</p>");
             content.append("</div>");

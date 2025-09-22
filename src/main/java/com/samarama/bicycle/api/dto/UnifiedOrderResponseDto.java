@@ -1,7 +1,10 @@
 package com.samarama.bicycle.api.dto;
 
+import com.samarama.bicycle.api.model.IndividualUser;
 import com.samarama.bicycle.api.model.ServiceOrder;
 import com.samarama.bicycle.api.model.TransportOrder;
+import com.samarama.bicycle.api.model.User;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -26,11 +29,10 @@ public record UnifiedOrderResponseDto(
         String pickupAddress,
         String deliveryAddress,
         String targetServiceName,
+        Long targetServiceId,
         BigDecimal transportPrice,
 
         // === SERVICE INFO (tylko dla ServiceOrder) ===
-        String servicePackageCode,
-        String servicePackageName,
         BigDecimal servicePrice,
         BigDecimal totalPrice,
         LocalDateTime serviceStartDate,
@@ -67,9 +69,10 @@ public record UnifiedOrderResponseDto(
                 entity.getFullPickupAddress(), // Używamy nowej metody z rozbitego adresu
                 entity.getFullDeliveryAddress(), // Używamy nowej metody z rozbitego adresu
                 entity.getTargetService() != null ? entity.getTargetService().getName() : null,
+                entity.getTargetService() != null ? entity.getTargetService().getId() : null,
                 entity.getTransportPrice(),
                 // Service fields - null dla czystego transportu
-                null, null, null, entity.getTotalPrice(), null, null, null,
+                 null, entity.getTotalPrice(), null, null, null,
                 entity.getStatus() != null ? entity.getStatus().toString() : null,
                 entity.getStatusDisplayName(),
                 entity.getOrderDate(),
@@ -99,10 +102,9 @@ public record UnifiedOrderResponseDto(
                 entity.getFullPickupAddress(), // Używamy nowej metody z rozbitego adresu
                 entity.getFullDeliveryAddress(), // Używamy nowej metody z rozbitego adresu
                 entity.getTargetService() != null ? entity.getTargetService().getName() : "SERWIS WŁASNY",
+                2137L,
                 entity.getTransportPrice(),
                 // Service fields
-                entity.getServicePackageCode(),
-                entity.getServicePackageName(),
                 entity.getServicePrice(),
                 entity.getTotalPrice(),
                 entity.getServiceStartDate(),
@@ -121,9 +123,8 @@ public record UnifiedOrderResponseDto(
     /**
      * Helper do pobierania nazwy klienta
      */
-    private static String getClientName(com.samarama.bicycle.api.model.IncompleteUser client) {
-        if (client instanceof com.samarama.bicycle.api.model.User) {
-            com.samarama.bicycle.api.model.User user = (com.samarama.bicycle.api.model.User) client;
+    private static String getClientName(User client) {
+        if (client instanceof IndividualUser user) {
             if (user.getFirstName() != null || user.getLastName() != null) {
                 String firstName = user.getFirstName() != null ? user.getFirstName() : "";
                 String lastName = user.getLastName() != null ? user.getLastName() : "";

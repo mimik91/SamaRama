@@ -1,7 +1,6 @@
 package com.samarama.bicycle.api.service.helper;
 
 import com.samarama.bicycle.api.dto.ServiceOrTransportOrderDto;
-import com.samarama.bicycle.api.repository.ServicePackageRepository;
 import com.samarama.bicycle.api.repository.BikeServiceRepository;
 import com.samarama.bicycle.api.service.ServiceSlotService;
 import com.samarama.bicycle.api.service.impl.CityValidator;
@@ -19,7 +18,6 @@ import java.util.List;
 @Component
 public class OrderValidator {
 
-    private final ServicePackageRepository servicePackageRepository;
     private final BikeServiceRepository bikeServiceRepository;
     private final ServiceSlotService serviceSlotService;
     private final CityValidator cityValidator;
@@ -28,28 +26,14 @@ public class OrderValidator {
     public static String internalServiceIdString = "2137";
 
     public OrderValidator(
-            ServicePackageRepository servicePackageRepository,
             BikeServiceRepository bikeServiceRepository,
             ServiceSlotService serviceSlotService,
             CityValidator cityValidator) {
-        this.servicePackageRepository = servicePackageRepository;
         this.bikeServiceRepository = bikeServiceRepository;
         this.serviceSlotService = serviceSlotService;
         this.cityValidator = cityValidator;
     }
 
-    /**
-     * Główna metoda walidacji - automatycznie rozpoznaje typ zamówienia
-     */
-    public ValidationResult validate(ServiceOrTransportOrderDto dto) {
-        if (dto.isGuestOrder()) {
-            return validateGuestOrder(dto);
-        } else if (dto.isUserOrder()) {
-            return validateUserOrder(dto);
-        } else {
-            return ValidationResult.invalid("Nie można określić typu zamówienia - brak userId i email");
-        }
-    }
 
     /**
      * Waliduj zamówienie użytkownika zalogowanego
@@ -109,17 +93,6 @@ public class OrderValidator {
             errors.addAll(validateSlots(dto));
         }
 
-        boolean isServiceOrder = dto.getServicePackageId() != null;
-
-        if (isServiceOrder) {
-            // 1. Pakiet serwisowy musi istnieć
-            if (!servicePackageRepository.existsById(dto.getServicePackageId())) {
-                errors.add("Nieprawidłowy pakiet serwisowy");
-            }
-        } else {
-            // ZAMÓWIENIE TRANSPORTOWE - walidacja specyficzna
-            errors.addAll(validateGuestTransportOrderSpecific(dto));
-        }
 
         return new ValidationResult(errors.isEmpty(), errors);
     }
@@ -290,32 +263,8 @@ public class OrderValidator {
     // === WALIDACJA TYPU ZAMÓWIENIA ===
 
     private List<String> validateOrderType(ServiceOrTransportOrderDto dto) {
-        List<String> errors = new ArrayList<>();
 
-        if (dto.isServiceOrder()) {
-            errors.addAll(validateServiceOrder(dto));
-        } else {
-            errors.addAll(validateTransportOrder(dto));
-        }
-
-        return errors;
-    }
-
-    private List<String> validateServiceOrder(ServiceOrTransportOrderDto dto) {
-        List<String> errors = new ArrayList<>();
-
-        if (dto.getServicePackageId() == null) {
-            errors.add("Pakiet serwisowy jest wymagany dla zamówienia serwisowego");
-        } else if (!servicePackageRepository.existsById(dto.getServicePackageId())) {
-            errors.add("Nieprawidłowy pakiet serwisowy");
-        }
-
-        // Zamówienia serwisowe muszą być kierowane do serwisu własnego
-        if (dto.getTargetServiceId() != null && !dto.getTargetServiceId().equals(1L)) {
-            errors.add("Zamówienia serwisowe muszą być kierowane do serwisu własnego (ID=1)");
-        }
-
-        return errors;
+        return new ArrayList<>(validateTransportOrder(dto));
     }
 
     private List<String> validateTransportOrder(ServiceOrTransportOrderDto dto) {

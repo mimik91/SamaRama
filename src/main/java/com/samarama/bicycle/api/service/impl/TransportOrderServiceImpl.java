@@ -24,7 +24,7 @@ public class TransportOrderServiceImpl implements TransportOrderService {
 
     private final TransportOrderRepository transportOrderRepository;
     private final UserRepository userRepository;
-    private final IncompleteUserRepository incompleteUserRepository;
+    private final IndividualUserRepository individualUserRepository;
     private final IncompleteBikeRepository incompleteBikeRepository;
     private final BikeServiceRepository bikeServiceRepository;
     private final ServiceSlotService serviceSlotService;
@@ -34,13 +34,13 @@ public class TransportOrderServiceImpl implements TransportOrderService {
     public TransportOrderServiceImpl(
             TransportOrderRepository transportOrderRepository,
             UserRepository userRepository,
-            IncompleteUserRepository incompleteUserRepository,
+            IndividualUserRepository individualUserRepository,
             IncompleteBikeRepository incompleteBikeRepository,
             BikeServiceRepository bikeServiceRepository,
             ServiceSlotService serviceSlotService, CouponRepository couponRepository, BicycleEnumerationRepository bicycleEnumerationRepository){
         this.transportOrderRepository = transportOrderRepository;
         this.userRepository = userRepository;
-        this.incompleteUserRepository = incompleteUserRepository;
+        this.individualUserRepository = individualUserRepository;
         this.incompleteBikeRepository = incompleteBikeRepository;
         this.bikeServiceRepository = bikeServiceRepository;
         this.serviceSlotService = serviceSlotService;
@@ -52,7 +52,7 @@ public class TransportOrderServiceImpl implements TransportOrderService {
     @Transactional
     public ResponseEntity<?> createTransportOrder(ServiceOrTransportOrderDto dto, String userEmail) {
         // Pobierz użytkownika
-        User user = userRepository.findByEmail(userEmail)
+        IndividualUser user = individualUserRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
         // Pobierz serwis docelowy
@@ -104,7 +104,7 @@ public class TransportOrderServiceImpl implements TransportOrderService {
                     .orElseThrow(() -> new RuntimeException("Target service not found: " + dto.getTargetServiceId()));
 
             // Utwórz lub znajdź użytkownika tymczasowego
-            IncompleteUser guestUser = createOrFindIncompleteUser(dto.getEmail(), dto.getPhone());
+            IndividualUser guestUser = createOrFindIncompleteUser(dto.getEmail(), dto.getPhone());
 
             // Utwórz rowery gościa
             List<IncompleteBike> bikes = createIncompleteBikes(dto.getBicycles(), guestUser);
@@ -135,7 +135,7 @@ public class TransportOrderServiceImpl implements TransportOrderService {
 
     @Override
     public List<ServiceOrderResponseDto> getAllUserOrders(String userEmail) {
-        IncompleteUser user = getUserByEmail(userEmail);
+        IndividualUser user = getUserByEmail(userEmail);
         List<TransportOrder> orders = transportOrderRepository.findByClient(user);
 
         return orders.stream()
@@ -152,7 +152,7 @@ public class TransportOrderServiceImpl implements TransportOrderService {
 
     @Override
     public ResponseEntity<ServiceOrderDetailsResponseDto> getOrderDetails(Long orderId, String userEmail) {
-        IncompleteUser user = getUserByEmail(userEmail);
+        IndividualUser user = getUserByEmail(userEmail);
 
         Optional<TransportOrder> orderOpt = transportOrderRepository.findById(orderId);
         if (orderOpt.isEmpty()) {
@@ -176,7 +176,7 @@ public class TransportOrderServiceImpl implements TransportOrderService {
     @Override
     @Transactional
     public ResponseEntity<?> updateTransportOrder(Long orderId, ServiceOrTransportOrderDto dto) {
-        IncompleteUser user = getUserByEmail(dto.getEmail());
+        IndividualUser user = getUserByEmail(dto.getEmail());
 
         Optional<TransportOrder> orderOpt = transportOrderRepository.findById(orderId);
         if (orderOpt.isEmpty()) {
@@ -219,7 +219,7 @@ public class TransportOrderServiceImpl implements TransportOrderService {
     @Override
     @Transactional
     public ResponseEntity<?> cancelOrder(Long orderId, String userEmail) {
-        IncompleteUser user = getUserByEmail(userEmail);
+        IndividualUser user = getUserByEmail(userEmail);
 
         Optional<TransportOrder> orderOpt = transportOrderRepository.findById(orderId);
         if (orderOpt.isEmpty()) {
@@ -523,8 +523,8 @@ public class TransportOrderServiceImpl implements TransportOrderService {
 
     // === PRIVATE HELPER METHODS ===
 
-    private IncompleteUser getUserByEmail(String email) {
-        return incompleteUserRepository.findByEmail(email)
+    private IndividualUser getUserByEmail(String email) {
+        return individualUserRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found: " + email));
     }
 
@@ -543,25 +543,25 @@ public class TransportOrderServiceImpl implements TransportOrderService {
         return bikes;
     }
 
-    private IncompleteUser createOrFindIncompleteUser(String email, String phone) {
-        Optional<IncompleteUser> existingUser = incompleteUserRepository.findByEmail(email);
+    private IndividualUser createOrFindIncompleteUser(String email, String phone) {
+        Optional<IndividualUser> existingUser = individualUserRepository.findByEmail(email);
 
         if (existingUser.isPresent()) {
-            IncompleteUser user = existingUser.get();
+            IndividualUser user = existingUser.get();
             if (phone != null) {
                 user.setPhoneNumber(phone);
             }
-            return incompleteUserRepository.save(user);
+            return individualUserRepository.save(user);
         } else {
-            IncompleteUser newUser = new IncompleteUser();
+            IndividualUser newUser = new IndividualUser();
             newUser.setEmail(email);
             newUser.setPhoneNumber(phone);
             newUser.setCreatedAt(LocalDateTime.now());
-            return incompleteUserRepository.save(newUser);
+            return individualUserRepository.save(newUser);
         }
     }
 
-    private List<IncompleteBike> createIncompleteBikes(List<GuestBicycleDto> bicycleDtos, IncompleteUser owner) {
+    private List<IncompleteBike> createIncompleteBikes(List<GuestBicycleDto> bicycleDtos, IndividualUser owner) {
         List<IncompleteBike> bikes = new ArrayList<>();
 
         for (GuestBicycleDto bikeDto : bicycleDtos) {
@@ -581,7 +581,7 @@ public class TransportOrderServiceImpl implements TransportOrderService {
     }
 
     private List<TransportOrder> createTransportOrderFromDtos(
-            List<IncompleteBike> bikes, IncompleteUser user, ServiceOrTransportOrderDto dto,
+            List<IncompleteBike> bikes, IndividualUser user, ServiceOrTransportOrderDto dto,
             BikeService targetService) {
 
         List<TransportOrder> orders = new ArrayList<>();

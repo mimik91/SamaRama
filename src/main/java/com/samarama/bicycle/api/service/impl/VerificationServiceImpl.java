@@ -2,7 +2,7 @@ package com.samarama.bicycle.api.service.impl;
 
 import com.samarama.bicycle.api.model.User;
 import com.samarama.bicycle.api.model.VerificationToken;
-import com.samarama.bicycle.api.repository.IncompleteUserRepository;
+import com.samarama.bicycle.api.repository.IndividualUserRepository;
 import com.samarama.bicycle.api.repository.UserRepository;
 import com.samarama.bicycle.api.repository.VerificationTokenRepository;
 import com.samarama.bicycle.api.service.EmailService;
@@ -26,7 +26,7 @@ public class VerificationServiceImpl implements VerificationService {
     private final VerificationTokenRepository tokenRepository;
     private final UserRepository userRepository;
     private final EmailService emailService;
-    private final IncompleteUserRepository incompleteUserRepository;
+    private final IndividualUserRepository individualUserRepository;
 
     @Value("${app.verification.token.expiration:86400000}")
     private long tokenExpirationMs;
@@ -34,11 +34,11 @@ public class VerificationServiceImpl implements VerificationService {
     public VerificationServiceImpl(
             VerificationTokenRepository tokenRepository,
             UserRepository userRepository,
-            EmailService emailService, IncompleteUserRepository incompleteUserRepository) {
+            EmailService emailService, IndividualUserRepository individualUserRepository) {
         this.tokenRepository = tokenRepository;
         this.userRepository = userRepository;
         this.emailService = emailService;
-        this.incompleteUserRepository = incompleteUserRepository;
+        this.individualUserRepository = individualUserRepository;
     }
 
     @Transactional
@@ -66,6 +66,8 @@ public class VerificationServiceImpl implements VerificationService {
 
         return tokenRepository.save(verificationToken);
     }
+
+
 
     @Override
     public Optional<VerificationToken> getVerificationToken(String token) {
@@ -124,7 +126,7 @@ public class VerificationServiceImpl implements VerificationService {
 
         if (userOpt.isEmpty()) {
             // Check if this email belongs to an IncompleteUser
-            boolean incompleteUserExists = incompleteUserRepository.existsByEmail(email);
+            boolean incompleteUserExists = individualUserRepository.existsByEmail(email);
 
             if (incompleteUserExists) {
                 // This is a guest who ordered without registration

@@ -46,8 +46,6 @@ public class AdminInitializerService {
         if (existingAdmin.isEmpty()) {
             User admin = new User();
             admin.setEmail(adminEmail);
-            admin.setFirstName(adminFirstName);
-            admin.setLastName(adminLastName);
             admin.setPassword(passwordEncoder.encode(adminPassword));
             admin.setVerified(true);
             admin.setCreatedAt(LocalDateTime.now());

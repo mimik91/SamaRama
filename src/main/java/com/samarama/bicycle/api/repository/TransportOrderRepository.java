@@ -18,7 +18,7 @@ public interface TransportOrderRepository extends JpaRepository<TransportOrder, 
     /**
      * Znajdź wszystkie zamówienia transportowe dla klienta
      */
-    List<TransportOrder> findByClient(IncompleteUser client);
+    List<TransportOrder> findByClient(IndividualUser client);
 
     /**
      * Znajdź zamówienia transportowe dla roweru
@@ -70,13 +70,13 @@ public interface TransportOrderRepository extends JpaRepository<TransportOrder, 
     /**
      * Znajdź zamówienia transportowe klienta według statusu
      */
-    List<TransportOrder> findByClientAndStatus(IncompleteUser client, TransportOrder.OrderStatus status);
+    List<TransportOrder> findByClientAndStatus(IndividualUser client, TransportOrder.OrderStatus status);
 
     /**
      * Znajdź aktywne zamówienia transportowe klienta (nieanulowane)
      */
     @Query("SELECT t FROM TransportOrder t WHERE t.client = :client AND t.status != 'CANCELLED'")
-    List<TransportOrder> findActiveByClient(@Param("client") IncompleteUser client);
+    List<TransportOrder> findActiveByClient(@Param("client") IndividualUser client);
 
     // === ZAPYTANIA DLA SERWISU ===
 

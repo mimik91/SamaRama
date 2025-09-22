@@ -18,8 +18,6 @@ public record ServiceOrderDetailsResponseDto(
         String pickupAddress,
         String targetServiceName,
         String deliveryAddress,
-        String servicePackageName,
-        String servicePackageDescription,
         String serviceNotes,
         String additionalNotes,
         String transportNotes,
@@ -34,9 +32,6 @@ public record ServiceOrderDetailsResponseDto(
      */
     public static ServiceOrderDetailsResponseDto fromServiceOrder(ServiceOrder entity) {
         String servicePackageDescription = null;
-        if (entity.getServicePackage() != null) {
-            servicePackageDescription = entity.getServicePackage().getDescription();
-        }
 
         return new ServiceOrderDetailsResponseDto(
                 entity.getId(),
@@ -46,8 +41,6 @@ public record ServiceOrderDetailsResponseDto(
                 entity.getFullPickupAddress(),
                 entity.getTargetService() != null ? entity.getTargetService().getName() : "SERWIS WŁASNY",
                 entity.getFullDeliveryAddress(),
-                entity.getServicePackageName(),
-                servicePackageDescription,
                 entity.getServiceNotes(),
                 entity.getAdditionalNotes(),
                 entity.getTransportNotes(),
@@ -72,8 +65,6 @@ public record ServiceOrderDetailsResponseDto(
                 entity.getTargetService() != null ? entity.getTargetService().getName() : null,
                 entity.getFullDeliveryAddress(),
                 "Transport", // Brak pakietu serwisowego
-                "Usługa transportu roweru do wybranego serwisu", // Opis transportu
-                null, // Brak notatek serwisowych
                 entity.getAdditionalNotes(),
                 entity.getTransportNotes(),
                 entity.getTotalPrice(),

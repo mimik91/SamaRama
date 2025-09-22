@@ -1,7 +1,7 @@
 package com.samarama.bicycle.api.controller;
 
-import com.samarama.bicycle.api.dto.BikeServiceDto;
 import com.samarama.bicycle.api.dto.LoginDto;
+import com.samarama.bicycle.api.dto.ServiceUserDto;
 import com.samarama.bicycle.api.dto.UserRegistrationDto;
 import com.samarama.bicycle.api.service.AuthService;
 import org.springframework.http.ResponseEntity;
@@ -32,7 +32,7 @@ public class AuthController {
     }
 
     @PostMapping("/signup/service")
-    public ResponseEntity<Map<String, String>> registerService(@Valid @RequestBody BikeServiceDto bikeServiceDto) {
-        return authService.registerService(bikeServiceDto);
+    public ResponseEntity<Map<String, String>> registerServiceUser(@Valid @RequestBody ServiceUserDto serviceUserDto) {
+        return authService.registerServiceUser(serviceUserDto);
     }
 }

@@ -1,6 +1,5 @@
 package com.samarama.bicycle.api.model;
 
-import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
@@ -11,9 +10,13 @@ import lombok.NoArgsConstructor;
 import lombok.ToString;
 
 import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Pozycja cennika - pojedyncza usługa z ceną
+ * Może być przypisana do wielu kategorii i wielu serwisów
  */
 @Data
 @NoArgsConstructor
@@ -21,21 +24,13 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "pricelist_items")
 @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
-@ToString(exclude = "category") // Zapobiega cyklicznym referencjom w toString
+@ToString(exclude = {"categories", "bikeServicePricelistItems"})
 public class PricelistItem {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id")
     private Long id;
-
-    /**
-     * Kategoria do której należy pozycja
-     */
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "category_id", nullable = false)
-    @JsonBackReference
-    private PricelistCategory category;
 
     /**
      * Nazwa usługi (np. "Wymiana łańcucha")
@@ -46,12 +41,12 @@ public class PricelistItem {
     private String serviceName;
 
     /**
-     * Cena usługi (np. "50zł", "od 30zł", "50-80zł")
+     * Bazowa cena usługi (np. "50zł", "od 30zł", "50-80zł")
+     * Może być nadpisana w konkretnym serwisie przez BikeServicePricelistItem
      */
-    @NotBlank
     @Size(max = 100)
-    @Column(name = "price", nullable = false)
-    private String price;
+    @Column(name = "base_price")
+    private String basePrice;
 
     /**
      * Dodatkowy opis usługi
@@ -61,10 +56,21 @@ public class PricelistItem {
     private String description;
 
     /**
-     * Kolejność wyświetlania w kategorii
+     * Kategorie do których należy pozycja
      */
-    @Column(name = "display_order", nullable = false)
-    private Integer displayOrder = 0;
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+            name = "pricelist_item_categories",
+            joinColumns = @JoinColumn(name = "pricelist_item_id"),
+            inverseJoinColumns = @JoinColumn(name = "pricelist_category_id")
+    )
+    private Set<PricelistCategory> categories = new HashSet<>();
+
+    /**
+     * Relacja z serwisami przez tabelę łączącą BikeServicePricelistItem
+     */
+    @OneToMany(mappedBy = "pricelistItem", fetch = FetchType.LAZY)
+    private Set<BikeServicePricelistItem> bikeServicePricelistItems = new HashSet<>();
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
@@ -88,17 +94,26 @@ public class PricelistItem {
     // === METODY POMOCNICZE ===
 
     /**
-     * Zwraca nazwę kategorii
+     * Dodaje kategorię do pozycji
      */
-    public String getCategoryName() {
-        return category != null ? category.getName() : null;
+    public void addCategory(PricelistCategory category) {
+        categories.add(category);
+        category.getPricelistItems().add(this);
     }
 
     /**
-     * Zwraca ID serwisu przez kategorię
+     * Usuwa kategorię z pozycji
      */
-    public Long getBikeServiceId() {
-        return category != null ? category.getBikeServiceId() : null;
+    public void removeCategory(PricelistCategory category) {
+        categories.remove(category);
+        category.getPricelistItems().remove(this);
+    }
+
+    /**
+     * Sprawdza czy pozycja ma bazową cenę
+     */
+    public boolean hasBasePrice() {
+        return basePrice != null && !basePrice.trim().isEmpty();
     }
 
     /**
@@ -106,5 +121,28 @@ public class PricelistItem {
      */
     public boolean hasDescription() {
         return description != null && !description.trim().isEmpty();
+    }
+
+    /**
+     * Pobiera wszystkie serwisy które oferują tę pozycję
+     */
+    public Set<BikeServiceRegistered> getBikeServices() {
+        return bikeServicePricelistItems.stream()
+                .map(BikeServicePricelistItem::getBikeService)
+                .collect(Collectors.toSet());
+    }
+
+    /**
+     * Sprawdza czy pozycja jest używana przez jakiś serwis
+     */
+    public boolean isUsedByServices() {
+        return !bikeServicePricelistItems.isEmpty();
+    }
+
+    /**
+     * Sprawdza czy pozycja należy do jakiejś kategorii
+     */
+    public boolean hasCategories() {
+        return !categories.isEmpty();
     }
 }

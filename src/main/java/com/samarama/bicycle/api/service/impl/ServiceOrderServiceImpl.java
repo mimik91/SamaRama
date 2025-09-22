@@ -25,9 +25,8 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
 
     private final ServiceOrderRepository serviceOrderRepository;
     private final UserRepository userRepository;
-    private final IncompleteUserRepository incompleteUserRepository;
+    private final IndividualUserRepository individualUserRepository;
     private final IncompleteBikeRepository incompleteBikeRepository;
-    private final ServicePackageRepository servicePackageRepository;
     private final BikeServiceRepository bikeServiceRepository;
     private final ServiceSlotService serviceSlotService;
     private final EmailService emailService;
@@ -35,17 +34,15 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
     public ServiceOrderServiceImpl(
             ServiceOrderRepository serviceOrderRepository,
             UserRepository userRepository,
-            IncompleteUserRepository incompleteUserRepository,
+            IndividualUserRepository individualUserRepository,
             IncompleteBikeRepository incompleteBikeRepository,
-            ServicePackageRepository servicePackageRepository,
             BikeServiceRepository bikeServiceRepository,
             ServiceSlotService serviceSlotService,
             EmailService emailService) {
         this.serviceOrderRepository = serviceOrderRepository;
         this.userRepository = userRepository;
-        this.incompleteUserRepository = incompleteUserRepository;
+        this.individualUserRepository = individualUserRepository;
         this.incompleteBikeRepository = incompleteBikeRepository;
-        this.servicePackageRepository = servicePackageRepository;
         this.bikeServiceRepository = bikeServiceRepository;
         this.serviceSlotService = serviceSlotService;
         this.emailService = emailService;
@@ -84,11 +81,7 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
             }
 
             // Pobierz użytkownika
-            User user = getUserByEmail(userEmail);
-
-            // Pobierz pakiet serwisowy
-            ServicePackage servicePackage = servicePackageRepository.findById(dto.getServicePackageId())
-                    .orElseThrow(() -> new RuntimeException("Service package not found"));
+            IndividualUser user = getUserByEmail(userEmail);
 
             // Pobierz serwis własny
             BikeService ownService = getOwnService();
@@ -97,7 +90,7 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
             List<IncompleteBike> bikes = validateAndGetBikes(dto.getBicycleIds(), user.getId());
 
             // Utwórz zamówienia serwisowe
-            List<ServiceOrder> orders = createServiceOrdersFromDto(bikes, user, dto, servicePackage, ownService);
+            List<ServiceOrder> orders = createServiceOrdersFromDto(bikes, user, dto, ownService);
 
             // Zapisz zamówienia
             List<ServiceOrder> savedOrders = serviceOrderRepository.saveAll(orders);
@@ -151,11 +144,7 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
             }
 
             // Utwórz lub znajdź użytkownika tymczasowego
-            IncompleteUser guestUser = createOrFindIncompleteUser(dto.getEmail(), dto.getPhone());
-
-            // Pobierz pakiet serwisowy
-            ServicePackage servicePackage = servicePackageRepository.findById(dto.getServicePackageId())
-                    .orElseThrow(() -> new RuntimeException("Service package not found"));
+            IndividualUser guestUser = createOrFindIncompleteUser(dto.getEmail(), dto.getPhone());
 
             // Pobierz serwis własny
             BikeService ownService = getOwnService();
@@ -164,7 +153,7 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
             List<IncompleteBike> bikes = createIncompleteBikes(dto.getBicycles(), guestUser);
 
             // Utwórz zamówienia serwisowe
-            List<ServiceOrder> orders = createServiceOrdersFromDto(bikes, guestUser, dto, servicePackage, ownService);
+            List<ServiceOrder> orders = createServiceOrdersFromDto(bikes, guestUser, dto, ownService);
 
             // Zapisz zamówienia
             List<ServiceOrder> savedOrders = serviceOrderRepository.saveAll(orders);
@@ -365,8 +354,8 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
 
     // === PRIVATE HELPER METHODS ===
 
-    private User getUserByEmail(String email) {
-        return userRepository.findByEmail(email)
+    private IndividualUser getUserByEmail(String email) {
+        return individualUserRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found: " + email));
     }
 
@@ -405,25 +394,25 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
         return bikes;
     }
 
-    private IncompleteUser createOrFindIncompleteUser(String email, String phone) {
-        Optional<IncompleteUser> existingUser = incompleteUserRepository.findByEmail(email);
+    private IndividualUser createOrFindIncompleteUser(String email, String phone) {
+        Optional<IndividualUser> existingUser = individualUserRepository.findByEmail(email);
 
         if (existingUser.isPresent()) {
-            IncompleteUser user = existingUser.get();
+            IndividualUser user = existingUser.get();
             if (phone != null) {
                 user.setPhoneNumber(phone);
             }
-            return incompleteUserRepository.save(user);
+            return individualUserRepository.save(user);
         } else {
-            IncompleteUser newUser = new IncompleteUser();
+            IndividualUser newUser = new IndividualUser();
             newUser.setEmail(email);
             newUser.setPhoneNumber(phone);
             newUser.setCreatedAt(LocalDateTime.now());
-            return incompleteUserRepository.save(newUser);
+            return individualUserRepository.save(newUser);
         }
     }
 
-    private List<IncompleteBike> createIncompleteBikes(List<GuestBicycleDto> bicycleDtos, IncompleteUser owner) {
+    private List<IncompleteBike> createIncompleteBikes(List<GuestBicycleDto> bicycleDtos, IndividualUser owner) {
         List<IncompleteBike> bikes = new ArrayList<>();
 
         for (GuestBicycleDto bikeDto : bicycleDtos) {
@@ -443,8 +432,8 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
     }
 
     private List<ServiceOrder> createServiceOrdersFromDto(
-            List<IncompleteBike> bikes, IncompleteUser guestUser, ServiceOrTransportOrderDto dto,
-            ServicePackage servicePackage, BikeService ownService) {
+            List<IncompleteBike> bikes, IndividualUser user, ServiceOrTransportOrderDto dto,
+             BikeService ownService) {
 
         List<ServiceOrder> orders = new ArrayList<>();
         BigDecimal transportPrice = dto.getTransportPrice(); // Używamy znormalizowanej ceny (0)
@@ -454,7 +443,7 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
 
             // Pola bazowe z TransportOrder
             order.setBicycle(bike);
-            order.setClient(guestUser);
+            order.setClient(user);
             order.setPickupDate(dto.getPickupDate());
 
             // Nowa struktura adresu odbioru - rozbita na pola
@@ -488,9 +477,6 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
             order.setOrderDate(LocalDateTime.now());
 
             // Pola specyficzne dla ServiceOrder
-            order.setServicePackage(servicePackage);
-            order.setServicePackageCode(servicePackage.getCode());
-            order.setServicePrice(servicePackage.getPrice());
             order.setServiceNotes(dto.getServiceNotes());
             order.setServiceStartDate(null);
             order.setServiceCompletionDate(null);
@@ -516,13 +502,6 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
         }
         if (dto.getServiceNotes() != null) {
             order.setServiceNotes(dto.getServiceNotes());
-        }
-        if (dto.getServicePackageId() != null) {
-            ServicePackage servicePackage = servicePackageRepository.findById(dto.getServicePackageId())
-                    .orElseThrow(() -> new RuntimeException("Service package not found"));
-            order.setServicePackage(servicePackage);
-            order.setServicePackageCode(servicePackage.getCode());
-            order.setServicePrice(servicePackage.getPrice());
         }
     }
 

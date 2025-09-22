@@ -49,7 +49,7 @@ public class TransportOrder {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "client_id", nullable = false)
-    private IncompleteUser client;
+    private IndividualUser client;
 
     // === INFORMACJE O ODBIORZE - ROZBITY ADRES ===
 
@@ -385,7 +385,7 @@ public class TransportOrder {
 
     // === KONSTRUKTORY ===
 
-    public TransportOrder(IncompleteBike bicycle, IncompleteUser client,
+    public TransportOrder(IncompleteBike bicycle, IndividualUser client,
                           BikeService targetService, BigDecimal transportPrice) {
         this.bicycle = bicycle;
         this.client = client;
@@ -401,7 +401,7 @@ public class TransportOrder {
     /**
      * Konstruktor z rozbitym adresem odbioru
      */
-    public TransportOrder(IncompleteBike bicycle, IncompleteUser client,
+    public TransportOrder(IncompleteBike bicycle, IndividualUser client,
                           String pickupStreet, String pickupBuilding, String pickupApartment,
                           String pickupCity, String pickupPostalCode,
                           BikeService targetService, BigDecimal transportPrice) {

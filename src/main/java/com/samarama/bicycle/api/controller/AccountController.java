@@ -2,7 +2,9 @@ package com.samarama.bicycle.api.controller;
 
 import com.samarama.bicycle.api.dto.PasswordChangeDto;
 import com.samarama.bicycle.api.dto.UserProfileUpdateDto;
+import com.samarama.bicycle.api.model.IndividualUser;
 import com.samarama.bicycle.api.model.User;
+import com.samarama.bicycle.api.repository.IndividualUserRepository;
 import com.samarama.bicycle.api.repository.UserRepository;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.http.ResponseEntity;
@@ -19,45 +21,57 @@ import java.util.Optional;
 public class AccountController {
 
     private final UserRepository userRepository;
+    private final IndividualUserRepository individualUserRepository;
     private final PasswordEncoder passwordEncoder;
 
     // Use @Lazy on the PasswordEncoder to prevent circular dependencies
-    public AccountController(UserRepository userRepository,
+    public AccountController(UserRepository userRepository, IndividualUserRepository individualUserRepository,
                              @Lazy PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
+        this.individualUserRepository = individualUserRepository;
         this.passwordEncoder = passwordEncoder;
     }
 
     @GetMapping("/profile")
     public ResponseEntity<?> getUserProfile() {
         String email = getCurrentUserEmail();
-        Optional<User> userOpt = userRepository.findByEmail(email);
+        Optional<IndividualUser> indUserOpt = individualUserRepository.findByEmail(email);
 
-        if (userOpt.isEmpty()) {
-            return ResponseEntity.notFound().build();
+        if (indUserOpt.isEmpty()) {
+            Optional<User> userOpt = userRepository.findByEmail(email);
+            User user = userOpt.get();
+            return ResponseEntity.ok(Map.of(
+                    "id", user.getId(),
+                    "email", user.getEmail()
+            ));
+        } else {
+            IndividualUser user = indUserOpt.get();
+            String phoneNumber = user.getPhoneNumber() != null ? user.getPhoneNumber() : "";
+            return ResponseEntity.ok(Map.of(
+                    "id", user.getId(),
+                    "email", user.getEmail(),
+                    "firstName", user.getFirstName(),
+                    "lastName", user.getLastName(),
+                    "phoneNumber", phoneNumber
+            ));
         }
 
-        User user = userOpt.get();
-        String phoneNumber = user.getPhoneNumber() != null ? user.getPhoneNumber() : "" ;
-        return ResponseEntity.ok(Map.of(
-                "id", user.getId(),
-                "email", user.getEmail(),
-                "firstName", user.getFirstName(),
-                "lastName", user.getLastName(),
-                "phoneNumber", phoneNumber
-        ));
+
+
+
+
     }
 
     @PutMapping("/profile")
     public ResponseEntity<?> updateUserProfile(@RequestBody UserProfileUpdateDto updateDto) {
         String email = getCurrentUserEmail();
-        Optional<User> userOpt = userRepository.findByEmail(email);
+        Optional<IndividualUser> userOpt = individualUserRepository.findByEmail(email);
 
         if (userOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
 
-        User user = userOpt.get();
+        IndividualUser user = userOpt.get();
         user.setFirstName(updateDto.firstName());
         user.setLastName(updateDto.lastName());
         user.setPhoneNumber(updateDto.phoneNumber());

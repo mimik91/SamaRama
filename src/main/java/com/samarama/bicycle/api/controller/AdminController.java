@@ -22,7 +22,6 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.*;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -42,40 +41,33 @@ public class AdminController {
     private final TransportOrderService transportOrderService;
     private final ServiceOrderService serviceOrderService;
     private final BikeServiceService bikeServiceService;
-    private final ServicePackageService servicePackageService;
     private final ServiceSlotService serviceSlotService;
-    private final IncompleteUserRepository incompleteUserRepository;
+    private final IndividualUserRepository individualUserRepository;
 
     // Repositories for advanced queries
     private final UserRepository userRepository;
     private final TransportOrderRepository transportOrderRepository;
     private final ServiceOrderRepository serviceOrderRepository;
     private final IncompleteBikeRepository bikeRepository;
-    private final ServicePackageRepository servicePackageRepository;
 
     public AdminController(
             TransportOrderService transportOrderService,
             ServiceOrderService serviceOrderService,
             BikeServiceService bikeServiceService,
-            ServicePackageService servicePackageService,
-            ServiceSlotService serviceSlotService,
-            IncompleteUserRepository incompleteUserRepository,
+            ServiceSlotService serviceSlotService, IndividualUserRepository individualUserRepository,
             UserRepository userRepository,
             TransportOrderRepository transportOrderRepository,
             ServiceOrderRepository serviceOrderRepository,
-            IncompleteBikeRepository bikeRepository,
-            ServicePackageRepository servicePackageRepository) {
+            IncompleteBikeRepository bikeRepository) {
         this.transportOrderService = transportOrderService;
         this.serviceOrderService = serviceOrderService;
         this.bikeServiceService = bikeServiceService;
-        this.servicePackageService = servicePackageService;
         this.serviceSlotService = serviceSlotService;
-        this.incompleteUserRepository = incompleteUserRepository;
+        this.individualUserRepository = individualUserRepository;
         this.userRepository = userRepository;
         this.transportOrderRepository = transportOrderRepository;
         this.serviceOrderRepository = serviceOrderRepository;
         this.bikeRepository = bikeRepository;
-        this.servicePackageRepository = servicePackageRepository;
     }
 
     // =================== DASHBOARD & OVERVIEW ===================
@@ -262,97 +254,6 @@ public class AdminController {
         }
     }
 
-    /**
-     * Endpoint dla zamówień serwisowych
-     */
-    @GetMapping("/orders/service")
-    public ResponseEntity<Map<String, Object>> getServiceOrders(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size,
-            @RequestParam(defaultValue = "orderDate") String sortBy,
-            @RequestParam(defaultValue = "desc") String sortDir,
-            @RequestParam(required = false) String status,
-            @RequestParam(required = false) String searchTerm,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate pickupDateFrom,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate pickupDateTo) {
-
-        String adminEmail = getCurrentUserEmail();
-        logAdminAction("VIEW_SERVICE_ORDERS", buildFilterString(status, "SERVICE", searchTerm, pickupDateFrom, pickupDateTo), adminEmail);
-
-        try {
-            // Pobierz tylko zamówienia serwisowe
-            List<UnifiedOrderResponseDto> serviceOrders = serviceOrderService.getAllServiceOrdersAsUnified();
-
-            // Zastosuj filtry
-            List<UnifiedOrderResponseDto> filteredOrders = applyOrderFilters(
-                    serviceOrders, status, "SERVICE", searchTerm, pickupDateFrom, pickupDateTo);
-
-            // Paginacja
-            int start = page * size;
-            int end = Math.min(start + size, filteredOrders.size());
-            List<UnifiedOrderResponseDto> pageContent = start > filteredOrders.size()
-                    ? new ArrayList<>()
-                    : filteredOrders.subList(start, end);
-
-            Map<String, Object> response = new HashMap<>();
-            response.put("content", pageContent);
-            response.put("totalElements", filteredOrders.size());
-            response.put("totalPages", (int) Math.ceil((double) filteredOrders.size() / size));
-            response.put("currentPage", page);
-            response.put("pageSize", size);
-
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            logger.severe("Error loading service orders: " + e.getMessage());
-            return ResponseEntity.internalServerError().body(Map.of("message", "Błąd ładowania zamówień serwisowych"));
-        }
-    }
-
-    /**
-     * Endpoint dla zamówień transportowych
-     */
-    @GetMapping("/orders/transport")
-    public ResponseEntity<Map<String, Object>> getTransportOrders(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size,
-            @RequestParam(defaultValue = "orderDate") String sortBy,
-            @RequestParam(defaultValue = "desc") String sortDir,
-            @RequestParam(required = false) String status,
-            @RequestParam(required = false) String searchTerm,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate pickupDateFrom,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate pickupDateTo) {
-
-        String adminEmail = getCurrentUserEmail();
-        logAdminAction("VIEW_TRANSPORT_ORDERS", buildFilterString(status, "TRANSPORT", searchTerm, pickupDateFrom, pickupDateTo), adminEmail);
-
-        try {
-            // Pobierz tylko zamówienia transportowe
-            List<UnifiedOrderResponseDto> transportOrders = transportOrderService.getAllTransportOrdersAsUnified();
-
-            // Zastosuj filtry
-            List<UnifiedOrderResponseDto> filteredOrders = applyOrderFilters(
-                    transportOrders, status, "TRANSPORT", searchTerm, pickupDateFrom, pickupDateTo);
-
-            // Paginacja i odpowiedź
-            int start = page * size;
-            int end = Math.min(start + size, filteredOrders.size());
-            List<UnifiedOrderResponseDto> pageContent = start > filteredOrders.size()
-                    ? new ArrayList<>()
-                    : filteredOrders.subList(start, end);
-
-            Map<String, Object> response = new HashMap<>();
-            response.put("content", pageContent);
-            response.put("totalElements", filteredOrders.size());
-            response.put("totalPages", (int) Math.ceil((double) filteredOrders.size() / size));
-            response.put("currentPage", page);
-            response.put("pageSize", size);
-
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            logger.severe("Error loading transport orders: " + e.getMessage());
-            return ResponseEntity.internalServerError().body(Map.of("message", "Błąd ładowania zamówień transportowych"));
-        }
-    }
 
     /**
      * Endpoint dla szczegółów zamówienia
@@ -451,132 +352,8 @@ public class AdminController {
         }
     }
 
-    // =================== USER MANAGEMENT ===================
 
-    /**
-     * Zarządzanie użytkownikami z paginacją i filtrowaniem
-     */
-    @GetMapping("/users")
-    public ResponseEntity<Map<String, Object>> getAllUsers(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size,
-            @RequestParam(defaultValue = "createdAt") String sortBy,
-            @RequestParam(defaultValue = "desc") String sortDir,
-            @RequestParam(required = false) String searchTerm,
-            @RequestParam(required = false) String role,
-            @RequestParam(required = false) Boolean verified) {
 
-        String adminEmail = getCurrentUserEmail();
-        logAdminAction("VIEW_USERS", "search=" + searchTerm + ", role=" + role, adminEmail);
-
-        try {
-            // Walidacja parametrów
-            if (size > 100) size = 100;
-            if (size < 1) size = 20;
-            if (page < 0) page = 0;
-
-            String validatedSortBy = validateSortField(sortBy, Arrays.asList("createdAt", "email", "firstName", "lastName"));
-            Sort.Direction direction = "desc".equalsIgnoreCase(sortDir) ? Sort.Direction.DESC : Sort.Direction.ASC;
-
-            Pageable pageable = PageRequest.of(page, size, Sort.by(direction, validatedSortBy));
-
-            // Użyj repository z paginacją
-            Page<IncompleteUser> userPage = getUsersWithFilters(pageable, searchTerm, role, verified);
-
-            Map<String, Object> response = new HashMap<>();
-            response.put("content", userPage.getContent().stream()
-                    .map(this::mapUserToDto)
-                    .collect(Collectors.toList()));
-            response.put("totalElements", userPage.getTotalElements());
-            response.put("totalPages", userPage.getTotalPages());
-            response.put("currentPage", page);
-            response.put("pageSize", size);
-
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            logger.severe("Error loading users: " + e.getMessage());
-            return ResponseEntity.internalServerError().body(Map.of("message", "Błąd ładowania użytkowników"));
-        }
-    }
-
-    /**
-     * Bezpieczna zmiana ról użytkownika
-     */
-    @PatchMapping("/users/{userId}/roles")
-    @PreAuthorize("hasRole('ADMIN')") // Tylko ADMIN może zmieniać role
-    public ResponseEntity<?> updateUserRoles(
-            @PathVariable Long userId,
-            @Valid @RequestBody Map<String, Set<String>> request) {
-
-        String adminEmail = getCurrentUserEmail();
-        Set<String> newRoles = request.get("roles");
-
-        // Walidacja ról
-        if (newRoles == null || newRoles.isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Role są wymagane"));
-        }
-
-        if (!areValidRoles(newRoles)) {
-            return ResponseEntity.badRequest().body(Map.of(
-                    "message", "Nieprawidłowe role",
-                    "validRoles", getValidRoles()
-            ));
-        }
-
-        logAdminAction("UPDATE_USER_ROLES", "userId=" + userId + ", roles=" + newRoles, adminEmail);
-
-        try {
-            Optional<User> userOpt = userRepository.findById(userId);
-            if (userOpt.isEmpty()) {
-                return ResponseEntity.notFound().build();
-            }
-
-            User user = userOpt.get();
-
-            // Nie pozwól adminowi usunąć sobie uprawnień ADMIN
-            if (user.getEmail().equals(adminEmail) && !newRoles.contains("ROLE_ADMIN")) {
-                return ResponseEntity.badRequest().body(Map.of(
-                        "message", "Nie możesz usunąć sobie uprawnień administratora"
-                ));
-            }
-
-            user.setRoles(newRoles);
-            userRepository.save(user);
-
-            return ResponseEntity.ok(Map.of(
-                    "message", "Role zostały zaktualizowane",
-                    "user", mapUserToDto(user)
-            ));
-        } catch (Exception e) {
-            logger.severe("Error updating user roles: " + e.getMessage());
-            return ResponseEntity.internalServerError().body(Map.of("message", "Błąd aktualizacji ról"));
-        }
-    }
-
-    // =================== SERVICE PACKAGE MANAGEMENT ===================
-
-    /**
-     * Zarządzanie pakietami serwisowymi z walidacją
-     */
-    @PostMapping("/service-packages")
-    public ResponseEntity<?> createServicePackage(@Valid @RequestBody ServicePackageDto packageDto) {
-        String adminEmail = getCurrentUserEmail();
-        logAdminAction("CREATE_SERVICE_PACKAGE", "code=" + packageDto.code(), adminEmail);
-
-        try {
-            // Dodatkowa walidacja biznesowa
-            if (servicePackageRepository.existsByCode(packageDto.code())) {
-                return ResponseEntity.badRequest().body(Map.of(
-                        "message", "Pakiet o kodzie '" + packageDto.code() + "' już istnieje"
-                ));
-            }
-
-            return servicePackageService.createServicePackage(packageDto);
-        } catch (Exception e) {
-            logger.severe("Error creating service package: " + e.getMessage());
-            return ResponseEntity.internalServerError().body(Map.of("message", "Błąd tworzenia pakietu"));
-        }
-    }
 
     // =================== BIKE SERVICE MANAGEMENT ===================
 
@@ -665,6 +442,218 @@ public class AdminController {
         }
     }
 
+    @GetMapping("/orders/service")
+    public ResponseEntity<Map<String, Object>> getServiceOrders(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "orderDate") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDir,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String searchTerm,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate pickupDateFrom,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate pickupDateTo) {
+
+        String adminEmail = getCurrentUserEmail();
+        logAdminAction("VIEW_SERVICE_ORDERS", buildFilterString(status, "SERVICE", searchTerm, pickupDateFrom, pickupDateTo), adminEmail);
+
+        try {
+            // Pobierz tylko zamówienia serwisowe
+            List<UnifiedOrderResponseDto> serviceOrders = serviceOrderService.getAllServiceOrdersAsUnified();
+
+            // Zastosuj filtry
+            List<UnifiedOrderResponseDto> filteredOrders = applyOrderFilters(
+                    serviceOrders, status, "SERVICE", searchTerm, pickupDateFrom, pickupDateTo);
+
+            // Paginacja
+            int start = page * size;
+            int end = Math.min(start + size, filteredOrders.size());
+            List<UnifiedOrderResponseDto> pageContent = start > filteredOrders.size()
+                    ? new ArrayList<>()
+                    : filteredOrders.subList(start, end);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("content", pageContent);
+            response.put("totalElements", filteredOrders.size());
+            response.put("totalPages", (int) Math.ceil((double) filteredOrders.size() / size));
+            response.put("currentPage", page);
+            response.put("pageSize", size);
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            logger.severe("Error loading service orders: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(Map.of("message", "Błąd ładowania zamówień serwisowych"));
+        }
+    }
+
+    /**
+     * Endpoint dla zamówień transportowych
+     */
+    @GetMapping("/orders/transport")
+    public ResponseEntity<Map<String, Object>> getTransportOrders(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "orderDate") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDir,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String searchTerm,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate pickupDateFrom,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate pickupDateTo) {
+
+        String adminEmail = getCurrentUserEmail();
+        logAdminAction("VIEW_TRANSPORT_ORDERS", buildFilterString(status, "TRANSPORT", searchTerm, pickupDateFrom, pickupDateTo), adminEmail);
+
+        try {
+            // Pobierz tylko zamówienia transportowe
+            List<UnifiedOrderResponseDto> transportOrders = transportOrderService.getAllTransportOrdersAsUnified();
+
+            // Zastosuj filtry
+            List<UnifiedOrderResponseDto> filteredOrders = applyOrderFilters(
+                    transportOrders, status, "TRANSPORT", searchTerm, pickupDateFrom, pickupDateTo);
+
+            // Paginacja i odpowiedź
+            int start = page * size;
+            int end = Math.min(start + size, filteredOrders.size());
+            List<UnifiedOrderResponseDto> pageContent = start > filteredOrders.size()
+                    ? new ArrayList<>()
+                    : filteredOrders.subList(start, end);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("content", pageContent);
+            response.put("totalElements", filteredOrders.size());
+            response.put("totalPages", (int) Math.ceil((double) filteredOrders.size() / size));
+            response.put("currentPage", page);
+            response.put("pageSize", size);
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            logger.severe("Error loading transport orders: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(Map.of("message", "Błąd ładowania zamówień transportowych"));
+        }
+    }
+
+    @GetMapping("/users")
+    public ResponseEntity<Map<String, Object>> getAllUsers(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDir,
+            @RequestParam(required = false) String searchTerm,
+            @RequestParam(required = false) String role,
+            @RequestParam(required = false) Boolean verified) {
+
+        String adminEmail = getCurrentUserEmail();
+        logAdminAction("VIEW_USERS", "search=" + searchTerm + ", role=" + role, adminEmail);
+
+        try {
+            // Walidacja parametrów
+            if (size > 100) size = 100;
+            if (size < 1) size = 20;
+            if (page < 0) page = 0;
+
+            String validatedSortBy = validateSortField(sortBy, Arrays.asList("createdAt", "email", "firstName", "lastName"));
+            Sort.Direction direction = "desc".equalsIgnoreCase(sortDir) ? Sort.Direction.DESC : Sort.Direction.ASC;
+
+            Pageable pageable = PageRequest.of(page, size, Sort.by(direction, validatedSortBy));
+
+            // Użyj repository z paginacją
+            Page<IndividualUser> userPage = getUsersWithFilters(pageable, searchTerm, role, verified);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("content", userPage.getContent().stream()
+                    .map(this::mapUserToDto)
+                    .collect(Collectors.toList()));
+            response.put("totalElements", userPage.getTotalElements());
+            response.put("totalPages", userPage.getTotalPages());
+            response.put("currentPage", page);
+            response.put("pageSize", size);
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            logger.severe("Error loading users: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(Map.of("message", "Błąd ładowania użytkowników"));
+        }
+    }
+
+    /**
+     * Bezpieczna zmiana ról użytkownika
+     */
+    @PatchMapping("/users/{userId}/roles")
+    @PreAuthorize("hasRole('ADMIN')") // Tylko ADMIN może zmieniać role
+    public ResponseEntity<?> updateUserRoles(
+            @PathVariable Long userId,
+            @Valid @RequestBody Map<String, Set<String>> request) {
+
+        String adminEmail = getCurrentUserEmail();
+        Set<String> newRoles = request.get("roles");
+
+        // Walidacja ról
+        if (newRoles == null || newRoles.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Role są wymagane"));
+        }
+
+        if (!areValidRoles(newRoles)) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "message", "Nieprawidłowe role",
+                    "validRoles", getValidRoles()
+            ));
+        }
+
+        logAdminAction("UPDATE_USER_ROLES", "userId=" + userId + ", roles=" + newRoles, adminEmail);
+
+        try {
+            Optional<IndividualUser> userOpt = individualUserRepository.findById(userId);
+            if (userOpt.isEmpty()) {
+                return ResponseEntity.notFound().build();
+            }
+
+            IndividualUser user = userOpt.get();
+
+            // Nie pozwól adminowi usunąć sobie uprawnień ADMIN
+            if (user.getEmail().equals(adminEmail) && !newRoles.contains("ROLE_ADMIN")) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "message", "Nie możesz usunąć sobie uprawnień administratora"
+                ));
+            }
+
+            user.setRoles(newRoles);
+            userRepository.save(user);
+
+            return ResponseEntity.ok(Map.of(
+                    "message", "Role zostały zaktualizowane",
+                    "user", mapUserToDto(user)
+            ));
+        } catch (Exception e) {
+            logger.severe("Error updating user roles: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(Map.of("message", "Błąd aktualizacji ról"));
+        }
+    }
+
+    @PutMapping("/orders/transport/{orderId}")
+    public ResponseEntity<?> updateTransportOrder(
+            @PathVariable Long orderId,
+            @Valid @RequestBody ServiceOrTransportOrderDto dto) {
+
+        try {
+            return transportOrderService.updateTransportOrder(orderId, dto);
+
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Błąd walidacji", "message", e.getMessage()));
+
+        } catch (SecurityException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "Brak uprawnień", "message", e.getMessage()));
+
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.notFound().build();
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Błąd serwera", "message", "Nie udało się zaktualizować zamówienia"));
+        }
+    }
+
+
 
 
 
@@ -685,28 +674,6 @@ public class AdminController {
     private void logAdminAction(String action, String details, String adminEmail) {
         logger.info(String.format("ADMIN_ACTION: %s by %s - %s", action, adminEmail, details));
         // TODO: Zapisz do tabeli audit_log
-    }
-
-    private List<Object[]> getOrderTrends(LocalDate startDate, LocalDate endDate) {
-        return transportOrderRepository.countOrdersForDateRange(startDate, endDate);
-    }
-
-    private Map<String, Object> getRevenueStatistics(LocalDate startDate, LocalDate endDate) {
-        // TODO: Implementacja statystyk przychodów
-        return Map.of(
-                "totalRevenue", 0,
-                "transportRevenue", 0,
-                "serviceRevenue", 0
-        );
-    }
-
-    private Map<String, Object> getUserGrowthStatistics(LocalDate startDate, LocalDate endDate) {
-        // TODO: Implementacja statystyk wzrostu użytkowników
-        return Map.of("newUsers", 0);
-    }
-
-    private String validateSortField(String sortBy, List<String> allowedFields) {
-        return allowedFields.contains(sortBy) ? sortBy : allowedFields.get(0);
     }
 
     private List<UnifiedOrderResponseDto> applyOrderFilters(
@@ -748,43 +715,7 @@ public class AdminController {
         return true;
     }
 
-    private Page<IncompleteUser> getUsersWithFilters(Pageable pageable, String searchTerm, String role, Boolean verified) {
-        // TODO: Implementacja filtrowanego wyszukiwania użytkowników
-        return incompleteUserRepository.findAll(pageable);
-    }
 
-    private Map<String, Object> mapUserToDto(IncompleteUser user) {
-        if(user instanceof User fullUser) {
-            return Map.of(
-                    "id", user.getId(),
-                    "email", user.getEmail(),
-                    "firstName", fullUser.getFirstName() != null ? fullUser.getFirstName() : "",
-                    "lastName", fullUser.getLastName() != null ? fullUser.getLastName() : "",
-                    "verified", fullUser.isVerified(),
-                    "roles", user.getRoles(),
-                    "createdAt", user.getCreatedAt()
-            );
-        } else {
-            return Map.of(
-                    "id", user.getId(),
-                    "email", user.getEmail(),
-                    "firstName",  "",
-                    "lastName",  "",
-                    "verified", false,
-                    "roles", user.getRoles(),
-                    "createdAt", user.getCreatedAt()
-            );
-        }
-    }
-
-    private boolean areValidRoles(Set<String> roles) {
-        Set<String> validRoles = Set.of("ROLE_CLIENT", "ROLE_SERVICE", "ROLE_ADMIN", "ROLE_MODERATOR");
-        return validRoles.containsAll(roles);
-    }
-
-    private Set<String> getValidRoles() {
-        return Set.of("ROLE_CLIENT", "ROLE_SERVICE", "ROLE_ADMIN", "ROLE_MODERATOR");
-    }
 
     private boolean isValidCsvFile(MultipartFile file) {
         String filename = file.getOriginalFilename();
@@ -797,28 +728,33 @@ public class AdminController {
                 status, orderType, searchTerm, dateFrom, dateTo);
     }
 
-    @PutMapping("/orders/transport/{orderId}")
-    public ResponseEntity<?> updateTransportOrder(
-            @PathVariable Long orderId,
-            @Valid @RequestBody ServiceOrTransportOrderDto dto) {
+    private boolean areValidRoles(Set<String> roles) {
+        Set<String> validRoles = Set.of("ROLE_CLIENT", "ROLE_SERVICE", "ROLE_ADMIN", "ROLE_MODERATOR");
+        return validRoles.containsAll(roles);
+    }
 
-        try {
-            return transportOrderService.updateTransportOrder(orderId, dto);
+    private Set<String> getValidRoles() {
+        return Set.of("ROLE_CLIENT", "ROLE_SERVICE", "ROLE_ADMIN", "ROLE_MODERATOR");
+    }
 
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest()
-                    .body(Map.of("error", "Błąd walidacji", "message", e.getMessage()));
+    private String validateSortField(String sortBy, List<String> allowedFields) {
+        return allowedFields.contains(sortBy) ? sortBy : allowedFields.get(0);
+    }
 
-        } catch (SecurityException e) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(Map.of("error", "Brak uprawnień", "message", e.getMessage()));
+    private Page<IndividualUser> getUsersWithFilters(Pageable pageable, String searchTerm, String role, Boolean verified) {
+        // TODO: Implementacja filtrowanego wyszukiwania użytkowników
+        return individualUserRepository.findAll(pageable);
+    }
 
-        } catch (EntityNotFoundException e) {
-            return ResponseEntity.notFound().build();
-
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Błąd serwera", "message", "Nie udało się zaktualizować zamówienia"));
-        }
+    private Map<String, Object> mapUserToDto(IndividualUser user) {
+            return Map.of(
+                    "id", user.getId(),
+                    "email", user.getEmail(),
+                    "firstName", user.getFirstName() != null ? user.getFirstName() : "",
+                    "lastName", user.getLastName() != null ? user.getLastName() : "",
+                    "verified", user.isVerified(),
+                    "roles", user.getRoles(),
+                    "createdAt", user.getCreatedAt()
+            );
     }
 }

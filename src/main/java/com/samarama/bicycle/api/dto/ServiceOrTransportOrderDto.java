@@ -173,7 +173,6 @@ public class ServiceOrTransportOrderDto {
         return email != null && !email.trim().isEmpty() &&
                 phone != null && !phone.trim().isEmpty() &&
                 pickupDate != null &&
-                usesNewBicycles() &&
                 this.transportPrice != null &&
                 targetServiceId != null;
     }

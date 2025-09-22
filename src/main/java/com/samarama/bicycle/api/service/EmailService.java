@@ -2,10 +2,14 @@ package com.samarama.bicycle.api.service;
 
 import com.samarama.bicycle.api.dto.ServiceRegisterDto;
 import com.samarama.bicycle.api.dto.TransportOrderDto;
+import com.samarama.bicycle.api.model.IndividualUser;
 import com.samarama.bicycle.api.model.ServiceOrder;
+import com.samarama.bicycle.api.model.ServiceUser;
 import com.samarama.bicycle.api.model.User;
+import org.springframework.http.ResponseEntity;
 
 import java.util.List;
+import java.util.Map;
 
 public interface EmailService {
     /**

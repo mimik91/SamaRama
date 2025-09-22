@@ -67,11 +67,5 @@ public interface BikeServiceService {
      */
     ResponseEntity<?> importBikeServicesFromCsv(MultipartFile file, String adminEmail);
 
-    /**
-     * Pobierz statystyki serwisów
-     * @return mapa ze statystykami
-     */
-    ResponseEntity<?> getBikeServiceStatistics();
-
     void updateTransportPrices(String previous, String newPrice);
 }

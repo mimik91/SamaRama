@@ -9,9 +9,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
-import java.math.BigDecimal;
 import java.util.List;
-import java.util.Map;
 
 /**
  * Podstawowy kontroler dla zamówień - obsługuje transport i serwis
@@ -19,22 +17,16 @@ import java.util.Map;
 @CrossOrigin(origins = "*", maxAge = 3600)
 @RestController
 @RequestMapping("/api/orders")
-public class UnifiedOrderController {
+public class TransportOrderController {
 
     private final TransportOrderService transportOrderService;
-    private final ServiceOrderService serviceOrderService;
     private final BikeServiceService bikeServiceService;
-    private final ServicePackageService servicePackageService;
 
-    public UnifiedOrderController(
+    public TransportOrderController(
             TransportOrderService transportOrderService,
-            ServiceOrderService serviceOrderService,
-            BikeServiceService bikeServiceService,
-            ServicePackageService servicePackageService) {
+            BikeServiceService bikeServiceService) {
         this.transportOrderService = transportOrderService;
-        this.serviceOrderService = serviceOrderService;
         this.bikeServiceService = bikeServiceService;
-        this.servicePackageService = servicePackageService;
     }
 
     // =================== PUBLICZNE ===================
@@ -45,18 +37,6 @@ public class UnifiedOrderController {
     @GetMapping("/services")
     public ResponseEntity<List<BikeServicePinDto>> getServices() {
         return ResponseEntity.ok(bikeServiceService.getAllBikeServicePins());
-    }
-
-    /**
-     * Lista pakietów serwisowych
-     */
-    @GetMapping("/packages")
-    public ResponseEntity<List<ServicePackageDto>> getPackages() {
-        List<ServicePackageDto> packages = servicePackageService.getActiveServicePackages()
-                .stream()
-                .map(ServicePackageDto::fromEntity)
-                .toList();
-        return ResponseEntity.ok(packages);
     }
 
     // =================== DLA UŻYTKOWNIKÓW ===================
@@ -70,18 +50,6 @@ public class UnifiedOrderController {
         String userEmail = getCurrentUserEmail();
         List<ServiceOrderResponseDto> orders = transportOrderService.getAllUserOrders(userEmail);
         return ResponseEntity.ok(orders);
-    }
-
-
-
-    /**
-     * Nowe zamówienie serwisowe (transport + serwis)
-     */
-    @PostMapping("/service")
-    @PreAuthorize("hasRole('CLIENT')")
-    public ResponseEntity<?> createServiceOrder(@Valid @RequestBody ServiceOrTransportOrderDto dto) {
-        String userEmail = getCurrentUserEmail();
-        return serviceOrderService.createServiceOrder(dto, userEmail);
     }
 
     /**

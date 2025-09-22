@@ -22,12 +22,6 @@ import java.time.LocalDateTime;
 @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class ServiceOrder extends TransportOrder {
 
-    // === INFORMACJE O SERWISIE ===
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "service_package_id")
-    private ServicePackage servicePackage;
-
     @Column(name = "service_package_code")
     private String servicePackageCode;
 
@@ -65,21 +59,6 @@ public class ServiceOrder extends TransportOrder {
     }
 
     // === METODY BIZNESOWE SERWISU ===
-
-    /**
-     * Sprawdza czy zamówienie ma przypisany pakiet serwisowy
-     */
-    public boolean hasServicePackage() {
-        return servicePackage != null ||
-                (servicePackageCode != null && !servicePackageCode.trim().isEmpty());
-    }
-
-    /**
-     * Zwraca nazwę pakietu serwisowego
-     */
-    public String getServicePackageName() {
-        return servicePackage != null ? servicePackage.getName() : servicePackageCode;
-    }
 
     /**
      * Sprawdza czy serwis może zostać rozpoczęty
@@ -176,21 +155,15 @@ public class ServiceOrder extends TransportOrder {
 
     // === KONSTRUKTORY ===
 
-    public ServiceOrder(IncompleteBike bicycle, IncompleteUser client,
-                        ServicePackage servicePackage, BigDecimal transportPrice) {
+    public ServiceOrder(IncompleteBike bicycle, IndividualUser client,
+                          BigDecimal transportPrice) {
         // Wywołanie konstruktora bazowego - transport zawsze do serwisu własnego (ID=1)
         super(bicycle, client,
                 createOwnService(), // TODO: pobierz z repo lub ustaw stałą
                 transportPrice);
-
-        this.servicePackage = servicePackage;
-        this.servicePackageCode = servicePackage != null ? servicePackage.getCode() : null;
-        this.servicePrice = servicePackage != null ? servicePackage.getPrice() : BigDecimal.ZERO;
-
-
     }
 
-    public ServiceOrder(IncompleteBike bicycle, IncompleteUser client,
+    public ServiceOrder(IncompleteBike bicycle, IndividualUser client,
                         String servicePackageCode, BigDecimal servicePrice,
                         BigDecimal transportPrice) {
         super(bicycle, client,
@@ -207,46 +180,6 @@ public class ServiceOrder extends TransportOrder {
         ownService.setId(1L); // ID serwisu własnego
         ownService.setName("Serwis Własny");
         return ownService;
-    }
-
-    // === METODY WALIDACYJNE ===
-
-    /**
-     * Waliduje czy pakiet serwisowy jest zgodny z kodem
-     */
-    public boolean isServicePackageConsistent() {
-        if (servicePackage == null) {
-            return servicePackageCode == null || servicePackageCode.trim().isEmpty();
-        }
-        return servicePackageCode != null && servicePackageCode.equals(servicePackage.getCode());
-    }
-
-    /**
-     * Sprawdza czy ceny są spójne
-     */
-    public boolean arePricesConsistent() {
-        if (servicePackage != null && servicePrice != null) {
-            return servicePackage.getPrice().compareTo(servicePrice) == 0;
-        }
-        return true; // Brak pakietu lub ceny - nie można sprawdzić
-    }
-
-    // === LIFECYCLE HOOKS ===
-
-    @PrePersist
-    @Override
-    protected void onCreate() {
-        super.onCreate();
-
-        // Automatyczne ustawienie ceny serwisu z pakietu
-        if (servicePackage != null && servicePrice == null) {
-            servicePrice = servicePackage.getPrice();
-        }
-
-        // Automatyczne ustawienie kodu pakietu
-        if (servicePackage != null && servicePackageCode == null) {
-            servicePackageCode = servicePackage.getCode();
-        }
     }
 
     @PreUpdate

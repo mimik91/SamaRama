@@ -23,7 +23,7 @@ import java.util.stream.Collectors;
 @Service
 public class BicycleServiceImpl implements BicycleService {
     private final ServiceOrderRepository serviceOrderRepository;
-    private final IncompleteUserRepository incompleteUserRepository;
+    private final IndividualUserRepository individualUserRepository;
     private final BicycleRepository bicycleRepository;
     private final IncompleteBikeRepository incompleteBikeRepository;
     private final BicyclePhotoRepository bicyclePhotoRepository;
@@ -34,13 +34,13 @@ public class BicycleServiceImpl implements BicycleService {
 
 
     public BicycleServiceImpl(
-            ServiceOrderRepository serviceOrderRepository, IncompleteUserRepository incompleteUserRepository, BicycleRepository bicycleRepository,
+            ServiceOrderRepository serviceOrderRepository, IndividualUserRepository individualUserRepository, BicycleRepository bicycleRepository,
             IncompleteBikeRepository incompleteBikeRepository,
             BicyclePhotoRepository bicyclePhotoRepository,
             UserRepository userRepository, TransportOrderRepository transportOrderRepository
     ) {
         this.serviceOrderRepository = serviceOrderRepository;
-        this.incompleteUserRepository = incompleteUserRepository;
+        this.individualUserRepository = individualUserRepository;
         this.bicycleRepository = bicycleRepository;
         this.incompleteBikeRepository = incompleteBikeRepository;
         this.bicyclePhotoRepository = bicyclePhotoRepository;
@@ -107,11 +107,11 @@ public class BicycleServiceImpl implements BicycleService {
             String email = getCurrentUserEmail();
             Optional<User> userOpt = userRepository.findByEmail(email);
 
-            IncompleteUser owner;
+            IndividualUser owner;
             if (userOpt.isPresent()) {
-                owner = userOpt.get();
+                owner = (IndividualUser) userOpt.get();
             } else {
-                owner = incompleteUserRepository.findByEmail(email)
+                owner = individualUserRepository.findByEmail(email)
                         .orElseThrow(() -> new RuntimeException("User not found"));
             }
 
@@ -206,7 +206,7 @@ public class BicycleServiceImpl implements BicycleService {
                 String email = getCurrentUserEmail();
                 User user = userRepository.findByEmail(email)
                         .orElseThrow(() -> new RuntimeException("User not found"));
-                incompleteBike.setOwner(user);
+                incompleteBike.setOwner((IndividualUser) user);
 
                 // Save the incomplete bike
                 IncompleteBike savedBike = incompleteBikeRepository.save(incompleteBike);

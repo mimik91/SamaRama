@@ -4,7 +4,7 @@ import com.samarama.bicycle.api.dto.PasswordResetDto;
 import com.samarama.bicycle.api.dto.PasswordResetRequestDto;
 import com.samarama.bicycle.api.model.User;
 import com.samarama.bicycle.api.model.VerificationToken;
-import com.samarama.bicycle.api.repository.IncompleteUserRepository;
+import com.samarama.bicycle.api.repository.IndividualUserRepository;
 import com.samarama.bicycle.api.repository.UserRepository;
 import com.samarama.bicycle.api.repository.VerificationTokenRepository;
 import com.samarama.bicycle.api.service.EmailService;
@@ -31,7 +31,7 @@ public class PasswordResetServiceImpl implements PasswordResetService {
     private final VerificationTokenRepository tokenRepository;
     private final EmailService emailService;
     private final PasswordEncoder passwordEncoder;
-    private final IncompleteUserRepository incompleteUserRepository;
+    private final IndividualUserRepository individualUserRepository;
     private final VerificationService verificationService;
 
     @Autowired
@@ -39,12 +39,12 @@ public class PasswordResetServiceImpl implements PasswordResetService {
             UserRepository userRepository,
             VerificationTokenRepository tokenRepository,
             EmailService emailService,
-            PasswordEncoder passwordEncoder, IncompleteUserRepository incompleteUserRepository, VerificationService verificationService) {
+            PasswordEncoder passwordEncoder, IndividualUserRepository individualUserRepository, VerificationService verificationService) {
         this.userRepository = userRepository;
         this.tokenRepository = tokenRepository;
         this.emailService = emailService;
         this.passwordEncoder = passwordEncoder;
-        this.incompleteUserRepository = incompleteUserRepository;
+        this.individualUserRepository = individualUserRepository;
         this.verificationService = verificationService;
     }
 
@@ -58,7 +58,7 @@ public class PasswordResetServiceImpl implements PasswordResetService {
 
         if (userOpt.isEmpty()) {
             // Check if this email belongs to an IncompleteUser
-            boolean incompleteUserExists = incompleteUserRepository.existsByEmail(email);
+            boolean incompleteUserExists = individualUserRepository.existsByEmail(email);
 
             if (incompleteUserExists) {
                 // This is a guest who ordered without registration

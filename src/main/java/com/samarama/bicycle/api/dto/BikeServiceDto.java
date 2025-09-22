@@ -1,5 +1,6 @@
 package com.samarama.bicycle.api.dto;
 
+import com.samarama.bicycle.api.model.BikeServiceRegistered;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -54,12 +55,16 @@ public record BikeServiceDto(
         LocalDateTime createdAt,
         LocalDateTime updatedAt,
 
-        boolean transportAvailable
+        boolean transportAvailable,
+
+        boolean registered
 ) {
         /**
          * Tworzy DTO z encji BikeService
          */
         public static BikeServiceDto fromEntity(com.samarama.bicycle.api.model.BikeService entity) {
+                boolean registered = entity instanceof BikeServiceRegistered;
+
                 return new BikeServiceDto(
                         entity.getId(),
                         entity.getName(),
@@ -75,7 +80,8 @@ public record BikeServiceDto(
                         entity.getTransportCost(),
                         entity.getCreatedAt(),
                         entity.getUpdatedAt(),
-                        entity.isTransportAvailable()
+                        entity.isTransportAvailable(),
+                        registered
                 );
         }
 

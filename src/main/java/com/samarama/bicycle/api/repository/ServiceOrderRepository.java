@@ -10,7 +10,6 @@ import org.springframework.stereotype.Repository;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 
 @Repository
 public interface ServiceOrderRepository extends JpaRepository<ServiceOrder, Long>, JpaSpecificationExecutor<ServiceOrder> {
@@ -21,7 +20,7 @@ public interface ServiceOrderRepository extends JpaRepository<ServiceOrder, Long
      * Znajdź zamówienia serwisowe dla klienta
      */
     @Query("SELECT s FROM ServiceOrder s WHERE s.client = :client")
-    List<ServiceOrder> findByClient(@Param("client") IncompleteUser client);
+    List<ServiceOrder> findByClient(@Param("client") User client);
 
     /**
      * Znajdź zamówienia serwisowe dla roweru
@@ -29,10 +28,6 @@ public interface ServiceOrderRepository extends JpaRepository<ServiceOrder, Long
     @Query("SELECT s FROM ServiceOrder s WHERE s.bicycle = :bicycle")
     List<ServiceOrder> findByBicycle(@Param("bicycle") IncompleteBike bicycle);
 
-    /**
-     * Znajdź zamówienia serwisowe według pakietu
-     */
-    List<ServiceOrder> findByServicePackage(ServicePackage servicePackage);
 
     /**
      * Znajdź zamówienia serwisowe według kodu pakietu

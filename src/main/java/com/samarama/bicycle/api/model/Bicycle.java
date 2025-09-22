@@ -20,7 +20,7 @@ public class Bicycle extends IncompleteBike {
     private String frameNumber;
 
     public Bicycle(Long id, String brand, String model, String type, String frameMaterial,
-                   LocalDate productionDate, User owner, String frameNumber) {
+                   LocalDate productionDate, IndividualUser owner, String frameNumber) {
         super(id, brand, model, type, frameMaterial, null, owner, LocalDateTime.now(), productionDate);
         this.frameNumber = frameNumber;
     }

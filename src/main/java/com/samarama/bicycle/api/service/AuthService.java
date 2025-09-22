@@ -2,6 +2,7 @@ package com.samarama.bicycle.api.service;
 
 import com.samarama.bicycle.api.dto.BikeServiceDto;
 import com.samarama.bicycle.api.dto.LoginDto;
+import com.samarama.bicycle.api.dto.ServiceUserDto;
 import com.samarama.bicycle.api.dto.UserRegistrationDto;
 import org.springframework.http.ResponseEntity;
 
@@ -23,9 +24,9 @@ public interface AuthService {
     ResponseEntity<Map<String, String>> registerClient(UserRegistrationDto registrationDto);
 
     /**
-     * Register a new bike service
-     * @param bikeServiceDto bike service registration data
+     * Register a new serviceUser
+     * @param serviceUserDto bike service registration data
      * @return registration result
      */
-    ResponseEntity<Map<String, String>> registerService(BikeServiceDto bikeServiceDto);
+    ResponseEntity<Map<String, String>> registerServiceUser(ServiceUserDto serviceUserDto);
 }

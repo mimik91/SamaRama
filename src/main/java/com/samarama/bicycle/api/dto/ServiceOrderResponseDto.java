@@ -18,7 +18,6 @@ public record ServiceOrderResponseDto(
         LocalDate pickupDate,
         String pickupAddress,
         String targetServiceName,
-        String servicePackageName,
         BigDecimal totalPrice,
         String status,
         String statusDisplayName,
@@ -36,9 +35,6 @@ public record ServiceOrderResponseDto(
         String targetServiceName = entity.getTargetService() != null ?
                 entity.getTargetService().getName() : "Serwis Domyślny";
 
-        // Pobierz nazwę pakietu serwisowego
-        String servicePackageName = getServicePackageName(entity);
-
         // Pobierz cenę całkowitą
         BigDecimal totalPrice = getTotalPrice(entity);
 
@@ -52,7 +48,6 @@ public record ServiceOrderResponseDto(
                 entity.getPickupDate(),
                 entity.getFullPickupAddress(),
                 targetServiceName,
-                servicePackageName,
                 totalPrice,
                 entity.getStatus() != null ? entity.getStatus().toString() : null,
                 statusDisplayName,
@@ -86,7 +81,6 @@ public record ServiceOrderResponseDto(
                 entity.getPickupDate(),
                 entity.getFullPickupAddress(),
                 targetServiceName,
-                servicePackageName, // Dla transportu = "Transport"
                 totalPrice,
                 entity.getStatus() != null ? entity.getStatus().toString() : null,
                 statusDisplayName,
@@ -138,26 +132,6 @@ public record ServiceOrderResponseDto(
         }
 
         return description.toString();
-    }
-
-    /**
-     * Pobiera nazwę pakietu serwisowego
-     */
-    private static String getServicePackageName(ServiceOrder entity) {
-        // Sprawdź różne źródła nazwy pakietu
-        if (entity.getServicePackageName() != null) {
-            return entity.getServicePackageName();
-        }
-
-        if (entity.getServicePackage() != null && entity.getServicePackage().getName() != null) {
-            return entity.getServicePackage().getName();
-        }
-
-        if (entity.getServicePackageCode() != null) {
-            return entity.getServicePackageCode();
-        }
-
-        return "Nieznany pakiet";
     }
 
     /**
