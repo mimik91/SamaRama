@@ -202,15 +202,12 @@ CREATE TABLE transport_orders (
 -- Tabela zamówień serwisowych (dziedziczy po transport_orders)
 CREATE TABLE service_orders (
     id BIGINT NOT NULL,
-    service_package_id BIGINT,
-    service_package_code VARCHAR(20),
     service_price DECIMAL(10,2),
     service_notes VARCHAR(500),
     service_start_date TIMESTAMP,
     service_completion_date TIMESTAMP,
     PRIMARY KEY (id),
     FOREIGN KEY (id) REFERENCES transport_orders(id) ON DELETE CASCADE,
-    FOREIGN KEY (service_package_id) REFERENCES service_packages(id)
 );
 
 -- ==========================================

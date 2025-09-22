@@ -22,9 +22,6 @@ import java.time.LocalDateTime;
 @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class ServiceOrder extends TransportOrder {
 
-    @Column(name = "service_package_code")
-    private String servicePackageCode;
-
     @Column(name = "service_price")
     private BigDecimal servicePrice; // TYLKO koszt serwisu
 
@@ -170,7 +167,6 @@ public class ServiceOrder extends TransportOrder {
                 createOwnService(), // TODO: pobierz z repo lub ustaw stałą
                 transportPrice);
 
-        this.servicePackageCode = servicePackageCode;
         this.servicePrice = servicePrice != null ? servicePrice : BigDecimal.ZERO;
     }
 
