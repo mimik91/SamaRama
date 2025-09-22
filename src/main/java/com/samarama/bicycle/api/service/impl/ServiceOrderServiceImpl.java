@@ -527,10 +527,9 @@ public class ServiceOrderServiceImpl implements ServiceOrderService {
 
     private void logServiceOrderCreation(ServiceOrder order, String userEmail) {
         logger.info(String.format(
-                "Service order created: ID=%d, User=%s, Package=%s, Date=%s, TotalPrice=%s",
+                "Service order created: ID=%d, User=%s, Date=%s, TotalPrice=%s",
                 order.getId(),
                 userEmail,
-                order.getServicePackageCode(),
                 order.getPickupDate(),
                 order.getTotalPrice()
         ));

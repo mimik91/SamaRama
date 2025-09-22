@@ -207,7 +207,7 @@ CREATE TABLE service_orders (
     service_start_date TIMESTAMP,
     service_completion_date TIMESTAMP,
     PRIMARY KEY (id),
-    FOREIGN KEY (id) REFERENCES transport_orders(id) ON DELETE CASCADE,
+    FOREIGN KEY (id) REFERENCES transport_orders(id) ON DELETE CASCADE
 );
 
 -- ==========================================

@@ -160,8 +160,7 @@ public class ServiceOrder extends TransportOrder {
                 transportPrice);
     }
 
-    public ServiceOrder(IncompleteBike bicycle, IndividualUser client,
-                        String servicePackageCode, BigDecimal servicePrice,
+    public ServiceOrder(IncompleteBike bicycle, IndividualUser client, BigDecimal servicePrice,
                         BigDecimal transportPrice) {
         super(bicycle, client,
                 createOwnService(), // TODO: pobierz z repo lub ustaw stałą

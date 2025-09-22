@@ -235,7 +235,6 @@ public class EmailServiceImpl implements EmailService {
             // Informacje o pakiecie serwisowym
             content.append("<h3 style='color: #2c3e50; margin-top: 20px;'>Pakiet serwisowy</h3>");
             content.append("<div style='background-color: #f5f0ff; padding: 15px; border-radius: 5px; margin-bottom: 20px;'>");
-            content.append("<p><strong>Kod pakietu:</strong> ").append(serviceOrder.getServicePackageCode()).append("</p>");
             content.append("<p><strong>Cena:</strong> ").append(serviceOrder.getServicePrice()).append(" zł</p>");
             content.append("</div>");
 

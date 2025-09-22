@@ -28,12 +28,6 @@ public interface ServiceOrderRepository extends JpaRepository<ServiceOrder, Long
     @Query("SELECT s FROM ServiceOrder s WHERE s.bicycle = :bicycle")
     List<ServiceOrder> findByBicycle(@Param("bicycle") IncompleteBike bicycle);
 
-
-    /**
-     * Znajdź zamówienia serwisowe według kodu pakietu
-     */
-    List<ServiceOrder> findByServicePackageCode(String servicePackageCode);
-
     /**
      * Znajdź zamówienia serwisowe według statusu
      */
@@ -92,13 +86,6 @@ public interface ServiceOrderRepository extends JpaRepository<ServiceOrder, Long
     @Query("SELECT COUNT(s) FROM ServiceOrder s WHERE s.pickupDate = :date AND s.status != 'CANCELLED'")
     int countByPickupDate(@Param("date") LocalDate date);
 
-    /**
-     * Zlicz zamówienia serwisowe według pakietu
-     */
-    @Query("SELECT COUNT(s) FROM ServiceOrder s WHERE s.servicePackageCode = :packageCode AND s.status != 'CANCELLED'")
-    int countByServicePackageCode(@Param("packageCode") String packageCode);
-
-
 
     /**
      * Najbliższe zamówienia serwisowe do rozpoczęcia
@@ -150,41 +137,6 @@ public interface ServiceOrderRepository extends JpaRepository<ServiceOrder, Long
             "ORDER BY s.pickupDate")
     List<Object[]> countServiceOrdersForDateRange(@Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
 
-    // === ANALITYKA PAKIETÓW SERWISOWYCH ===
-
-    /**
-     * Statystyki pakietów serwisowych (najpopularniejsze)
-     */
-    @Query("SELECT s.servicePackageCode, COUNT(s) as orderCount " +
-            "FROM ServiceOrder s WHERE s.status != 'CANCELLED' " +
-            "GROUP BY s.servicePackageCode " +
-            "ORDER BY orderCount DESC")
-    List<Object[]> getServicePackageStatistics();
-
-    /**
-     * Przychody z pakietów serwisowych
-     */
-    @Query("SELECT s.servicePackageCode, SUM(s.servicePrice) as totalRevenue " +
-            "FROM ServiceOrder s WHERE s.status NOT IN ('CANCELLED', 'PENDING') " +
-            "GROUP BY s.servicePackageCode " +
-            "ORDER BY totalRevenue DESC")
-    List<Object[]> getServicePackageRevenue();
-
-    // === DODATKOWE PRZYDATNE ZAPYTANIA ===
-
-    /**
-     * Znajdź zamówienia z najdłuższym czasem serwisu
-     */
-    @Query("SELECT s FROM ServiceOrder s WHERE s.serviceStartDate IS NOT NULL AND s.serviceCompletionDate IS NOT NULL " +
-            "ORDER BY (s.serviceCompletionDate - s.serviceStartDate) DESC")
-    List<ServiceOrder> findOrdersWithLongestServiceTime();
-
-    /**
-     * Znajdź zamówienia bez rozpoczętego serwisu starsze niż X dni
-     */
-    @Query("SELECT s FROM ServiceOrder s WHERE s.status = 'PICKED_UP' AND s.serviceStartDate IS NULL " +
-            "AND s.pickupDate < :cutoffDate")
-    List<ServiceOrder> findOverdueServiceOrders(@Param("cutoffDate") LocalDate cutoffDate);
 
     /**
      * Statystyki dzienne - ile zamówień serwisowych na dzień
