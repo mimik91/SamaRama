@@ -9,6 +9,8 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.RequiredArgsConstructor;
 
+import java.time.LocalDateTime;
+
 @Data
 @Entity
 @Table(name = "bike_repair_coverage_category")
@@ -24,4 +26,7 @@ public class BikeRepairCoverageCategory {
 
     @Column(name = "display_order")
     private Integer displayOrder;
+
+    @Column(name = "created_at", nullable = false)
+    private LocalDateTime createdAt;
 }

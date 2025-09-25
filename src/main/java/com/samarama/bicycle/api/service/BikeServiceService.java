@@ -1,7 +1,9 @@
 package com.samarama.bicycle.api.service;
 
+import com.samarama.bicycle.api.dto.BikeRepairCoverageMapDto;
 import com.samarama.bicycle.api.dto.BikeServiceDto;
 import com.samarama.bicycle.api.dto.BikeServicePinDto;
+import com.samarama.bicycle.api.dto.BikeServiceRegisteredDto;
 import com.samarama.bicycle.api.model.BicycleEnumeration;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.multipart.MultipartFile;
@@ -68,4 +70,29 @@ public interface BikeServiceService {
     ResponseEntity<?> importBikeServicesFromCsv(MultipartFile file, String adminEmail);
 
     void updateTransportPrices(String previous, String newPrice);
+
+    /**
+     * Pobierz szczegóły swojego zarejestrowanego serwisu dla zalogowanego użytkownika
+     * @param userEmail email zalogowanego użytkownika serwisu
+     * @return pełne informacje o zarejestrowanym serwisie lub ResponseEntity z błędem
+     */
+    ResponseEntity<?> getMyBikeServiceRegisteredDetails(String userEmail);
+
+    /**
+     * Zarejestruj nowy serwis rowerowy dla zalogowanego użytkownika
+     * @param bikeServiceRegisteredDto dane nowego zarejestrowanego serwisu
+     * @return odpowiedź z wynikiem operacji
+     */
+    ResponseEntity<?> registerMyBikeService(BikeServiceRegisteredDto bikeServiceRegisteredDto);
+
+    /**
+     * Zaktualizuj swój zarejestrowany serwis rowerowy
+     * @param bikeServiceRegisteredDto zaktualizowane dane serwisu
+     * @param userEmail email zalogowanego użytkownika serwisu
+     * @return odpowiedź z wynikiem operacji
+     */
+    ResponseEntity<?> updateMyBikeServiceRegistered(BikeServiceRegisteredDto bikeServiceRegisteredDto, String userEmail);
+
+
+    boolean isSuffixTaken(String suffix);
 }

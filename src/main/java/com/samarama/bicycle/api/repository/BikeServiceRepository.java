@@ -15,6 +15,9 @@ public interface BikeServiceRepository extends JpaRepository<BikeService, Long> 
 
     Optional<BikeService> findServiceById(Long id);
 
+    Optional<BikeService> findServiceByNameIgnoreCase(String name);
+    Optional<BikeService> findServiceByEmailIgnoreCase(String email);
+
     /**
      * Znajdź serwisy które mają współrzędne geograficzne
      */
@@ -49,6 +52,11 @@ public interface BikeServiceRepository extends JpaRepository<BikeService, Long> 
      */
     @Query("SELECT CASE WHEN COUNT(s) > 0 THEN true ELSE false END FROM BikeService s WHERE LOWER(s.name) = LOWER(:name)")
     boolean existsByNameIgnoreCase(@Param("name") String name);
+
+    /**
+     * Sprawdź czy istnieje serwis z podanym emailem (case-insensitive)
+     */
+    boolean existsByEmailIgnoreCase(String email);
 
 
 }

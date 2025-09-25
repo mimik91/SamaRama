@@ -11,14 +11,15 @@ import java.util.stream.Collectors;
 /**
  * Rozszerzona encja serwisu rowerowego z godzinami otwarcia
  */
-@Data
+@Getter
+@Setter
 @EqualsAndHashCode(callSuper = true)
 @NoArgsConstructor
 @AllArgsConstructor
 @Entity
 @Table(name = "bike_services_registered")
 @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
-@ToString(exclude = {"pricelistCategories", "servicesPricelistItems"})
+@ToString(exclude = {"pricelistCategories", "servicesPricelistItems", "bikeRepairCoverages"})
 public class BikeServiceRegistered extends BikeService {
 
     @Size(max = 100)
@@ -38,6 +39,7 @@ public class BikeServiceRegistered extends BikeService {
             inverseJoinColumns = @JoinColumn(name = "pricelist_category_id")
     )
     @OrderBy("name ASC")
+    @EqualsAndHashCode.Exclude
     private Set<PricelistCategory> pricelistCategories = new HashSet<>();
 
     /**
@@ -82,6 +84,7 @@ public class BikeServiceRegistered extends BikeService {
             joinColumns = @JoinColumn(name = "bike_service_id"),
             inverseJoinColumns = @JoinColumn(name = "bike_service_coverage_id")
     )
+    @EqualsAndHashCode.Exclude
     private Set<BikeRepairCoverage> bikeRepairCoverages = new HashSet<>();
 
     // === METODY ZARZĄDZANIA KATEGORIAMI ===

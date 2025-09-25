@@ -1,14 +1,14 @@
 package com.samarama.bicycle.api.model;
 
 import jakarta.persistence.*;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.RequiredArgsConstructor;
+import lombok.*;
 
+import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
 
-@Data
+@Getter
+@Setter
 @Entity
 @Table(name = "bike_repair_coverage")
 @RequiredArgsConstructor
@@ -26,5 +26,10 @@ public class BikeRepairCoverage {
     private BikeRepairCoverageCategory category;
 
     @ManyToMany(mappedBy = "bikeRepairCoverages", fetch = FetchType.LAZY)
+    @EqualsAndHashCode.Exclude
+    @ToString.Exclude
     private Set<BikeServiceRegistered> bikeServices = new HashSet<>();
+
+    @Column(name = "created_at", nullable = false)
+    private LocalDateTime createdAt;
 }
