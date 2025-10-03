@@ -201,4 +201,12 @@ public class BikeService {
     public boolean isTransportAvailable() {
         return transportAvailable;
     }
+
+    public boolean getVerified() {
+        if(this instanceof BikeServiceRegistered){
+            return true;
+        } else {
+            return false;
+        }
+    }
 }

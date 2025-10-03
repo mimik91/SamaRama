@@ -1,6 +1,7 @@
 package com.samarama.bicycle.api.service.impl;
 
 import com.samarama.bicycle.api.dto.*;
+import com.samarama.bicycle.api.dto.mapDto.BikeServiceDto;
 import com.samarama.bicycle.api.model.*;
 import com.samarama.bicycle.api.repository.*;
 import com.samarama.bicycle.api.service.BikeServiceService;
@@ -33,34 +34,26 @@ public class BikeServiceServiceImpl implements BikeServiceService {
     private final BikeServiceRepository bikeServiceRepository;
     private final BikeServiceCsvImporter csvImporter;
     private final BikeServiceValidator validator;
+    private final BikeServiceCacheService cacheService;
+
 
     @Autowired
-    public BikeServiceServiceImpl( BikeServiceValidator bikeServiceValidator, BikeServiceRegisteredRepository bikeServiceRegisteredRepository, ServiceUserRepository serviceUserRepository, BikeServiceRepository bikeServiceRepository,
+    public BikeServiceServiceImpl(BikeServiceValidator bikeServiceValidator, BikeServiceRegisteredRepository bikeServiceRegisteredRepository, ServiceUserRepository serviceUserRepository, BikeServiceRepository bikeServiceRepository,
                                   BikeServiceCsvImporter csvImporter,
-                                  BikeServiceValidator validator) {
+                                  BikeServiceValidator validator, BikeServiceCacheService cacheService) {
         this.bikeServiceValidator = bikeServiceValidator;
         this.bikeServiceRegisteredRepository = bikeServiceRegisteredRepository;
         this.serviceUserRepository = serviceUserRepository;
         this.bikeServiceRepository = bikeServiceRepository;
         this.csvImporter = csvImporter;
         this.validator = validator;
+        this.cacheService = cacheService;
     }
 
     @PersistenceContext
     private EntityManager em;
 
-    // === PUBLICZNE METODY ===
 
-    @Override
-    @Transactional(readOnly = true)
-    public List<BikeServicePinDto> getAllBikeServicePins() {
-        logger.info("Pobieranie pinów wszystkich serwisów rowerowych");
-
-        return bikeServiceRepository.findServicesWithCoordinates().stream()
-                .map(BikeServicePinDto::fromEntity)
-                .filter(BikeServicePinDto::hasValidCoordinates)
-                .collect(Collectors.toList());
-    }
 
     @Override
     @Transactional(readOnly = true)
@@ -134,6 +127,7 @@ public class BikeServiceServiceImpl implements BikeServiceService {
             BikeService updatedService = bikeServiceRepository.save(existingService);
 
             logger.info("Zaktualizowano serwis rowerowy: " + updatedService.getName() + " (ID: " + id + ")");
+            cacheService.evictCache();
 
             return ResponseEntity.ok(Map.of(
                     "message", "Serwis rowerowy został zaktualizowany pomyślnie",
@@ -171,7 +165,9 @@ public class BikeServiceServiceImpl implements BikeServiceService {
     @Override
     @Transactional
     public ResponseEntity<?> importBikeServicesFromCsv(MultipartFile file, String adminEmail) {
-        return csvImporter.importBikeServicesFromCsv(file, adminEmail);
+        ResponseEntity<?> response = csvImporter.importBikeServicesFromCsv(file, adminEmail);
+        cacheService.evictCache();
+        return response;
     }
 
     @Override
@@ -318,6 +314,7 @@ public class BikeServiceServiceImpl implements BikeServiceService {
             logger.info("Pomyślnie zaktualizowano serwis: " + updatedService.getName() +
                     " (ID: " + updatedService.getId() + ") dla użytkownika: " + userEmail);
 
+            cacheService.evictCache();
             return ResponseEntity.ok(Map.of(
                     "message", "Dane serwisu zostały zaktualizowane pomyślnie",
                     "service", BikeServiceRegisteredDto.fromEntity(updatedService)

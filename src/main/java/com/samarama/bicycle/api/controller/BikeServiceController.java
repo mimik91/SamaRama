@@ -1,6 +1,7 @@
 package com.samarama.bicycle.api.controller;
 
 import com.samarama.bicycle.api.dto.*;
+import com.samarama.bicycle.api.dto.mapDto.BikeServiceDto;
 import com.samarama.bicycle.api.service.BikeRepairCoverageService;
 import com.samarama.bicycle.api.service.BikeServiceService;
 import jakarta.validation.Valid;
@@ -10,7 +11,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.Optional;
 
 @CrossOrigin(origins = "*", maxAge = 3600)
@@ -27,15 +27,6 @@ public class BikeServiceController {
         this.bikeRepairCoverageService = bikeRepairCoverageService;
     }
 
-    /**
-     * Pobierz piny wszystkich serwisów rowerowych (tylko ID i współrzędne geograficzne)
-     * Endpoint publiczny dla mapy serwisów
-     */
-    @GetMapping("/pins")
-    public ResponseEntity<List<BikeServicePinDto>> getAllBikeServicePins() {
-        List<BikeServicePinDto> pins = bikeServiceService.getAllBikeServicePins();
-        return ResponseEntity.ok(pins);
-    }
 
     /**
      * Pobierz szczegółowe informacje o serwisie rowerowym po ID
@@ -97,14 +88,6 @@ public class BikeServiceController {
     public ResponseEntity<?> getMyRepairCoverages(Authentication authentication) {
         return bikeRepairCoverageService.getMyRepairCoverages(authentication.getName());
     }
-
-//    @PutMapping("/repair-coverage/assign/{bikeServiceId}")
-//    public ResponseEntity<?> assignMyRepairCoverages(
-//            @PathVariable Long bikeServiceId,
-//            @RequestBody BikeRepairCoverageMapDto coverages) {
-//        return bikeRepairCoverageService.assignMyRepairCoverages(bikeServiceId, coverages);
-//    }
-
 
     @PutMapping("/repair-coverage/assign/{bikeServiceId}")
     public ResponseEntity<?> assignFlexibleRepairCoverages(

@@ -31,13 +31,6 @@ public class TransportOrderController {
 
     // =================== PUBLICZNE ===================
 
-    /**
-     * Lista serwisów na mapę
-     */
-    @GetMapping("/services")
-    public ResponseEntity<List<BikeServicePinDto>> getServices() {
-        return ResponseEntity.ok(bikeServiceService.getAllBikeServicePins());
-    }
 
     // =================== DLA UŻYTKOWNIKÓW ===================
 

@@ -59,4 +59,7 @@ public interface BikeServiceRepository extends JpaRepository<BikeService, Long> 
     boolean existsByEmailIgnoreCase(String email);
 
 
+    List<BikeService> findByCityIgnoreCase(String city);
+
+    List<BikeService> findByNameContainingIgnoreCaseOrCityContainingIgnoreCase(String trim, String trim1);
 }

@@ -1,10 +1,8 @@
 package com.samarama.bicycle.api.service;
 
-import com.samarama.bicycle.api.dto.BikeRepairCoverageMapDto;
-import com.samarama.bicycle.api.dto.BikeServiceDto;
+import com.samarama.bicycle.api.dto.mapDto.BikeServiceDto;
 import com.samarama.bicycle.api.dto.BikeServicePinDto;
 import com.samarama.bicycle.api.dto.BikeServiceRegisteredDto;
-import com.samarama.bicycle.api.model.BicycleEnumeration;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -18,11 +16,6 @@ public interface BikeServiceService {
 
     // === PUBLICZNE METODY ===
 
-    /**
-     * Pobierz piny wszystkich serwisów rowerowych (tylko ID i współrzędne)
-     * @return lista pinów serwisów które mają współrzędne geograficzne
-     */
-    List<BikeServicePinDto> getAllBikeServicePins();
 
     /**
      * Pobierz szczegóły serwisu rowerowego po ID

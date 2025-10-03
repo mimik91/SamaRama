@@ -1,4 +1,4 @@
-package com.samarama.bicycle.api.dto;
+package com.samarama.bicycle.api.dto.mapDto;
 
 import com.samarama.bicycle.api.model.BikeServiceRegistered;
 import jakarta.validation.constraints.Email;

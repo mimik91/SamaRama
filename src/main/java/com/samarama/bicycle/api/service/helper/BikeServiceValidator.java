@@ -1,6 +1,6 @@
 package com.samarama.bicycle.api.service.helper;
 
-import com.samarama.bicycle.api.dto.BikeServiceDto;
+import com.samarama.bicycle.api.dto.mapDto.BikeServiceDto;
 import com.samarama.bicycle.api.dto.BikeServiceRegisteredDto;
 import com.samarama.bicycle.api.model.BikeService;
 import com.samarama.bicycle.api.model.BikeServiceRegistered;

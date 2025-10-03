@@ -1,6 +1,5 @@
 package com.samarama.bicycle.api.service;
 
-import com.samarama.bicycle.api.dto.BikeServiceDto;
 import com.samarama.bicycle.api.dto.LoginDto;
 import com.samarama.bicycle.api.dto.ServiceUserDto;
 import com.samarama.bicycle.api.dto.UserRegistrationDto;

@@ -1,6 +1,7 @@
 package com.samarama.bicycle.api.controller;
 
 import com.samarama.bicycle.api.dto.*;
+import com.samarama.bicycle.api.dto.mapDto.BikeServiceDto;
 import com.samarama.bicycle.api.model.*;
 import com.samarama.bicycle.api.service.*;
 import com.samarama.bicycle.api.repository.*;

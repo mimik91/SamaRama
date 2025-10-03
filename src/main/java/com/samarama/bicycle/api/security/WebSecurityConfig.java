@@ -59,6 +59,7 @@ public class WebSecurityConfig {
                                 "/api/service-slots/check-availability",
                                 "/api/account/public/**",
                                 "/bicycles/bike",
+                                "/api/map/**",
                                 "/api/bicycles/**",
                                 "/api/bike-services/**"
                         ).permitAll()
